@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:personal_hub/core/errors/app_exceptions.dart';
+import 'package:personal_hub/core/theme/glass_widgets.dart';
 import 'package:personal_hub/features/ai/models/ai_models.dart';
 import 'package:personal_hub/features/ai/providers/ai_providers.dart';
 import 'package:personal_hub/features/notes/models/note.dart';
@@ -154,8 +155,8 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
     final theme = Theme.of(context);
     final parsedTags = _parseTags(_tagsController.text);
 
-    return Scaffold(
-      appBar: AppBar(
+    return GlassScaffold(
+      appBar: GlassAppBar(
         title: Text(_isEditing ? 'Edit Catatan' : 'Catatan Baru'),
         actions: [
           IconButton(

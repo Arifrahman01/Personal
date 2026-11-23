@@ -1,8 +1,12 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path/path.dart' as p;
-import 'package:sqflite/sqflite.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:sqflite_common_ffi/sqflite_ffi.dart';
+import 'package:sqflite_common_ffi_web/sqflite_ffi_web.dart';
 
-/// Local SQLite database manager for Personal Hub.
+/// Local SQLite database manager for Personal Hub across Android, iOS, macOS,
+/// Windows, Linux, and Chrome/Web.
 class AppDatabase {
   AppDatabase._(this._db);
 
@@ -19,11 +23,61 @@ class AppDatabase {
     String? pathOverride,
     DatabaseFactory? factoryOverride,
   }) async {
-    final factory = factoryOverride ?? databaseFactory;
+    if (factoryOverride != null) {
+      final dbPath =
+          pathOverride ??
+          (kIsWeb
+              ? _databaseFileName
+              : p.join(
+                  await factoryOverride.getDatabasesPath(),
+                  _databaseFileName,
+                ));
+      return _openWithFactory(factoryOverride, dbPath);
+    }
+
+    if (kIsWeb) {
+      final dbPath = pathOverride ?? _databaseFileName;
+      return _openOnWeb(dbPath);
+    }
+
+    if (defaultTargetPlatform == TargetPlatform.windows ||
+        defaultTargetPlatform == TargetPlatform.linux) {
+      sqfliteFfiInit();
+      final factory = databaseFactoryFfi;
+      final dbPath = pathOverride ?? await _resolveDesktopDbPath(factory);
+      return _openWithFactory(factory, dbPath);
+    }
+
+    final factory = databaseFactory;
     final dbPath =
         pathOverride ??
         p.join(await factory.getDatabasesPath(), _databaseFileName);
+    return _openWithFactory(factory, dbPath);
+  }
 
+  static Future<AppDatabase> _openOnWeb(String dbPath) async {
+    try {
+      databaseFactory = databaseFactoryFfiWeb;
+      return await _openWithFactory(databaseFactoryFfiWeb, dbPath);
+    } catch (_) {
+      databaseFactory = databaseFactoryFfiWebNoWebWorker;
+      return _openWithFactory(databaseFactoryFfiWebNoWebWorker, dbPath);
+    }
+  }
+
+  static Future<String> _resolveDesktopDbPath(DatabaseFactory factory) async {
+    try {
+      final supportDir = await getApplicationSupportDirectory();
+      return p.join(supportDir.path, _databaseFileName);
+    } catch (_) {
+      return p.join(await factory.getDatabasesPath(), _databaseFileName);
+    }
+  }
+
+  static Future<AppDatabase> _openWithFactory(
+    DatabaseFactory factory,
+    String dbPath,
+  ) async {
     final database = await factory.openDatabase(
       dbPath,
       options: OpenDatabaseOptions(
@@ -33,7 +87,6 @@ class AppDatabase {
         },
       ),
     );
-
     return AppDatabase._(database);
   }
 

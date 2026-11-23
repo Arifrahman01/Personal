@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:personal_hub/core/constants/ai_constants.dart';
+import 'package:personal_hub/core/theme/glass_widgets.dart';
 import 'package:personal_hub/features/ai/models/ai_models.dart';
 import 'package:personal_hub/features/ai/providers/ai_providers.dart';
 
@@ -87,8 +88,8 @@ class _AiChatScreenState extends ConsumerState<AiChatScreen> {
       }
     });
 
-    return Scaffold(
-      appBar: AppBar(
+    return GlassScaffold(
+      appBar: GlassAppBar(
         title: const Text('Asisten AI'),
         actions: [
           IconButton(
@@ -120,6 +121,7 @@ class _AiChatScreenState extends ConsumerState<AiChatScreen> {
         ],
       ),
       body: SafeArea(
+        top: false,
         child: chatAsync.when(
           loading: () => const Center(child: CircularProgressIndicator()),
           error: (error, _) => Center(
@@ -388,10 +390,13 @@ class _AiChatScreenState extends ConsumerState<AiChatScreen> {
   }
 
   Widget _buildInputBar(ThemeData theme, bool isSending) {
+    final isDark = theme.brightness == Brightness.dark;
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 8, 12, 12),
       decoration: BoxDecoration(
-        color: theme.colorScheme.surface,
+        color: isDark
+            ? const Color(0xFF0E1D1F).withValues(alpha: 0.72)
+            : Colors.white.withValues(alpha: 0.72),
         border: Border(
           top: BorderSide(
             color: theme.colorScheme.outlineVariant.withValues(alpha: 0.4),

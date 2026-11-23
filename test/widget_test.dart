@@ -1,124 +1,109 @@
-import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:personal_hub/app.dart';
-import 'package:personal_hub/features/ai/data/chat_repository.dart';
-import 'package:personal_hub/features/ai/models/ai_models.dart';
-import 'package:personal_hub/features/ai/providers/ai_providers.dart';
-import 'package:personal_hub/features/notes/data/notes_repository.dart';
-import 'package:personal_hub/features/notes/models/note.dart';
-import 'package:personal_hub/features/notes/providers/notes_providers.dart';
-import 'package:uuid/uuid.dart';
+import 'package:personal_hub/core/config/secure_config_store.dart';
+import 'package:personal_hub/core/database/app_database.dart';
+import 'package:personal_hub/core/theme/glass_widgets.dart';
+import 'package:personal_hub/features/vault/providers/vault_lock_controller.dart';
+import 'package:personal_hub/features/vault/providers/vault_providers.dart';
+import 'package:personal_hub/features/vault/services/clipboard_guard.dart';
+import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
-class _InMemoryNotesRepository implements NotesRepository {
-  final List<Note> _notes = [];
-  static const Uuid _uuid = Uuid();
+class _InMemorySecureStorage implements KeyValueSecureStorage {
+  final Map<String, String> _data = {};
 
   @override
-  Future<Note> createNote({
-    required String title,
-    required String content,
-    List<String> tags = const [],
-  }) async {
-    final now = DateTime.now().toUtc();
-    final note = Note(
-      id: _uuid.v4(),
-      title: title.trim(),
-      content: content,
-      tags: tags,
-      isPinned: false,
-      createdAt: now,
-      updatedAt: now,
-    );
-    _notes.insert(0, note);
-    return note;
+  Future<String?> read(String key) async => _data[key];
+
+  @override
+  Future<void> write(String key, String value) async {
+    _data[key] = value;
   }
 
   @override
-  Future<void> deleteNote(String id) async {
-    _notes.removeWhere((n) => n.id == id);
-  }
-
-  @override
-  Future<List<Note>> getNotes({String? query, String? tag}) async {
-    return List<Note>.unmodifiable(_notes);
-  }
-
-  @override
-  Future<Note> togglePin(String id) async {
-    final index = _notes.indexWhere((n) => n.id == id);
-    final updated = _notes[index].copyWith(isPinned: !_notes[index].isPinned);
-    _notes[index] = updated;
-    return updated;
-  }
-
-  @override
-  Future<Note> updateNote(Note note) async {
-    final index = _notes.indexWhere((n) => n.id == note.id);
-    final updated = note.copyWith(updatedAt: DateTime.now().toUtc());
-    _notes[index] = updated;
-    return updated;
+  Future<void> delete(String key) async {
+    _data.remove(key);
   }
 }
 
-class _InMemoryChatRepository implements ChatRepository {
-  final List<ChatThreadMessage> _messages = [];
+class _FakeBiometricAdapter implements BiometricAuthAdapter {
+  @override
+  Future<bool> canAuthenticate() async => false;
 
   @override
-  Future<void> clearHistory() async {
-    _messages.clear();
-  }
+  Future<bool> authenticate(String reason) async => false;
+}
+
+class _FakeClipboardAdapter implements ClipboardAdapter {
+  @override
+  Future<String?> getText() async => '';
 
   @override
-  Future<List<ChatThreadMessage>> getMessages() async {
-    return List<ChatThreadMessage>.unmodifiable(_messages);
-  }
-
-  @override
-  Future<void> saveMessage(ChatThreadMessage message) async {
-    _messages.add(message);
-  }
+  Future<void> setText(String text) async {}
 }
 
 void main() {
-  testWidgets('PersonalHubApp renders 5-tab Indonesian NavigationBar', (
-    WidgetTester tester,
-  ) async {
-    await tester.pumpWidget(
-      ProviderScope(
-        overrides: [
-          chatRepositoryProvider.overrideWithValue(_InMemoryChatRepository()),
-          notesRepositoryProvider.overrideWithValue(_InMemoryNotesRepository()),
-        ],
-        child: const PersonalHubApp(),
-      ),
-    );
-    await tester.pumpAndSettle();
-
-    final navBar = find.byType(NavigationBar);
-    expect(navBar, findsOneWidget);
-
-    for (final label in ['Beranda', 'Catatan', 'Meeting', 'Vault', 'AI']) {
-      expect(
-        find.descendant(of: navBar, matching: find.text(label)),
-        findsOneWidget,
-      );
-    }
-
-    await tester.tap(find.descendant(of: navBar, matching: find.text('Catatan')));
-    await tester.pumpAndSettle();
-
-    expect(find.text('Belum ada catatan'), findsOneWidget);
-
-    await tester.tap(find.descendant(of: navBar, matching: find.text('Vault')));
-    await tester.pumpAndSettle();
-
-    expect(find.text('Modul Vault siap digunakan.'), findsOneWidget);
-
-    await tester.tap(find.descendant(of: navBar, matching: find.text('AI')));
-    await tester.pumpAndSettle();
-
-    expect(find.text('Asisten AI'), findsOneWidget);
-    expect(find.text('Asisten AI Samudra'), findsOneWidget);
+  setUpAll(() {
+    GoogleFonts.config.allowRuntimeFetching = false;
+    sqfliteFfiInit();
   });
+
+  testWidgets(
+    'PersonalHubApp renders 5-tab Indonesian GlassBottomNavBar and navigates tabs',
+    (WidgetTester tester) async {
+      final appDb = await AppDatabase.open(
+        pathOverride: inMemoryDatabasePath,
+        factoryOverride: databaseFactoryFfiNoIsolate,
+      );
+      addTearDown(() async => appDb.close());
+
+      final clipboardGuard = ClipboardGuard(_FakeClipboardAdapter());
+      addTearDown(clipboardGuard.dispose);
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            appDatabaseProvider.overrideWithValue(appDb),
+            secureConfigStoreProvider.overrideWithValue(
+              SecureConfigStore(_InMemorySecureStorage()),
+            ),
+            biometricAuthAdapterProvider.overrideWithValue(
+              _FakeBiometricAdapter(),
+            ),
+            clipboardGuardProvider.overrideWithValue(clipboardGuard),
+          ],
+          child: const PersonalHubApp(),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final navBar = find.byType(GlassBottomNavBar);
+      expect(navBar, findsOneWidget);
+
+      for (final label in ['Beranda', 'Catatan', 'Meeting', 'Vault', 'AI']) {
+        expect(
+          find.descendant(of: navBar, matching: find.text(label)),
+          findsOneWidget,
+        );
+      }
+
+      await tester.tap(
+        find.descendant(of: navBar, matching: find.text('Catatan')),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('Belum ada catatan'), findsOneWidget);
+
+      await tester.tap(
+        find.descendant(of: navBar, matching: find.text('Vault')),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('Buat PIN Brankas'), findsOneWidget);
+
+      await tester.tap(find.descendant(of: navBar, matching: find.text('AI')));
+      await tester.pumpAndSettle();
+      expect(find.text('Asisten AI'), findsOneWidget);
+      expect(find.text('Asisten AI Samudra'), findsOneWidget);
+    },
+  );
 }

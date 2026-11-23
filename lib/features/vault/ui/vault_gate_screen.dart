@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:personal_hub/core/errors/app_exceptions.dart';
+import 'package:personal_hub/core/theme/glass_widgets.dart';
 import 'package:personal_hub/features/vault/providers/vault_providers.dart';
 import 'package:personal_hub/features/vault/ui/vault_list_screen.dart';
 
@@ -190,23 +191,23 @@ class _VaultGateScreenState extends ConsumerState<VaultGateScreen> {
     final theme = Theme.of(context);
 
     if (_isLoading) {
-      return const Scaffold(
+      return const GlassScaffold(
         body: Center(child: CircularProgressIndicator()),
       );
     }
 
-    return Scaffold(
-      appBar: AppBar(title: const Text('Brankas Kata Sandi')),
+    return GlassScaffold(
+      appBar: const GlassAppBar(title: Text('Brankas Kata Sandi')),
       body: SafeArea(
+        top: false,
         child: Center(
           child: SingleChildScrollView(
             padding: const EdgeInsets.all(24),
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 420),
-              child: Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(24),
-                  child: Column(
+              child: GlassCard(
+                padding: const EdgeInsets.all(24),
+                child: Column(
                     mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
@@ -338,7 +339,6 @@ class _VaultGateScreenState extends ConsumerState<VaultGateScreen> {
             ),
           ),
         ),
-      ),
     );
   }
 }

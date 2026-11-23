@@ -1,168 +1,138 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:personal_hub/core/theme/app_theme.dart';
+import 'package:personal_hub/core/theme/glass_widgets.dart';
 import 'package:personal_hub/features/ai/ui/ai_chat_screen.dart';
+import 'package:personal_hub/features/home/ui/home_screen.dart';
+import 'package:personal_hub/features/meetings/models/meeting.dart';
+import 'package:personal_hub/features/meetings/ui/meetings_screen.dart';
 import 'package:personal_hub/features/notes/ui/notes_screen.dart';
+import 'package:personal_hub/features/tasks/providers/tasks_providers.dart';
+import 'package:personal_hub/features/vault/providers/vault_providers.dart';
+import 'package:personal_hub/features/vault/ui/vault_gate_screen.dart';
 
 /// Root Material 3 application widget for Personal Hub.
-class PersonalHubApp extends StatelessWidget {
+class PersonalHubApp extends ConsumerWidget {
   const PersonalHubApp({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final themeMode = ref.watch(themeModeProvider);
+
     return MaterialApp(
       title: 'Personal Hub',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light,
       darkTheme: AppTheme.dark,
-      themeMode: ThemeMode.system,
+      themeMode: themeMode,
       home: const MainNavigationShell(),
     );
   }
 }
 
-/// Primary 5-tab navigation shell in Bahasa Indonesia.
-class MainNavigationShell extends StatefulWidget {
+/// Primary 5-tab Glassmorphism navigation shell with Vault background auto-lock.
+class MainNavigationShell extends ConsumerStatefulWidget {
   const MainNavigationShell({super.key});
 
   @override
-  State<MainNavigationShell> createState() => _MainNavigationShellState();
+  ConsumerState<MainNavigationShell> createState() =>
+      _MainNavigationShellState();
 }
 
-class _MainNavigationShellState extends State<MainNavigationShell> {
+class _MainNavigationShellState extends ConsumerState<MainNavigationShell>
+    with WidgetsBindingObserver {
   int _selectedIndex = 0;
 
-  static const List<_TabConfig> _tabs = [
-    _TabConfig(
+  static const List<GlassNavDestination> _destinations = [
+    GlassNavDestination(
       label: 'Beranda',
-      icon: Icons.home_outlined,
-      selectedIcon: Icons.home_rounded,
-      subtitle: 'Ringkasan harian, jadwal sholat, dan pencarian global',
+      icon: LucideIcons.house,
+      selectedIcon: LucideIcons.house,
     ),
-    _TabConfig(
+    GlassNavDestination(
       label: 'Catatan',
-      icon: Icons.note_alt_outlined,
-      selectedIcon: Icons.note_alt_rounded,
-      subtitle: 'Catatan pribadi, tugas, dan ide cepat',
+      icon: LucideIcons.notebookPen,
+      selectedIcon: LucideIcons.notebookPen,
     ),
-    _TabConfig(
+    GlassNavDestination(
       label: 'Meeting',
-      icon: Icons.event_note_outlined,
-      selectedIcon: Icons.event_note_rounded,
-      subtitle: 'Notulensi rapat dan tindak lanjut otomatis',
+      icon: LucideIcons.calendarClock,
+      selectedIcon: LucideIcons.calendarClock,
     ),
-    _TabConfig(
+    GlassNavDestination(
       label: 'Vault',
-      icon: Icons.lock_outline,
-      selectedIcon: Icons.lock_rounded,
-      subtitle: 'Brankas kata sandi terenkripsi lokal',
+      icon: LucideIcons.shieldCheck,
+      selectedIcon: LucideIcons.shieldCheck,
     ),
-    _TabConfig(
+    GlassNavDestination(
       label: 'AI',
-      icon: Icons.auto_awesome_outlined,
-      selectedIcon: Icons.auto_awesome_rounded,
-      subtitle: 'Asisten AI pribadi dengan kontrol konteks lokal',
+      icon: LucideIcons.sparkles,
+      selectedIcon: LucideIcons.sparkles,
     ),
   ];
 
   @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      body: IndexedStack(
-        index: _selectedIndex,
-        children: [
-          for (var i = 0; i < _tabs.length; i++)
-            switch (i) {
-              1 => const NotesScreen(),
-              4 => const AiChatScreen(),
-              _ => _TabPlaceholderPage(tab: _tabs[i]),
-            },
-        ],
-      ),
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: _selectedIndex,
-        onDestinationSelected: (index) {
-          setState(() {
-            _selectedIndex = index;
-          });
-        },
-        destinations: [
-          for (final tab in _tabs)
-            NavigationDestination(
-              icon: Icon(tab.icon),
-              selectedIcon: Icon(tab.selectedIcon),
-              label: tab.label,
-            ),
-        ],
-      ),
-    );
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
   }
-}
 
-class _TabConfig {
-  const _TabConfig({
-    required this.label,
-    required this.icon,
-    required this.selectedIcon,
-    required this.subtitle,
-  });
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
 
-  final String label;
-  final IconData icon;
-  final IconData selectedIcon;
-  final String subtitle;
-}
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    ref.read(vaultLockControllerProvider).handleAppLifecycle(state);
+  }
 
-class _TabPlaceholderPage extends StatelessWidget {
-  const _TabPlaceholderPage({required this.tab});
+  void _selectTab(int index) {
+    setState(() {
+      _selectedIndex = index;
+    });
+  }
 
-  final _TabConfig tab;
+  Future<void> _promoteActionItem(
+    Meeting meeting,
+    MeetingActionItem item,
+  ) async {
+    await ref
+        .read(tasksProvider.notifier)
+        .createTask(title: item.text, sourceMeetingId: meeting.id);
+    if (!mounted) return;
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          content: Text('Action item "${item.text}" ditambahkan ke Tugas.'),
+        ),
+      );
+  }
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return SafeArea(
-      child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              tab.label,
-              style: theme.textTheme.headlineMedium?.copyWith(
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              tab.subtitle,
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
-              ),
-            ),
-            const SizedBox(height: 24),
-            Card(
-              child: Padding(
-                padding: const EdgeInsets.all(20),
-                child: Row(
-                  children: [
-                    CircleAvatar(
-                      backgroundColor: theme.colorScheme.primaryContainer,
-                      foregroundColor: theme.colorScheme.onPrimaryContainer,
-                      child: Icon(tab.selectedIcon),
-                    ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: Text(
-                        'Modul ${tab.label} siap digunakan.',
-                        style: theme.textTheme.titleMedium,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ],
-        ),
+    return GlassScaffold(
+      extendBody: true,
+      body: IndexedStack(
+        index: _selectedIndex,
+        children: [
+          HomeScreen(
+            onSwitchTab: _selectTab,
+            onPromoteActionItem: _promoteActionItem,
+          ),
+          const NotesScreen(),
+          MeetingsScreen(onPromoteActionItem: _promoteActionItem),
+          const VaultTabView(),
+          const AiChatScreen(),
+        ],
+      ),
+      bottomNavigationBar: GlassBottomNavBar(
+        selectedIndex: _selectedIndex,
+        onDestinationSelected: _selectTab,
+        destinations: _destinations,
       ),
     );
   }

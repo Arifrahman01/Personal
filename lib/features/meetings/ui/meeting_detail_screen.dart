@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:personal_hub/core/errors/app_exceptions.dart';
+import 'package:personal_hub/core/theme/glass_widgets.dart';
 import 'package:personal_hub/features/meetings/models/meeting.dart';
 import 'package:personal_hub/features/meetings/providers/meetings_providers.dart';
 import 'package:personal_hub/features/meetings/services/meeting_voice_recorder.dart';
 import 'package:personal_hub/features/meetings/ui/meeting_form_screen.dart';
 import 'package:personal_hub/features/meetings/ui/meetings_screen.dart';
+import 'package:personal_hub/features/tasks/providers/tasks_providers.dart';
 
 /// Detail view for a meeting with agenda, notes, interactive action items, and AI extraction.
 class MeetingDetailScreen extends ConsumerStatefulWidget {
@@ -138,6 +140,27 @@ class _MeetingDetailScreenState extends ConsumerState<MeetingDetailScreen> {
         .addActionItems(meeting, [text]);
   }
 
+  Future<void> _promoteActionItem(
+    Meeting meeting,
+    MeetingActionItem item,
+  ) async {
+    if (widget.onPromoteActionItem != null) {
+      await widget.onPromoteActionItem!(meeting, item);
+      return;
+    }
+    await ref
+        .read(tasksProvider.notifier)
+        .createTask(title: item.text, sourceMeetingId: meeting.id);
+    if (!mounted) return;
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          content: Text('Action item "${item.text}" ditambahkan ke Tugas.'),
+        ),
+      );
+  }
+
   Future<void> _openVoiceRecorderSheet(Meeting meeting) async {
     await showModalBottomSheet<void>(
       context: context,
@@ -158,11 +181,11 @@ class _MeetingDetailScreenState extends ConsumerState<MeetingDetailScreen> {
     final theme = Theme.of(context);
 
     return meetingsAsync.when(
-      loading: () => const Scaffold(
+      loading: () => const GlassScaffold(
         body: Center(child: CircularProgressIndicator()),
       ),
-      error: (error, _) => Scaffold(
-        appBar: AppBar(title: const Text('Detail Meeting')),
+      error: (error, _) => GlassScaffold(
+        appBar: const GlassAppBar(title: Text('Detail Meeting')),
         body: Center(
           child: Padding(
             padding: const EdgeInsets.all(24),
@@ -179,14 +202,14 @@ class _MeetingDetailScreenState extends ConsumerState<MeetingDetailScreen> {
         }
         final meeting = found ?? (_isDeleting ? _lastKnownMeeting : null);
         if (meeting == null) {
-          return Scaffold(
-            appBar: AppBar(title: const Text('Detail Meeting')),
-            body: const Center(child: Text('Meeting tidak ditemukan.')),
+          return const GlassScaffold(
+            appBar: GlassAppBar(title: Text('Detail Meeting')),
+            body: Center(child: Text('Meeting tidak ditemukan.')),
           );
         }
 
-        return Scaffold(
-          appBar: AppBar(
+        return GlassScaffold(
+          appBar: GlassAppBar(
             title: const Text('Detail Meeting'),
             actions: [
               IconButton(
@@ -523,12 +546,10 @@ class _MeetingDetailScreenState extends ConsumerState<MeetingDetailScreen> {
                         ),
                       ),
                     ),
-                    if (widget.onPromoteActionItem != null)
                       IconButton(
                         tooltip: 'Jadikan Tugas',
                         icon: const Icon(Icons.add_task_rounded, size: 20),
-                        onPressed: () =>
-                            widget.onPromoteActionItem!(meeting, item),
+                        onPressed: () => _promoteActionItem(meeting, item),
                       ),
                   ],
                 ),

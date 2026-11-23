@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:personal_hub/core/errors/app_exceptions.dart';
+import 'package:personal_hub/core/theme/glass_widgets.dart';
 import 'package:personal_hub/features/vault/models/vault_entry.dart';
 import 'package:personal_hub/features/vault/providers/vault_providers.dart';
 import 'package:personal_hub/features/vault/services/password_generator.dart';
@@ -83,8 +84,8 @@ class _VaultListScreenState extends ConsumerState<VaultListScreen> {
     final query = ref.watch(vaultSearchQueryProvider);
     final theme = Theme.of(context);
 
-    return Scaffold(
-      appBar: AppBar(
+    return GlassScaffold(
+      appBar: GlassAppBar(
         title: const Text('Brankas Kata Sandi'),
         actions: [
           IconButton(
@@ -99,12 +100,16 @@ class _VaultListScreenState extends ConsumerState<VaultListScreen> {
           ),
         ],
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => _openEntryForm(),
-        icon: const Icon(Icons.add_rounded),
-        label: const Text('Tambah Akun'),
+      floatingActionButton: GlassFabAnchor(
+        child: FloatingActionButton.extended(
+          heroTag: 'vault_fab',
+          onPressed: () => _openEntryForm(),
+          icon: const Icon(Icons.add_rounded),
+          label: const Text('Tambah Akun'),
+        ),
       ),
       body: SafeArea(
+        top: false,
         child: Column(
           children: [
             Padding(
@@ -268,10 +273,9 @@ class _VaultEntryCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
+    return GlassCard(
+      padding: const EdgeInsets.all(16),
+      child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
@@ -396,7 +400,6 @@ class _VaultEntryCard extends StatelessWidget {
             ],
           ],
         ),
-      ),
     );
   }
 }

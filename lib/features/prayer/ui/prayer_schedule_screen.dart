@@ -7,6 +7,7 @@ import 'package:flutter_compass/flutter_compass.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:intl/intl.dart';
+import 'package:personal_hub/core/theme/glass_widgets.dart';
 import 'package:personal_hub/features/prayer/models/prayer_models.dart';
 import 'package:personal_hub/features/prayer/providers/prayer_providers.dart';
 import 'package:personal_hub/features/prayer/services/firebase_adzan_service.dart';
@@ -173,10 +174,10 @@ class _PrayerScheduleScreenState extends ConsumerState<PrayerScheduleScreen> {
 
     return DefaultTabController(
       length: 2,
-      child: Scaffold(
-        appBar: AppBar(
-          title: const Text('Jadwal Sholat & Kiblat'),
-          bottom: const TabBar(
+      child: GlassScaffold(
+        appBar: const GlassAppBar(
+          title: Text('Jadwal Sholat & Kiblat'),
+          bottom: TabBar(
             tabs: [
               Tab(
                 icon: Icon(Icons.schedule_outlined),

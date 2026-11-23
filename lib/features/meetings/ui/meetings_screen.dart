@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:personal_hub/core/theme/glass_widgets.dart';
 import 'package:personal_hub/features/meetings/models/meeting.dart';
 import 'package:personal_hub/features/meetings/providers/meetings_providers.dart';
 import 'package:personal_hub/features/meetings/ui/meeting_detail_screen.dart';
@@ -19,28 +20,32 @@ class MeetingsScreen extends ConsumerWidget {
 
     return DefaultTabController(
       length: 2,
-      child: Scaffold(
-        appBar: AppBar(
-          title: const Text('Meeting'),
-          bottom: const TabBar(
+      child: GlassScaffold(
+        appBar: const GlassAppBar(
+          title: Text('Meeting'),
+          bottom: TabBar(
             tabs: [
               Tab(text: 'Mendatang'),
               Tab(text: 'Selesai'),
             ],
           ),
         ),
-        floatingActionButton: FloatingActionButton.extended(
-          onPressed: () {
-            Navigator.of(context).push(
-              MaterialPageRoute<void>(
-                builder: (_) => const MeetingFormScreen(),
-              ),
-            );
-          },
-          icon: const Icon(Icons.add_rounded),
-          label: const Text('Meeting Baru'),
+        floatingActionButton: GlassFabAnchor(
+          child: FloatingActionButton.extended(
+            heroTag: 'meetings_fab',
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) => const MeetingFormScreen(),
+                ),
+              );
+            },
+            icon: const Icon(Icons.add_rounded),
+            label: const Text('Meeting Baru'),
+          ),
         ),
         body: SafeArea(
+          top: false,
           child: meetingsAsync.when(
             loading: () => const Center(child: CircularProgressIndicator()),
             error: (error, _) => Center(
@@ -180,13 +185,10 @@ class _MeetingCard extends StatelessWidget {
     final doneCount = meeting.actionItems.where((i) => i.isDone).length;
     final totalCount = meeting.actionItems.length;
 
-    return Card(
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
+    return GlassCard(
+      onTap: onTap,
+      padding: const EdgeInsets.all(16),
+      child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Row(
@@ -293,8 +295,6 @@ class _MeetingCard extends StatelessWidget {
                 ),
               ],
             ],
-          ),
-        ),
       ),
     );
   }

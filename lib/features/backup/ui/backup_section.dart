@@ -1,17 +1,16 @@
-import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
-import 'package:path/path.dart' as p;
-import 'package:path_provider/path_provider.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:personal_hub/core/errors/app_exceptions.dart';
+import 'package:personal_hub/core/theme/glass_widgets.dart';
+import 'package:personal_hub/core/utils/file_export_helper.dart';
 import 'package:personal_hub/features/backup/providers/backup_providers.dart';
 import 'package:personal_hub/features/backup/services/backup_crypto_service.dart';
 import 'package:personal_hub/features/backup/services/backup_service.dart';
-import 'package:share_plus/share_plus.dart';
 
 /// Callback that persists/shares exported `.phub` bytes with a suggested [fileName].
 typedef BackupExportHandler =
@@ -43,72 +42,70 @@ class _BackupSectionState extends ConsumerState<BackupSection> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                CircleAvatar(
-                  backgroundColor: theme.colorScheme.primaryContainer,
-                  foregroundColor: theme.colorScheme.onPrimaryContainer,
-                  child: const Icon(Icons.shield_outlined),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Backup & Restore (.phub)',
-                        style: theme.textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        'Enkripsi AES-256-GCM dengan passphrase pribadi Anda.',
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: theme.colorScheme.onSurfaceVariant,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            Text(
-              'Mencakup catatan, rapat, brankas sandi, tugas, kebiasaan, transaksi keuangan, riwayat AI, dan preferensi jadwal sholat.',
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
+    return GlassCard(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const GlassIconTile(
+                icon: LucideIcons.shieldCheck,
+                size: 40,
+                iconSize: 20,
               ),
-            ),
-            if (_isBusy) ...[
-              const SizedBox(height: 12),
-              const LinearProgressIndicator(),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Backup & Restore (.phub)',
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      'Enkripsi AES-256-GCM dengan passphrase pribadi Anda.',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ],
-            const SizedBox(height: 16),
-            Wrap(
-              spacing: 12,
-              runSpacing: 12,
-              children: [
-                FilledButton.icon(
-                  onPressed: _isBusy ? null : _handleExport,
-                  icon: const Icon(Icons.upload_file_outlined),
-                  label: const Text('Ekspor Backup (.phub)'),
-                ),
-                OutlinedButton.icon(
-                  onPressed: _isBusy ? null : _handleImport,
-                  icon: const Icon(Icons.restore_outlined),
-                  label: const Text('Impor Backup (.phub)'),
-                ),
-              ],
+          ),
+          const SizedBox(height: 12),
+          Text(
+            'Mencakup catatan, rapat, brankas sandi, tugas, kebiasaan, transaksi keuangan, riwayat AI, dan preferensi jadwal sholat.',
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
             ),
+          ),
+          if (_isBusy) ...[
+            const SizedBox(height: 12),
+            const LinearProgressIndicator(),
           ],
-        ),
+          const SizedBox(height: 16),
+          Wrap(
+            spacing: 12,
+            runSpacing: 12,
+            children: [
+              FilledButton.icon(
+                onPressed: _isBusy ? null : _handleExport,
+                icon: const Icon(LucideIcons.upload, size: 17),
+                label: const Text('Ekspor Backup (.phub)'),
+              ),
+              OutlinedButton.icon(
+                onPressed: _isBusy ? null : _handleImport,
+                icon: const Icon(LucideIcons.download, size: 17),
+                label: const Text('Impor Backup (.phub)'),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }
@@ -200,16 +197,7 @@ class _BackupSectionState extends ConsumerState<BackupSection> {
   }
 
   Future<void> _defaultExportHandler(Uint8List bytes, String fileName) async {
-    final tempDir = await getTemporaryDirectory();
-    final file = File(p.join(tempDir.path, fileName));
-    await file.writeAsBytes(bytes, flush: true);
-    await SharePlus.instance.share(
-      ShareParams(
-        files: [XFile(file.path)],
-        subject: 'Backup Personal Hub ($fileName)',
-        text: 'Berkas backup terenkripsi Personal Hub (.phub).',
-      ),
-    );
+    await shareBackupBytes(bytes, fileName);
   }
 
   Future<Uint8List?> _defaultPickImportBytes() async {

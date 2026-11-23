@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:personal_hub/core/errors/app_exceptions.dart';
+import 'package:personal_hub/core/theme/glass_widgets.dart';
 import 'package:personal_hub/features/tasks/models/task_models.dart';
 import 'package:personal_hub/features/tasks/providers/tasks_providers.dart';
 
@@ -355,9 +356,9 @@ class _TasksHabitsScreenState extends ConsumerState<TasksHabitsScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Tugas & Habit'),
+    return GlassScaffold(
+      appBar: const GlassAppBar(
+        title: Text('Tugas & Habit'),
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: _section == _TasksSection.tasks

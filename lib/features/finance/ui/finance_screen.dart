@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:personal_hub/core/errors/app_exceptions.dart';
+import 'package:personal_hub/core/theme/glass_widgets.dart';
 import 'package:personal_hub/features/ai/models/ai_models.dart';
 import 'package:personal_hub/features/finance/models/finance_models.dart';
 import 'package:personal_hub/features/finance/providers/finance_providers.dart';
@@ -95,8 +96,8 @@ class _FinanceScreenState extends ConsumerState<FinanceScreen> {
     final aiState = ref.watch(financeAiControllerProvider);
     final theme = Theme.of(context);
 
-    return Scaffold(
-      appBar: AppBar(
+    return GlassScaffold(
+      appBar: GlassAppBar(
         title: const Text('Keuangan'),
         actions: [
           IconButton(

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:personal_hub/core/errors/app_exceptions.dart';
+import 'package:personal_hub/core/theme/glass_widgets.dart';
 import 'package:personal_hub/features/meetings/models/meeting.dart';
 import 'package:personal_hub/features/meetings/providers/meetings_providers.dart';
 import 'package:personal_hub/features/meetings/ui/meetings_screen.dart';
@@ -173,11 +174,12 @@ class _MeetingFormScreenState extends ConsumerState<MeetingFormScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
-    return Scaffold(
-      appBar: AppBar(
+    return GlassScaffold(
+      appBar: GlassAppBar(
         title: Text(_isEditing ? 'Edit Meeting' : 'Meeting Baru'),
       ),
       body: SafeArea(
+        top: false,
         child: Form(
           key: _formKey,
           child: ListView(
