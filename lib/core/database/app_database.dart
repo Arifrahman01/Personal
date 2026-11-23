@@ -1,0 +1,169 @@
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:path/path.dart' as p;
+import 'package:sqflite/sqflite.dart';
+
+/// Local SQLite database manager for Personal Hub.
+class AppDatabase {
+  AppDatabase._(this._db);
+
+  static const int schemaVersion = 1;
+  static const String _databaseFileName = 'personal_hub.db';
+
+  final Database _db;
+
+  /// Underlying sqflite [Database] handle.
+  Database get db => _db;
+
+  /// Opens the SQLite database, applying schema creation on first run.
+  static Future<AppDatabase> open({
+    String? pathOverride,
+    DatabaseFactory? factoryOverride,
+  }) async {
+    final factory = factoryOverride ?? databaseFactory;
+    final dbPath =
+        pathOverride ??
+        p.join(await factory.getDatabasesPath(), _databaseFileName);
+
+    final database = await factory.openDatabase(
+      dbPath,
+      options: OpenDatabaseOptions(
+        version: schemaVersion,
+        onCreate: (db, version) async {
+          await _createSchemaV1(db);
+        },
+      ),
+    );
+
+    return AppDatabase._(database);
+  }
+
+  static Future<void> _createSchemaV1(Database db) async {
+    final batch = db.batch();
+
+    for (final ddl in _schemaV1Statements) {
+      batch.execute(ddl);
+    }
+
+    await batch.commit(noResult: true);
+  }
+
+  static const List<String> _schemaV1Statements = [
+    '''
+    CREATE TABLE notes (
+      id TEXT PRIMARY KEY,
+      title TEXT NOT NULL,
+      content TEXT NOT NULL,
+      tags TEXT NOT NULL,
+      is_pinned INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    )
+    ''',
+    '''
+    CREATE TABLE meetings (
+      id TEXT PRIMARY KEY,
+      title TEXT NOT NULL,
+      scheduled_at TEXT NOT NULL,
+      location TEXT NOT NULL DEFAULT '',
+      attendees TEXT NOT NULL DEFAULT '[]',
+      agenda TEXT NOT NULL DEFAULT '',
+      notes TEXT NOT NULL DEFAULT '',
+      action_items TEXT NOT NULL DEFAULT '[]',
+      reminder_minutes INTEGER NOT NULL DEFAULT 15,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    )
+    ''',
+    '''
+    CREATE TABLE vault_items (
+      id TEXT PRIMARY KEY,
+      title TEXT NOT NULL,
+      username TEXT NOT NULL DEFAULT '',
+      encrypted_payload TEXT NOT NULL,
+      nonce TEXT NOT NULL,
+      mac TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    )
+    ''',
+    '''
+    CREATE TABLE chat_messages (
+      id TEXT PRIMARY KEY,
+      role TEXT NOT NULL,
+      content TEXT NOT NULL,
+      used_model TEXT,
+      did_fallback INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT NOT NULL
+    )
+    ''',
+    '''
+    CREATE TABLE prayer_prefs (
+      id INTEGER PRIMARY KEY,
+      city_name TEXT NOT NULL,
+      latitude REAL NOT NULL,
+      longitude REAL NOT NULL,
+      method TEXT NOT NULL,
+      pre_reminder_minutes INTEGER NOT NULL DEFAULT 0,
+      sound_enabled INTEGER NOT NULL DEFAULT 1,
+      enabled_prayers TEXT NOT NULL
+    )
+    ''',
+    '''
+    CREATE TABLE tasks (
+      id TEXT PRIMARY KEY,
+      title TEXT NOT NULL,
+      due_date TEXT,
+      priority TEXT NOT NULL DEFAULT 'medium',
+      is_done INTEGER NOT NULL DEFAULT 0,
+      source_meeting_id TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    )
+    ''',
+    '''
+    CREATE TABLE habits (
+      id TEXT PRIMARY KEY,
+      title TEXT NOT NULL,
+      category TEXT NOT NULL DEFAULT 'Umum',
+      target_per_day INTEGER NOT NULL DEFAULT 1,
+      created_at TEXT NOT NULL
+    )
+    ''',
+    '''
+    CREATE TABLE habit_logs (
+      id TEXT PRIMARY KEY,
+      habit_id TEXT NOT NULL,
+      log_date TEXT NOT NULL,
+      completed_count INTEGER NOT NULL DEFAULT 1,
+      UNIQUE(habit_id, log_date)
+    )
+    ''',
+    '''
+    CREATE TABLE transactions (
+      id TEXT PRIMARY KEY,
+      type TEXT NOT NULL,
+      amount INTEGER NOT NULL,
+      category TEXT NOT NULL,
+      note TEXT NOT NULL DEFAULT '',
+      occurred_at TEXT NOT NULL,
+      created_at TEXT NOT NULL
+    )
+    ''',
+    'CREATE INDEX idx_notes_pinned_updated ON notes(is_pinned DESC, updated_at DESC)',
+    'CREATE INDEX idx_meetings_scheduled ON meetings(scheduled_at ASC)',
+    'CREATE INDEX idx_tasks_done_due ON tasks(is_done ASC, due_date ASC)',
+    'CREATE INDEX idx_habit_logs_habit_date ON habit_logs(habit_id, log_date)',
+    'CREATE INDEX idx_transactions_occurred ON transactions(occurred_at DESC)',
+    'CREATE INDEX idx_chat_messages_created ON chat_messages(created_at ASC)',
+  ];
+
+  /// Closes the underlying SQLite database connection.
+  Future<void> close() => _db.close();
+}
+
+/// Provides the initialized [AppDatabase] instance; must be overridden at startup or in tests.
+final appDatabaseProvider = Provider<AppDatabase>((ref) {
+  throw UnimplementedError(
+    'appDatabaseProvider must be overridden in ProviderScope.',
+  );
+});
