@@ -14,6 +14,7 @@ class NotesScreen extends ConsumerStatefulWidget {
 
 class _NotesScreenState extends ConsumerState<NotesScreen> {
   final TextEditingController _searchController = TextEditingController();
+  final Set<String> _pendingDeleteIds = <String>{};
   String _searchQuery = '';
   String? _selectedTag;
 
@@ -36,12 +37,15 @@ class _NotesScreenState extends ConsumerState<NotesScreen> {
     return tags;
   }
 
-  List<Note> _applyFilters(List<Note> notes) {
+  List<Note> _applyFilters(List<Note> notes, {String? activeTag}) {
     final query = _searchQuery.trim().toLowerCase();
-    final activeTag = _selectedTag?.trim().toLowerCase();
+    final normalizedTag = activeTag?.trim().toLowerCase();
 
     return notes
         .where((note) {
+          if (_pendingDeleteIds.contains(note.id)) {
+            return false;
+          }
           if (query.isNotEmpty) {
             final matchesTitle = note.title.toLowerCase().contains(query);
             final matchesContent = note.content.toLowerCase().contains(query);
@@ -49,8 +53,10 @@ class _NotesScreenState extends ConsumerState<NotesScreen> {
               return false;
             }
           }
-          if (activeTag != null && activeTag.isNotEmpty) {
-            final hasTag = note.tags.any((t) => t.toLowerCase() == activeTag);
+          if (normalizedTag != null && normalizedTag.isNotEmpty) {
+            final hasTag = note.tags.any(
+              (t) => t.toLowerCase() == normalizedTag,
+            );
             if (!hasTag) {
               return false;
             }
@@ -92,11 +98,40 @@ class _NotesScreenState extends ConsumerState<NotesScreen> {
   }
 
   Future<void> _deleteNote(Note note) async {
-    await ref.read(notesListProvider.notifier).deleteNote(note.id);
-    if (mounted) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Catatan "${note.title}" dihapus.')));
+    setState(() {
+      _pendingDeleteIds.add(note.id);
+    });
+    try {
+      await ref.read(notesListProvider.notifier).deleteNote(note.id);
+      if (mounted) {
+        setState(() {
+          _pendingDeleteIds.remove(note.id);
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Catatan "${note.title}" dihapus.')),
+        );
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _pendingDeleteIds.remove(note.id);
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Gagal menghapus catatan.')),
+        );
+      }
+    }
+  }
+
+  Future<void> _togglePin(Note note) async {
+    try {
+      await ref.read(notesListProvider.notifier).togglePin(note.id);
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Gagal memperbarui sematan catatan.')),
+        );
+      }
     }
   }
 
@@ -126,7 +161,10 @@ class _NotesScreenState extends ConsumerState<NotesScreen> {
             ),
           ),
           data: (allNotes) {
-            final availableTags = _extractTags(allNotes);
+            final visibleNotes = allNotes
+                .where((n) => !_pendingDeleteIds.contains(n.id))
+                .toList(growable: false);
+            final availableTags = _extractTags(visibleNotes);
             final activeTag =
                 _selectedTag != null &&
                     availableTags.any(
@@ -134,7 +172,19 @@ class _NotesScreenState extends ConsumerState<NotesScreen> {
                     )
                 ? _selectedTag
                 : null;
-            final filteredNotes = _applyFilters(allNotes);
+            if (_selectedTag != null && activeTag == null) {
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                if (mounted && _selectedTag != null) {
+                  setState(() {
+                    _selectedTag = null;
+                  });
+                }
+              });
+            }
+            final filteredNotes = _applyFilters(
+              visibleNotes,
+              activeTag: activeTag,
+            );
             final pinnedNotes = filteredNotes
                 .where((n) => n.isPinned)
                 .toList(growable: false);
@@ -208,7 +258,7 @@ class _NotesScreenState extends ConsumerState<NotesScreen> {
                     ),
                   ),
                 Expanded(
-                  child: allNotes.isEmpty
+                  child: visibleNotes.isEmpty
                       ? _buildEmptyState(theme)
                       : filteredNotes.isEmpty
                       ? _buildNoMatchState(theme)
@@ -271,8 +321,7 @@ class _NotesScreenState extends ConsumerState<NotesScreen> {
       child: _NoteCard(
         note: note,
         onTap: () => _openEditor(note),
-        onTogglePin: () =>
-            ref.read(notesListProvider.notifier).togglePin(note.id),
+        onTogglePin: () => _togglePin(note),
         onDelete: () async {
           if (await _confirmDelete(note)) {
             await _deleteNote(note);

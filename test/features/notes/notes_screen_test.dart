@@ -189,6 +189,57 @@ void main() {
     );
 
     testWidgets(
+      'resets active tag filter to Semua when the last note with that tag is deleted',
+      (tester) async {
+        final repo = _InMemoryNotesRepository();
+        await repo.createNote(
+          title: 'Catatan Kerja',
+          content: 'Jadwal sprint mingguan.',
+          tags: ['kerja'],
+        );
+        await repo.createNote(
+          title: 'Catatan Rumah',
+          content: 'Daftar belanja harian.',
+          tags: ['rumah'],
+        );
+
+        await tester.pumpWidget(
+          ProviderScope(
+            overrides: [notesRepositoryProvider.overrideWithValue(repo)],
+            child: const MaterialApp(home: NotesScreen()),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        expect(find.text('Catatan Kerja'), findsOneWidget);
+        expect(find.text('Catatan Rumah'), findsOneWidget);
+
+        // Select #kerja filter chip
+        await tester.tap(find.widgetWithText(ChoiceChip, '#kerja'));
+        await tester.pumpAndSettle();
+
+        expect(find.text('Catatan Kerja'), findsOneWidget);
+        expect(find.text('Catatan Rumah'), findsNothing);
+
+        // Delete the only note tagged #kerja via popup menu
+        await tester.tap(find.byTooltip('Aksi catatan').first);
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Hapus'));
+        await tester.pumpAndSettle();
+        await tester.tap(find.widgetWithText(FilledButton, 'Hapus'));
+        await tester.pumpAndSettle();
+
+        // Filter falls back cleanly to Semua and displays remaining notes
+        final semuaChip = tester.widget<ChoiceChip>(
+          find.widgetWithText(ChoiceChip, 'Semua'),
+        );
+        expect(semuaChip.selected, isTrue);
+        expect(find.text('Catatan Kerja'), findsNothing);
+        expect(find.text('Catatan Rumah'), findsOneWidget);
+      },
+    );
+
+    testWidgets(
       'AI Bantu bottom sheet shows 3 actions, model badge, and supports Terapkan & Sisipkan di bawah',
       (tester) async {
         final repo = _InMemoryNotesRepository();
