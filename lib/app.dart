@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:personal_hub/core/theme/app_theme.dart';
+import 'package:personal_hub/features/ai/ui/ai_chat_screen.dart';
 
 /// Root Material 3 application widget for Personal Hub.
 class PersonalHubApp extends StatelessWidget {
@@ -68,7 +69,8 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
       body: IndexedStack(
         index: _selectedIndex,
         children: [
-          for (final tab in _tabs) _TabPlaceholderPage(tab: tab),
+          for (var i = 0; i < _tabs.length; i++)
+            i == 4 ? const AiChatScreen() : _TabPlaceholderPage(tab: _tabs[i]),
         ],
       ),
       bottomNavigationBar: NavigationBar(
