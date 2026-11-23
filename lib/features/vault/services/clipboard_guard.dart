@@ -28,15 +28,18 @@ class ClipboardGuard {
   final ClipboardAdapter _adapter;
   Timer? _clearTimer;
   String? _lastCopiedSecret;
+  bool _disposed = false;
 
   /// Copies [secret] and schedules clipboard wipe after [clearAfter] unless overwritten.
   Future<void> copySensitive(
     String secret, {
     Duration clearAfter = const Duration(seconds: 30),
   }) async {
+    if (_disposed) return;
     _clearTimer?.cancel();
     _lastCopiedSecret = secret;
     await _adapter.setText(secret);
+    if (_disposed || _lastCopiedSecret != secret) return;
 
     _clearTimer = Timer(clearAfter, () {
       unawaited(_clearIfUnchanged(secret));
@@ -44,8 +47,9 @@ class ClipboardGuard {
   }
 
   Future<void> _clearIfUnchanged(String secret) async {
-    if (_lastCopiedSecret != secret) return;
+    if (_disposed || _lastCopiedSecret != secret) return;
     final current = await _adapter.getText();
+    if (_disposed) return;
     if (current == secret) {
       await _adapter.setText('');
     }
@@ -54,6 +58,7 @@ class ClipboardGuard {
 
   /// Cancels any pending clipboard clear timer.
   void dispose() {
+    _disposed = true;
     _clearTimer?.cancel();
     _clearTimer = null;
     _lastCopiedSecret = null;

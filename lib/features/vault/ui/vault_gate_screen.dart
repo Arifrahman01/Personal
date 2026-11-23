@@ -89,11 +89,16 @@ class _VaultGateScreenState extends ConsumerState<VaultGateScreen> {
       await controller.unlockWithPin(pin);
       _pinController.clear();
       _confirmPinController.clear();
-      ref.invalidate(vaultEntriesProvider);
     } on ValidationException catch (error) {
       if (mounted) {
         setState(() {
           _errorMessage = error.message;
+        });
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _errorMessage = 'Gagal menyimpan PIN brankas. Silakan coba lagi.';
         });
       }
     } finally {
@@ -119,21 +124,30 @@ class _VaultGateScreenState extends ConsumerState<VaultGateScreen> {
       _errorMessage = null;
     });
 
-    final ok = await ref.read(vaultLockControllerProvider).unlockWithPin(pin);
-    if (!mounted) return;
+    try {
+      final ok = await ref.read(vaultLockControllerProvider).unlockWithPin(pin);
+      if (!mounted) return;
 
-    if (ok) {
-      _pinController.clear();
-      ref.invalidate(vaultEntriesProvider);
-    } else {
-      setState(() {
-        _errorMessage = 'PIN salah. Silakan coba lagi.';
-      });
+      if (ok) {
+        _pinController.clear();
+      } else {
+        setState(() {
+          _errorMessage = 'PIN salah. Silakan coba lagi.';
+        });
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _errorMessage = 'Gagal memverifikasi PIN. Silakan coba lagi.';
+        });
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isSubmitting = false;
+        });
+      }
     }
-
-    setState(() {
-      _isSubmitting = false;
-    });
   }
 
   Future<void> _handleUnlockWithBiometrics() async {
@@ -142,23 +156,33 @@ class _VaultGateScreenState extends ConsumerState<VaultGateScreen> {
       _errorMessage = null;
     });
 
-    final ok = await ref
-        .read(vaultLockControllerProvider)
-        .unlockWithBiometrics();
-    if (!mounted) return;
+    try {
+      final ok = await ref
+          .read(vaultLockControllerProvider)
+          .unlockWithBiometrics();
+      if (!mounted) return;
 
-    if (ok) {
-      _pinController.clear();
-      ref.invalidate(vaultEntriesProvider);
-    } else {
-      setState(() {
-        _errorMessage = 'Autentikasi biometrik gagal atau dibatalkan.';
-      });
+      if (ok) {
+        _pinController.clear();
+      } else {
+        setState(() {
+          _errorMessage = 'Autentikasi biometrik gagal atau dibatalkan.';
+        });
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _errorMessage =
+              'Terjadi kesalahan saat autentikasi biometrik. Coba lagi atau gunakan PIN.';
+        });
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isSubmitting = false;
+        });
+      }
     }
-
-    setState(() {
-      _isSubmitting = false;
-    });
   }
 
   @override

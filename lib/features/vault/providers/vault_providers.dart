@@ -70,11 +70,28 @@ class VaultEntriesNotifier extends AsyncNotifier<List<VaultEntry>> {
   @override
   Future<List<VaultEntry>> build() async {
     final lockController = ref.watch(vaultLockControllerProvider);
+    void onLockChanged() {
+      if (!lockController.isUnlocked) {
+        state = const AsyncData([]);
+      } else {
+        ref.invalidateSelf();
+      }
+    }
+
+    lockController.addListener(onLockChanged);
+    ref.onDispose(() => lockController.removeListener(onLockChanged));
+
     if (!lockController.isUnlocked) {
       return const [];
     }
     final query = ref.watch(vaultSearchQueryProvider);
-    return ref.watch(vaultRepositoryProvider).getEntries(query: query);
+    final entries = await ref
+        .watch(vaultRepositoryProvider)
+        .getEntries(query: query);
+    if (!lockController.isUnlocked) {
+      return const [];
+    }
+    return entries;
   }
 
   /// Reloads entries from encrypted SQLite storage.

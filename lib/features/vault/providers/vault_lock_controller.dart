@@ -24,7 +24,7 @@ class LocalAuthBiometricAdapter implements BiometricAuthAdapter {
     try {
       final canCheckBiometrics = await _localAuth.canCheckBiometrics;
       final isSupported = await _localAuth.isDeviceSupported();
-      return canCheckBiometrics || isSupported;
+      return canCheckBiometrics && isSupported;
     } catch (_) {
       return false;
     }
