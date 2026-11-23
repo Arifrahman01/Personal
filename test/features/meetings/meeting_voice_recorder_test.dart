@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -236,6 +238,26 @@ void main() {
     expect(gateway.startedLocales, ['en_US', 'id_ID']);
   });
 
+  test(
+    'dispose while initialize() is pending does not invoke startListening()',
+    () async {
+      final initCompleter = Completer<bool>();
+      final gateway = _PendingSpeechRecognizerGateway(initCompleter);
+      final recorder = MeetingVoiceRecorder(gateway);
+
+      final startFuture = recorder.start();
+      await Future<void>.delayed(Duration.zero);
+      recorder.dispose();
+
+      initCompleter.complete(true);
+      final started = await startFuture;
+
+      expect(started, isFalse);
+      expect(gateway.startListeningCalled, isFalse);
+      expect(gateway.cancelCount, 0);
+    },
+  );
+
   testWidgets(
     'MeetingDetailScreen records live transcript and summarizes with AI in 1 tap',
     (WidgetTester tester) async {
@@ -304,4 +326,32 @@ void main() {
       expect(find.text('Finalisasi QA build'), findsOneWidget);
     },
   );
+}
+
+class _PendingSpeechRecognizerGateway implements SpeechRecognizerGateway {
+  _PendingSpeechRecognizerGateway(this._initCompleter);
+
+  final Completer<bool> _initCompleter;
+  bool startListeningCalled = false;
+  int cancelCount = 0;
+
+  @override
+  Future<bool> initialize() => _initCompleter.future;
+
+  @override
+  Future<void> startListening({
+    required String localeId,
+    required void Function(String text, bool isFinal) onResult,
+    void Function(String status)? onStatus,
+  }) async {
+    startListeningCalled = true;
+  }
+
+  @override
+  Future<void> stopListening() async {}
+
+  @override
+  Future<void> cancel() async {
+    cancelCount++;
+  }
 }

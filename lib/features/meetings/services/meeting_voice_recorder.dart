@@ -157,6 +157,7 @@ class MeetingVoiceRecorder extends ChangeNotifier {
   final SpeechRecognizerGateway _gateway;
   MeetingVoiceSessionState _state = const MeetingVoiceSessionState.initial();
   bool _initialized = false;
+  bool _isStarting = false;
   bool _disposed = false;
 
   MeetingVoiceSessionState get state => _state;
@@ -181,21 +182,63 @@ class MeetingVoiceRecorder extends ChangeNotifier {
 
   /// Starts live voice recognition for [localeId] (defaults to current locale).
   Future<bool> start({String? localeId}) async {
+    if (_disposed) return false;
+    if (_state.isRecording || _isStarting) return true;
+
     final targetLocale = (localeId != null && localeId.trim().isNotEmpty)
         ? localeId.trim()
         : _state.localeId;
 
-    _state = _state.copyWith(localeId: targetLocale, clearError: true);
-    _safeNotify();
+    _isStarting = true;
+    try {
+      _state = _state.copyWith(localeId: targetLocale, clearError: true);
+      _safeNotify();
 
-    if (!_initialized) {
-      bool ready;
-      try {
-        ready = await _gateway.initialize();
-      } catch (_) {
-        ready = false;
+      if (!_initialized) {
+        bool ready;
+        try {
+          ready = await _gateway.initialize();
+        } catch (_) {
+          ready = false;
+        }
+        if (_disposed) {
+          return false;
+        }
+        if (!ready) {
+          _state = _state.copyWith(
+            isRecording: false,
+            errorMessage: _unavailableErrorMessage,
+          );
+          _safeNotify();
+          return false;
+        }
+        _initialized = true;
       }
-      if (!ready) {
+
+      _state = _state.copyWith(
+        isRecording: true,
+        localeId: targetLocale,
+        clearError: true,
+      );
+      _safeNotify();
+
+      try {
+        await _gateway.startListening(
+          localeId: targetLocale,
+          onResult: _handleResult,
+          onStatus: _handleStatus,
+        );
+        if (_disposed) {
+          _state = _state.copyWith(isRecording: false);
+          await _gateway.cancel();
+          return false;
+        }
+        return true;
+      } catch (_) {
+        if (_disposed) {
+          _state = _state.copyWith(isRecording: false);
+          return false;
+        }
         _state = _state.copyWith(
           isRecording: false,
           errorMessage: _unavailableErrorMessage,
@@ -203,30 +246,8 @@ class MeetingVoiceRecorder extends ChangeNotifier {
         _safeNotify();
         return false;
       }
-      _initialized = true;
-    }
-
-    _state = _state.copyWith(
-      isRecording: true,
-      localeId: targetLocale,
-      clearError: true,
-    );
-    _safeNotify();
-
-    try {
-      await _gateway.startListening(
-        localeId: targetLocale,
-        onResult: _handleResult,
-        onStatus: _handleStatus,
-      );
-      return true;
-    } catch (_) {
-      _state = _state.copyWith(
-        isRecording: false,
-        errorMessage: _unavailableErrorMessage,
-      );
-      _safeNotify();
-      return false;
+    } finally {
+      _isStarting = false;
     }
   }
 
@@ -253,6 +274,7 @@ class MeetingVoiceRecorder extends ChangeNotifier {
 
   /// Cancels listening without keeping any partial words.
   Future<void> cancel() async {
+    if (_disposed) return;
     final wasRecording = _state.isRecording;
     _state = _state.copyWith(isRecording: false, partialTranscript: '');
     _safeNotify();
@@ -367,8 +389,11 @@ class MeetingVoiceRecorder extends ChangeNotifier {
 
   @override
   void dispose() {
+    if (_disposed) return;
     _disposed = true;
-    if (_state.isRecording) {
+    final wasRecording = _state.isRecording;
+    _state = _state.copyWith(isRecording: false, partialTranscript: '');
+    if (wasRecording && !_isStarting) {
       _gateway.cancel();
     }
     super.dispose();
