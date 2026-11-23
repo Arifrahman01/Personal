@@ -150,49 +150,43 @@ class TasksRepository {
 
   /// Adjusts the completion count for [habitId] on [date] by [delta].
   ///
-  /// Upserts the `habit_logs` row for `YYYY-MM-DD`, clamping at `>= 0`,
-  /// and returns the updated `completedCount`.
+  /// Atomically upserts the `habit_logs` row for `YYYY-MM-DD` inside a SQLite
+  /// transaction, clamping at `>= 0`, and returns the updated `completedCount`.
   Future<int> logHabit(String habitId, DateTime date, {int delta = 1}) async {
-    final habitRows = await _database.db.query(
-      _habitsTable,
-      columns: ['id'],
-      where: 'id = ?',
-      whereArgs: [habitId],
-      limit: 1,
-    );
-    if (habitRows.isEmpty) {
-      throw const ValidationException('Habit tidak ditemukan.');
-    }
-
     final logDate = formatHabitLogDate(date);
-    final existing = await _database.db.query(
-      _habitLogsTable,
-      where: 'habit_id = ? AND log_date = ?',
-      whereArgs: [habitId, logDate],
-      limit: 1,
-    );
+    final initialCount = math.max(0, delta);
 
-    if (existing.isEmpty) {
-      final initialCount = math.max(0, delta);
-      final entry = HabitLog(
-        id: _uuid.v4(),
-        habitId: habitId,
-        logDate: logDate,
-        completedCount: initialCount,
+    return _database.db.transaction((txn) async {
+      final habitRows = await txn.query(
+        _habitsTable,
+        columns: ['id'],
+        where: 'id = ?',
+        whereArgs: [habitId],
+        limit: 1,
       );
-      await _database.db.insert(_habitLogsTable, entry.toMap());
-      return initialCount;
-    }
+      if (habitRows.isEmpty) {
+        throw const ValidationException('Habit tidak ditemukan.');
+      }
 
-    final current = HabitLog.fromMap(existing.first);
-    final nextCount = math.max(0, current.completedCount + delta);
-    await _database.db.update(
-      _habitLogsTable,
-      {'completed_count': nextCount},
-      where: 'id = ?',
-      whereArgs: [current.id],
-    );
-    return nextCount;
+      await txn.rawInsert(
+        '''
+        INSERT INTO $_habitLogsTable (id, habit_id, log_date, completed_count)
+        VALUES (?, ?, ?, ?)
+        ON CONFLICT(habit_id, log_date)
+        DO UPDATE SET completed_count = MAX(0, $_habitLogsTable.completed_count + ?)
+        ''',
+        [_uuid.v4(), habitId, logDate, initialCount, delta],
+      );
+
+      final updatedRows = await txn.query(
+        _habitLogsTable,
+        columns: ['completed_count'],
+        where: 'habit_id = ? AND log_date = ?',
+        whereArgs: [habitId, logDate],
+        limit: 1,
+      );
+      return updatedRows.first['completed_count'] as int? ?? 0;
+    });
   }
 
   /// Returns the logged completion count for [habitId] on [date].

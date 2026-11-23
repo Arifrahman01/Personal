@@ -172,5 +172,28 @@ void main() {
         expect(await repo.getTodayCount(habit.id, day6), 0);
       },
     );
+
+    test(
+      'handles concurrent logHabit calls on an unlogged day without UNIQUE constraint error',
+      () async {
+        final db = await openTestDb();
+        final repo = TasksRepository(db);
+
+        final habit = await repo.createHabit(
+          title: 'Baca Al-Quran',
+          category: 'Ibadah',
+          targetPerDay: 2,
+        );
+        final day = DateTime(2026, 11, 26);
+
+        final counts = await Future.wait([
+          repo.logHabit(habit.id, day),
+          repo.logHabit(habit.id, day),
+        ]);
+
+        expect(counts, unorderedEquals([1, 2]));
+        expect(await repo.getTodayCount(habit.id, day), 2);
+      },
+    );
   });
 }
