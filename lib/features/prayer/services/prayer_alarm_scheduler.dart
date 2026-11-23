@@ -6,6 +6,10 @@ import 'package:personal_hub/features/prayer/services/prayer_time_service.dart';
 import 'package:timezone/data/latest.dart' as tz_data;
 import 'package:timezone/timezone.dart' as tz;
 
+/// Batas rentang ID alarm lokal khusus jadwal sholat agar tidak menghapus alarm modul lain.
+const int prayerAlarmIdMin = 7000;
+const int prayerAlarmIdMax = 7999;
+
 /// Representasi satu alarm notifikasi lokal sholat yang direncanakan.
 @immutable
 class ScheduledPrayerAlarm {
@@ -77,7 +81,12 @@ class FlutterLocalNotificationsAlarmGateway implements LocalAlarmGateway {
             defaultTargetPlatform != TargetPlatform.iOS)) {
       return;
     }
-    await _plugin.cancelAll();
+    final pending = await _plugin.pendingNotificationRequests();
+    for (final request in pending) {
+      if (request.id >= prayerAlarmIdMin && request.id <= prayerAlarmIdMax) {
+        await _plugin.cancel(id: request.id);
+      }
+    }
   }
 
   @override
@@ -150,7 +159,7 @@ class PrayerAlarmScheduler {
           continue;
         }
         final prayerTime = times.timeFor(prayer);
-        final baseId = 7000 + dayOffset * 20 + prayer.index * 2;
+        final baseId = prayerAlarmIdMin + dayOffset * 20 + prayer.index * 2;
 
         if (prefs.preReminderMinutes > 0) {
           final preTime = prayerTime.subtract(

@@ -135,5 +135,31 @@ void main() {
       });
       expect(nonAdzan, isNull);
     });
+
+    test(
+      'unsubscribeCity unsubscribes city topic when configured and handles unconfigured gracefully',
+      () async {
+        final gateway = _FakeFcmGateway(
+          configured: true,
+          token: 'token-abc-999',
+        );
+        final service = FirebaseAdzanService(gateway);
+
+        final status = await service.unsubscribeCity('Jakarta Selatan');
+
+        expect(status.isConfigured, isTrue);
+        expect(status.subscribedTopic, isNull);
+        expect(gateway.unsubscribedTopics, ['adzan_jakarta_selatan']);
+
+        final unconfiguredService = FirebaseAdzanService(
+          _FakeFcmGateway(configured: false),
+        );
+        final unconfiguredStatus = await unconfiguredService.unsubscribeCity(
+          'Jakarta Selatan',
+        );
+        expect(unconfiguredStatus.isConfigured, isFalse);
+        expect(unconfiguredStatus.subscribedTopic, isNull);
+      },
+    );
   });
 }

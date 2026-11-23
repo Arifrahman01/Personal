@@ -3,6 +3,7 @@
 
 # Local secrets (NEVER commit)
 env/secrets.json
+android/app/google-services.json
 
 # Flutter/Dart defaults
 .dart_tool/

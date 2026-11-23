@@ -306,4 +306,33 @@ class FirebaseAdzanService {
       );
     }
   }
+
+  /// Berhenti berlangganan topik FCM untuk [cityName] dengan fallback aman saat Firebase tidak aktif.
+  Future<FirebaseAdzanStatus> unsubscribeCity(String cityName) async {
+    final topic = cityTopicName(cityName);
+    try {
+      final isConfigured = await _gateway.initialize();
+      if (!isConfigured) {
+        return const FirebaseAdzanStatus(
+          isConfigured: false,
+          message: 'Firebase belum dikonfigurasi.',
+        );
+      }
+
+      await _gateway.unsubscribeFromTopic(topic);
+      final token = await _gateway.getToken();
+
+      return FirebaseAdzanStatus(
+        isConfigured: true,
+        fcmToken: token,
+        subscribedTopic: null,
+        message: 'Berhenti berlangganan topik $topic (mode lokal offline).',
+      );
+    } catch (_) {
+      return const FirebaseAdzanStatus(
+        isConfigured: false,
+        message: 'Gagal memutus langganan topik FCM.',
+      );
+    }
+  }
 }

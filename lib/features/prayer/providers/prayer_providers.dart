@@ -54,6 +54,14 @@ class FirebaseAdzanStatusNotifier extends Notifier<FirebaseAdzanStatus> {
     state = status;
     return status;
   }
+
+  /// Memutus langganan topik FCM untuk [cityName] saat beralih ke mode offline.
+  Future<FirebaseAdzanStatus> unsubscribeCity(String cityName) async {
+    final service = ref.read(firebaseAdzanServiceProvider);
+    final status = await service.unsubscribeCity(cityName);
+    state = status;
+    return status;
+  }
 }
 
 /// Provider status FCM Adzan.
@@ -72,7 +80,8 @@ class PrayerPrefsNotifier extends AsyncNotifier<PrayerAlarmPrefs> {
 
   /// Menyimpan [nextPrefs], lalu menyinkronkan topik FCM dan alarm lokal offline.
   Future<void> updatePrefs(PrayerAlarmPrefs nextPrefs) async {
-    final previousCity = state.asData?.value.cityName;
+    final previousPrefs = state.asData?.value;
+    final previousCity = previousPrefs?.cityName;
     await ref.read(prayerPrefsRepositoryProvider).savePrefs(nextPrefs);
     state = AsyncData(nextPrefs);
 
@@ -81,6 +90,11 @@ class PrayerPrefsNotifier extends AsyncNotifier<PrayerAlarmPrefs> {
       await ref
           .read(firebaseAdzanStatusProvider.notifier)
           .syncCity(cityName: nextPrefs.cityName, previousCityName: previousCity);
+    } else if (previousPrefs == null ||
+        previousPrefs.notificationMode != AdzanNotificationMode.localOffline) {
+      await ref
+          .read(firebaseAdzanStatusProvider.notifier)
+          .unsubscribeCity(previousCity ?? nextPrefs.cityName);
     }
 
     await ref
