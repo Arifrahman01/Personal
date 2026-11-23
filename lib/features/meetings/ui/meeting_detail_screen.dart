@@ -28,6 +28,8 @@ class MeetingDetailScreen extends ConsumerStatefulWidget {
 class _MeetingDetailScreenState extends ConsumerState<MeetingDetailScreen> {
   final TextEditingController _newItemController = TextEditingController();
   bool _isExtracting = false;
+  bool _isDeleting = false;
+  Meeting? _lastKnownMeeting;
   String? _aiSummaryText;
   String? _aiUsedModel;
   bool _aiDidFallback = false;
@@ -63,11 +65,18 @@ class _MeetingDetailScreenState extends ConsumerState<MeetingDetailScreen> {
     );
 
     if (confirmed == true && mounted) {
-      await ref
-          .read(meetingsListProvider.notifier)
-          .deleteMeeting(meeting.id);
-      if (mounted) {
-        Navigator.of(context).pop();
+      _isDeleting = true;
+      _lastKnownMeeting = meeting;
+      try {
+        await ref
+            .read(meetingsListProvider.notifier)
+            .deleteMeeting(meeting.id);
+        if (mounted) {
+          Navigator.of(context).pop();
+        }
+      } catch (error) {
+        _isDeleting = false;
+        rethrow;
       }
     }
   }
@@ -147,9 +156,13 @@ class _MeetingDetailScreenState extends ConsumerState<MeetingDetailScreen> {
         ),
       ),
       data: (meetings) {
-        final meeting = meetings
+        final found = meetings
             .where((m) => m.id == widget.meetingId)
             .firstOrNull;
+        if (found != null) {
+          _lastKnownMeeting = found;
+        }
+        final meeting = found ?? (_isDeleting ? _lastKnownMeeting : null);
         if (meeting == null) {
           return Scaffold(
             appBar: AppBar(title: const Text('Detail Meeting')),

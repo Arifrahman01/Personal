@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -205,6 +207,95 @@ void main() {
       await tester.tap(promoteButtons.first);
       await tester.pumpAndSettle();
       expect(promoted, ['m-up:Kirim notulensi ke tim']);
+
+      // Deleting from detail should not flash "Meeting tidak ditemukan." during pop transition.
+      await tester.tap(find.byTooltip('Hapus meeting'));
+      await tester.pumpAndSettle();
+      expect(find.text('Hapus Meeting?'), findsOneWidget);
+      await tester.tap(find.text('Hapus'));
+      await tester.pump();
+      expect(find.text('Meeting tidak ditemukan.'), findsNothing);
+      await tester.pumpAndSettle();
+      expect(find.text('Meeting'), findsOneWidget);
+      expect(find.text('Sprint Review'), findsNothing);
     },
   );
+
+  test(
+    'summarizeAndExtractActionItems preserves concurrent action-item toggles made while AI call is in flight',
+    () async {
+      final chatCompleter = Completer<AiResponse>();
+      final now = DateTime.now().toUtc();
+      final seeded = Meeting(
+        id: 'm-concurrent',
+        title: 'Rapat Sinkronisasi',
+        scheduledAt: now.add(const Duration(hours: 2)),
+        notes: 'Finalisasi checklist rilis.',
+        actionItems: const [
+          MeetingActionItem(
+            id: 'existing-1',
+            text: 'Cek skema migrasi',
+            isDone: false,
+          ),
+        ],
+        createdAt: now,
+        updatedAt: now,
+      );
+
+      final container = ProviderContainer(
+        overrides: [
+          meetingsRepositoryProvider.overrideWithValue(
+            _InMemoryMeetingsRepository([seeded]),
+          ),
+          aiClientProvider.overrideWithValue(
+            _CompletableAiClient(chatCompleter),
+          ),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      await container.read(meetingsListProvider.future);
+      final notifier = container.read(meetingsListProvider.notifier);
+
+      final aiFuture = notifier.summarizeAndExtractActionItems(seeded);
+
+      // Concurrent toggle while AI request is still in flight.
+      await notifier.toggleActionItem('m-concurrent', 'existing-1');
+
+      chatCompleter.complete(
+        const AiResponse(
+          content: '{"summary":"Ringkas.","action_items":["Buat tag rilis"]}',
+          usedModel: AiConstants.freeModel,
+          didFallback: false,
+        ),
+      );
+
+      final result = await aiFuture;
+      final existingAfter = result.updatedMeeting.actionItems.firstWhere(
+        (item) => item.id == 'existing-1',
+      );
+      expect(existingAfter.isDone, isTrue);
+      expect(
+        result.updatedMeeting.actionItems.any(
+          (item) => item.text == 'Buat tag rilis',
+        ),
+        isTrue,
+      );
+    },
+  );
+}
+
+class _CompletableAiClient implements SamudraAiClient {
+  _CompletableAiClient(this._completer);
+
+  final Completer<AiResponse> _completer;
+
+  @override
+  Duration get timeout => const Duration(seconds: 45);
+
+  @override
+  Future<AiResponse> chat({
+    required List<AiMessage> messages,
+    String? systemPrompt,
+  }) => _completer.future;
 }

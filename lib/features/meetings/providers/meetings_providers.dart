@@ -139,8 +139,17 @@ class MeetingsNotifier extends AsyncNotifier<List<Meeting>> {
     );
     final parsed = MeetingAiParser.parseResponse(response.content);
 
-    final beforeCount = meeting.actionItems.length;
-    final updatedMeeting = await addActionItems(meeting, parsed.actionItems);
+    final latestMeeting =
+        state.asData?.value
+            .where((item) => item.id == meeting.id)
+            .firstOrNull ??
+        meeting;
+
+    final beforeCount = latestMeeting.actionItems.length;
+    final updatedMeeting = await addActionItems(
+      latestMeeting,
+      parsed.actionItems,
+    );
     final addedCount = updatedMeeting.actionItems.length - beforeCount;
 
     return MeetingAiExtractionResult(
