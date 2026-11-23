@@ -1,0 +1,27 @@
+# Superpowers SDD scratch workspace
+.superpowers/
+
+# Local secrets (NEVER commit)
+env/secrets.json
+
+# Flutter/Dart defaults
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+.pub-cache/
+.pub/
+build/
+*.iml
+.idea/
+.vscode/
+android/.gradle/
+android/local.properties
+android/app/debug/
+android/app/profile/
+android/app/release/
+ios/Pods/
+ios/.symlinks/
+windows/flutter/ephemeral/
+linux/flutter/ephemeral/
+macos/Flutter/ephemeral/
