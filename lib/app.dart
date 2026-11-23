@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:personal_hub/core/theme/app_theme.dart';
 import 'package:personal_hub/features/ai/ui/ai_chat_screen.dart';
+import 'package:personal_hub/features/notes/ui/notes_screen.dart';
 
 /// Root Material 3 application widget for Personal Hub.
 class PersonalHubApp extends StatelessWidget {
@@ -70,7 +71,11 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
         index: _selectedIndex,
         children: [
           for (var i = 0; i < _tabs.length; i++)
-            i == 4 ? const AiChatScreen() : _TabPlaceholderPage(tab: _tabs[i]),
+            switch (i) {
+              1 => const NotesScreen(),
+              4 => const AiChatScreen(),
+              _ => _TabPlaceholderPage(tab: _tabs[i]),
+            },
         ],
       ),
       bottomNavigationBar: NavigationBar(
