@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:personal_hub/core/errors/app_exceptions.dart';
+import 'package:personal_hub/core/theme/app_tokens.dart';
 import 'package:personal_hub/core/theme/glass_widgets.dart';
+import 'package:personal_hub/core/theme/hub_widgets.dart';
 import 'package:personal_hub/features/meetings/models/meeting.dart';
 import 'package:personal_hub/features/meetings/providers/meetings_providers.dart';
 import 'package:personal_hub/features/meetings/ui/meetings_screen.dart';
@@ -164,6 +167,22 @@ class _MeetingFormScreenState extends ConsumerState<MeetingFormScreen> {
     }
   }
 
+  void _setScheduledDate(DateTime targetDate) {
+    setState(() {
+      _scheduledAt = DateTime(
+        targetDate.year,
+        targetDate.month,
+        targetDate.day,
+        _scheduledAt.hour,
+        _scheduledAt.minute,
+      );
+    });
+  }
+
+  bool _isSameDay(DateTime a, DateTime b) {
+    return a.year == b.year && a.month == b.month && a.day == b.day;
+  }
+
   String _reminderLabel(int minutes) {
     if (minutes == 0) return 'Tanpa pengingat';
     if (minutes == 60) return '1 jam sebelum';
@@ -173,6 +192,11 @@ class _MeetingFormScreenState extends ConsumerState<MeetingFormScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final tomorrow = today.add(const Duration(days: 1));
+    final isToday = _isSameDay(_scheduledAt, today);
+    final isTomorrow = _isSameDay(_scheduledAt, tomorrow);
 
     return GlassScaffold(
       appBar: GlassAppBar(
@@ -185,12 +209,14 @@ class _MeetingFormScreenState extends ConsumerState<MeetingFormScreen> {
           child: ListView(
             padding: const EdgeInsets.all(16),
             children: [
+              // 1. Judul Meeting
               TextFormField(
                 controller: _titleController,
                 textInputAction: TextInputAction.next,
                 decoration: const InputDecoration(
                   labelText: 'Judul Meeting *',
                   hintText: 'Contoh: Sinkronisasi Mingguan Tim',
+                  prefixIcon: Icon(LucideIcons.calendar),
                 ),
                 validator: (value) {
                   if (value == null || value.trim().isEmpty) {
@@ -200,109 +226,183 @@ class _MeetingFormScreenState extends ConsumerState<MeetingFormScreen> {
                 },
               ),
               const SizedBox(height: 16),
+
+              // 2. Tanggal & Jam (Tactile M3 dengan Chip Cepat Hari Ini / Besok)
               Text(
-                'Jadwal',
+                'Jadwal & Waktu',
                 style: theme.textTheme.labelLarge?.copyWith(
-                  fontWeight: FontWeight.w600,
+                  fontWeight: FontWeight.w700,
+                  color: AppTokens.textSecondary(context),
                 ),
               ),
               const SizedBox(height: 8),
-              Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(12),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        formatMeetingDateTime(_scheduledAt),
-                        style: theme.textTheme.titleSmall?.copyWith(
-                          fontWeight: FontWeight.w600,
+              HubCard(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Expanded(
+                          child: Text(
+                            formatMeetingDateTime(_scheduledAt),
+                            style: HubTypography.tabular(
+                              theme.textTheme.titleSmall?.copyWith(
+                                fontWeight: FontWeight.w700,
+                              ) ?? const TextStyle(fontWeight: FontWeight.w700),
+                            ),
+                          ),
                         ),
-                      ),
-                      const SizedBox(height: 10),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: OutlinedButton.icon(
-                              onPressed: _pickDate,
-                              icon: const Icon(Icons.calendar_today_outlined),
-                              label: const Text('Pilih Tanggal'),
+                        // Quick chips Hari Ini / Besok
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            HubPill(
+                              label: 'Hari Ini',
+                              isSelected: isToday,
+                              onTap: () => _setScheduledDate(today),
                             ),
-                          ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: OutlinedButton.icon(
-                              onPressed: _pickTime,
-                              icon: const Icon(Icons.access_time_rounded),
-                              label: const Text('Pilih Jam'),
+                            const SizedBox(width: 6),
+                            HubPill(
+                              label: 'Besok',
+                              isSelected: isTomorrow,
+                              onTap: () => _setScheduledDate(tomorrow),
                             ),
+                          ],
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            onPressed: _pickDate,
+                            icon: const Icon(LucideIcons.calendar, size: 16),
+                            label: const Text('Pilih Tanggal'),
                           ),
-                        ],
-                      ),
-                    ],
-                  ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            onPressed: _pickTime,
+                            icon: const Icon(LucideIcons.clock, size: 16),
+                            label: const Text('Pilih Jam'),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
                 ),
               ),
               const SizedBox(height: 16),
+
+              // 3. Lokasi / Tautan
               TextFormField(
                 controller: _locationController,
                 textInputAction: TextInputAction.next,
                 decoration: const InputDecoration(
                   labelText: 'Lokasi / Tautan',
                   hintText: 'Contoh: Ruang Anggrek atau Google Meet',
+                  prefixIcon: Icon(LucideIcons.mapPin),
                 ),
               ),
               const SizedBox(height: 16),
-              TextFormField(
-                controller: _attendeesController,
-                textInputAction: TextInputAction.next,
-                decoration: const InputDecoration(
-                  labelText: 'Peserta',
-                  hintText: 'Pisahkan dengan koma, misal: Budi, Sari, Andi',
-                ),
-              ),
-              const SizedBox(height: 16),
-              DropdownButtonFormField<int>(
-                initialValue: _reminderMinutes,
-                decoration: const InputDecoration(labelText: 'Pengingat'),
-                items: [
-                  for (final minutes in _reminderOptions)
-                    DropdownMenuItem<int>(
-                      value: minutes,
-                      child: Text(_reminderLabel(minutes)),
+
+              // 4. Detail Tambahan Lipat
+              HubCard(
+                padding: EdgeInsets.zero,
+                child: Theme(
+                  data: theme.copyWith(dividerColor: Colors.transparent),
+                  child: ExpansionTile(
+                    initiallyExpanded: _isEditing ||
+                        _attendeesController.text.isNotEmpty ||
+                        _agendaController.text.isNotEmpty ||
+                        _notesController.text.isNotEmpty,
+                    leading: Icon(LucideIcons.slidersHorizontal, color: AppTokens.primary(context)),
+                    title: Text(
+                      'Detail Tambahan',
+                      style: theme.textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
-                ],
-                onChanged: (value) {
-                  if (value != null) {
-                    setState(() {
-                      _reminderMinutes = value;
-                    });
-                  }
-                },
-              ),
-              const SizedBox(height: 16),
-              TextFormField(
-                controller: _agendaController,
-                minLines: 2,
-                maxLines: 5,
-                decoration: const InputDecoration(
-                  labelText: 'Agenda',
-                  hintText: 'Topik utama yang akan dibahas...',
-                  alignLabelWithHint: true,
-                ),
-              ),
-              const SizedBox(height: 16),
-              TextFormField(
-                controller: _notesController,
-                minLines: 4,
-                maxLines: 10,
-                decoration: const InputDecoration(
-                  labelText: 'Catatan / Notulensi',
-                  hintText: 'Tulis poin diskusi dan keputusan rapat...',
-                  alignLabelWithHint: true,
+                    subtitle: Text(
+                      'Peserta, Pengingat, Agenda, & Catatan',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: AppTokens.textSecondary(context),
+                      ),
+                    ),
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            const Divider(height: 1),
+                            const SizedBox(height: 16),
+                            TextFormField(
+                              controller: _attendeesController,
+                              textInputAction: TextInputAction.next,
+                              decoration: const InputDecoration(
+                                labelText: 'Peserta',
+                                hintText: 'Pisahkan dengan koma, misal: Budi, Sari, Andi',
+                                prefixIcon: Icon(LucideIcons.users),
+                              ),
+                            ),
+                            const SizedBox(height: 16),
+                            DropdownButtonFormField<int>(
+                              initialValue: _reminderMinutes,
+                              decoration: const InputDecoration(
+                                labelText: 'Pengingat',
+                                prefixIcon: Icon(LucideIcons.bell),
+                              ),
+                              items: [
+                                for (final minutes in _reminderOptions)
+                                  DropdownMenuItem<int>(
+                                    value: minutes,
+                                    child: Text(_reminderLabel(minutes)),
+                                  ),
+                              ],
+                              onChanged: (value) {
+                                if (value != null) {
+                                  setState(() {
+                                    _reminderMinutes = value;
+                                  });
+                                }
+                              },
+                            ),
+                            const SizedBox(height: 16),
+                            TextFormField(
+                              controller: _agendaController,
+                              minLines: 2,
+                              maxLines: 5,
+                              decoration: const InputDecoration(
+                                labelText: 'Agenda',
+                                hintText: 'Topik utama yang akan dibahas...',
+                                alignLabelWithHint: true,
+                              ),
+                            ),
+                            const SizedBox(height: 16),
+                            TextFormField(
+                              controller: _notesController,
+                              minLines: 3,
+                              maxLines: 8,
+                              decoration: const InputDecoration(
+                                labelText: 'Catatan / Notulensi',
+                                hintText: 'Tulis poin diskusi dan keputusan rapat...',
+                                alignLabelWithHint: true,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
               const SizedBox(height: 24),
+
+              // 5. Tombol Simpan
               FilledButton.icon(
                 onPressed: _isSaving ? null : _handleSave,
                 icon: _isSaving
@@ -311,7 +411,7 @@ class _MeetingFormScreenState extends ConsumerState<MeetingFormScreen> {
                         height: 18,
                         child: CircularProgressIndicator(strokeWidth: 2),
                       )
-                    : const Icon(Icons.save_outlined),
+                    : const Icon(LucideIcons.save),
                 label: Text(_isEditing ? 'Simpan Perubahan' : 'Simpan Meeting'),
               ),
             ],

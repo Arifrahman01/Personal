@@ -1,13 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:personal_hub/core/errors/app_exceptions.dart';
-import 'package:personal_hub/core/theme/glass_widgets.dart';
+import 'package:personal_hub/core/theme/app_tokens.dart';
+import 'package:personal_hub/core/theme/hub_widgets.dart';
+import 'package:personal_hub/features/settings/ui/pages/security_vault_settings_page.dart';
 import 'package:personal_hub/features/vault/models/vault_entry.dart';
-import 'package:personal_hub/features/vault/providers/vault_lock_controller.dart';
 import 'package:personal_hub/features/vault/providers/vault_providers.dart';
 import 'package:personal_hub/features/vault/services/password_generator.dart';
 
-/// Unlocked password vault screen with search, reveal toggle, clipboard auto-clear, and CRUD.
+/// Unlocked password vault screen with category filtering, 1-tap copy,
+/// account detail sheet, and security settings.
 class VaultListScreen extends ConsumerStatefulWidget {
   const VaultListScreen({super.key});
 
@@ -17,12 +20,78 @@ class VaultListScreen extends ConsumerStatefulWidget {
 
 class _VaultListScreenState extends ConsumerState<VaultListScreen> {
   final TextEditingController _searchController = TextEditingController();
-  final Set<String> _revealedIds = <String>{};
+  String _selectedCategory = 'Semua';
+
+  static const List<String> _categories = [
+    'Semua',
+    'Kerja',
+    'Keuangan',
+    'Pribadi',
+  ];
 
   @override
   void dispose() {
     _searchController.dispose();
     super.dispose();
+  }
+
+  static String resolveEntryCategory(VaultEntry entry) {
+    final combined =
+        '${entry.title} ${entry.url} ${entry.username} ${entry.notes}'
+            .toLowerCase();
+
+    if (combined.contains('bank') ||
+        combined.contains('bca') ||
+        combined.contains('mandiri') ||
+        combined.contains('paypal') ||
+        combined.contains('crypto') ||
+        combined.contains('finance') ||
+        combined.contains('wallet') ||
+        combined.contains('kartu') ||
+        combined.contains('bni') ||
+        combined.contains('bri') ||
+        combined.contains('jenius') ||
+        combined.contains('jago') ||
+        combined.contains('ovo') ||
+        combined.contains('gopay') ||
+        combined.contains('dana') ||
+        combined.contains('bibit') ||
+        combined.contains('ajaib') ||
+        combined.contains('saham')) {
+      return 'Keuangan';
+    }
+
+    if (combined.contains('google') ||
+        combined.contains('github') ||
+        combined.contains('work') ||
+        combined.contains('slack') ||
+        combined.contains('jira') ||
+        combined.contains('office') ||
+        combined.contains('gitlab') ||
+        combined.contains('dev') ||
+        combined.contains('aws') ||
+        combined.contains('cloud') ||
+        combined.contains('trello') ||
+        combined.contains('zoom') ||
+        combined.contains('teams') ||
+        combined.contains('linkedin') ||
+        combined.contains('kerja')) {
+      return 'Kerja';
+    }
+
+    return 'Pribadi';
+  }
+
+  static Color getCategoryColor(String category, BuildContext context) {
+    switch (category) {
+      case 'Kerja':
+        return AppTokens.info(context);
+      case 'Keuangan':
+        return AppTokens.primary(context);
+      case 'Pribadi':
+      default:
+        return const Color(0xFF8B5CF6);
+    }
   }
 
   Future<void> _copyWithGuard(String secret, {required String label}) async {
@@ -32,10 +101,19 @@ class _VaultListScreenState extends ConsumerState<VaultListScreen> {
       ..hideCurrentSnackBar()
       ..showSnackBar(
         SnackBar(
-          content: Text(
-            '$label disalin. Clipboard akan dihapus otomatis dalam 30 detik.',
+          content: Row(
+            children: [
+              const Icon(LucideIcons.timer, color: Colors.white, size: 16),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  '$label disalin. Clipboard akan dihapus otomatis dalam 30 detik.',
+                ),
+              ),
+            ],
           ),
           duration: const Duration(seconds: 4),
+          behavior: SnackBarBehavior.floating,
         ),
       );
   }
@@ -45,8 +123,47 @@ class _VaultListScreenState extends ConsumerState<VaultListScreen> {
       context: context,
       isScrollControlled: true,
       useSafeArea: true,
+      backgroundColor: AppTokens.card(context),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(HubRadius.lg)),
+      ),
       builder: (sheetContext) {
         return _VaultEntryFormSheet(existing: existing);
+      },
+    );
+  }
+
+  Future<void> _openDetailSheet(VaultEntry entry) async {
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      backgroundColor: AppTokens.card(context),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(HubRadius.lg)),
+      ),
+      builder: (sheetContext) {
+        return _VaultAccountDetailSheet(
+          entry: entry,
+          onCopyPassword: () => _copyWithGuard(
+            entry.password,
+            label: 'Kata sandi',
+          ),
+          onCopyUsername: entry.username.isNotEmpty
+              ? () => _copyWithGuard(entry.username, label: 'Username')
+              : null,
+          onCopyUrl: entry.url.isNotEmpty
+              ? () => _copyWithGuard(entry.url, label: 'URL')
+              : null,
+          onEdit: () {
+            Navigator.of(sheetContext).pop();
+            _openEntryForm(existing: entry);
+          },
+          onDelete: () async {
+            Navigator.of(sheetContext).pop();
+            await _confirmDelete(entry);
+          },
+        );
       },
     );
   }
@@ -56,7 +173,7 @@ class _VaultListScreenState extends ConsumerState<VaultListScreen> {
       context: context,
       builder: (dialogContext) {
         return AlertDialog(
-          title: const Text('Hapus Entri Brankas?'),
+          title: const Text('Hapus Akun Brankas?'),
           content: Text(
             'Akun "${entry.title}" akan dihapus permanen dari brankas terenkripsi.',
           ),
@@ -66,6 +183,9 @@ class _VaultListScreenState extends ConsumerState<VaultListScreen> {
               child: const Text('Batal'),
             ),
             FilledButton(
+              style: FilledButton.styleFrom(
+                backgroundColor: AppTokens.error(context),
+              ),
               onPressed: () => Navigator.of(dialogContext).pop(true),
               child: const Text('Hapus'),
             ),
@@ -76,268 +196,21 @@ class _VaultListScreenState extends ConsumerState<VaultListScreen> {
 
     if (confirmed == true && mounted) {
       await ref.read(vaultEntriesProvider.notifier).deleteEntry(entry.id);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Akun "${entry.title}" telah dihapus.'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
     }
   }
 
-  Future<void> _openDuressPinDialog() async {
-    final controller = ref.read(vaultLockControllerProvider);
-    final pinController = TextEditingController();
-    final confirmController = TextEditingController();
-    String? errorText;
-
-    final result = await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) {
-        return StatefulBuilder(
-          builder: (context, setDialogState) {
-            return AlertDialog(
-              title: const Row(
-                children: [
-                  Icon(Icons.shield_outlined, size: 22),
-                  SizedBox(width: 8),
-                  Text('Atur Duress PIN'),
-                ],
-              ),
-              content: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Duress PIN adalah PIN umpan darurat. Saat dimasukkan di layar brankas, brankas akan membuka profil alternatif (decoy) yang aman tanpa mengekspos akun Anda yang sebenarnya.',
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: Theme.of(context).colorScheme.onSurfaceVariant,
-                            height: 1.35,
-                          ),
-                    ),
-                    const SizedBox(height: 16),
-                    TextField(
-                      controller: pinController,
-                      obscureText: true,
-                      keyboardType: TextInputType.number,
-                      decoration: const InputDecoration(
-                        labelText: 'Duress PIN Baru',
-                        hintText: 'Min. 4 digit angka',
-                        prefixIcon: Icon(Icons.pin_outlined),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    TextField(
-                      controller: confirmController,
-                      obscureText: true,
-                      keyboardType: TextInputType.number,
-                      decoration: const InputDecoration(
-                        labelText: 'Konfirmasi Duress PIN',
-                        hintText: 'Ulangi PIN umpan',
-                        prefixIcon: Icon(Icons.verified_user_outlined),
-                      ),
-                    ),
-                    if (errorText != null) ...[
-                      const SizedBox(height: 10),
-                      Text(
-                        errorText!,
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                              color: Theme.of(context).colorScheme.error,
-                              fontWeight: FontWeight.w600,
-                            ),
-                      ),
-                    ],
-                  ],
-                ),
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.of(dialogContext).pop(false),
-                  child: const Text('Batal'),
-                ),
-                FilledButton(
-                  onPressed: () async {
-                    final pin = pinController.text.trim();
-                    final confirm = confirmController.text.trim();
-                    if (pin != confirm) {
-                      setDialogState(() {
-                        errorText = 'Konfirmasi Duress PIN tidak cocok.';
-                      });
-                      return;
-                    }
-                    try {
-                      await controller.setupDuressPin(pin);
-                      if (dialogContext.mounted) {
-                        Navigator.of(dialogContext).pop(true);
-                      }
-                    } on ValidationException catch (e) {
-                      setDialogState(() {
-                        errorText = e.message;
-                      });
-                    } catch (_) {
-                      setDialogState(() {
-                        errorText = 'Gagal menyimpan Duress PIN. Coba lagi.';
-                      });
-                    }
-                  },
-                  child: const Text('Simpan Duress PIN'),
-                ),
-              ],
-            );
-          },
-        );
-      },
-    );
-
-    pinController.dispose();
-    confirmController.dispose();
-
-    if (result == true && mounted) {
-      ScaffoldMessenger.of(context)
-        ..hideCurrentSnackBar()
-        ..showSnackBar(
-          const SnackBar(
-            content: Text('Duress PIN (PIN Umpan) berhasil dikonfigurasi.'),
-          ),
-        );
-    }
-  }
-
-  Future<void> _openVaultSecuritySettings() async {
-    final controller = ref.read(vaultLockControllerProvider);
-    final hasDuress = await controller.hasDuressPin();
-    if (!mounted) return;
-
-    await showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      useSafeArea: true,
-      builder: (sheetContext) {
-        return StatefulBuilder(
-          builder: (context, setSheetState) {
-            final activeTimeout = controller.autoLockTimeout;
-
-            return Padding(
-              padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Center(
-                    child: Container(
-                      width: 40,
-                      height: 4,
-                      decoration: BoxDecoration(
-                        color: Theme.of(context).colorScheme.onSurfaceVariant.withValues(alpha: 0.4),
-                        borderRadius: BorderRadius.circular(2),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  Row(
-                    children: [
-                      const GlassIconTile(
-                        icon: Icons.security_rounded,
-                        size: 40,
-                        iconSize: 20,
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Text(
-                          'Keamanan & Pengaturan Brankas',
-                          style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                                fontWeight: FontWeight.w700,
-                              ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 20),
-                  Text(
-                    'Kunci Otomatis (Auto-Lock Timeout)',
-                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                          fontWeight: FontWeight.w700,
-                        ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    'Kunci brankas jika aplikasi diminimalkan atau tidak aktif.',
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: Theme.of(context).colorScheme.onSurfaceVariant,
-                        ),
-                  ),
-                  const SizedBox(height: 10),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: [
-                      for (final item in [
-                        (AutoLockTimeout.immediate, 'Seketika'),
-                        (AutoLockTimeout.seconds30, '30 Detik'),
-                        (AutoLockTimeout.minute1, '1 Menit'),
-                        (AutoLockTimeout.minutes5, '5 Menit'),
-                      ])
-                        ChoiceChip(
-                          label: Text(item.$2),
-                          selected: activeTimeout == item.$1,
-                          onSelected: (selected) async {
-                            if (selected) {
-                              await controller.setAutoLockTimeout(item.$1);
-                              setSheetState(() {});
-                            }
-                          },
-                        ),
-                    ],
-                  ),
-                  const Divider(height: 32),
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Duress PIN (Anti-Pemaksaan)',
-                              style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                                    fontWeight: FontWeight.w700,
-                                  ),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              hasDuress
-                                  ? 'Duress PIN aktif. Jika dipaksa membuka brankas, masukkan PIN ini untuk membuka profil akun umpan tanpa membocorkan data asli.'
-                                  : 'Belum diatur. Konfigurasikan PIN umpan untuk perlindungan ekstra saat berada dalam ancaman atau pemaksaan.',
-                              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                    color: Theme.of(context).colorScheme.onSurfaceVariant,
-                                  ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      GlassBadge(
-                        label: hasDuress ? 'Aktif' : 'Nonaktif',
-                        backgroundColor: (hasDuress
-                                ? Theme.of(context).colorScheme.primaryContainer
-                                : Theme.of(context).colorScheme.surfaceContainerHighest)
-                            .withValues(alpha: 0.7),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  SizedBox(
-                    width: double.infinity,
-                    child: OutlinedButton.icon(
-                      icon: const Icon(Icons.pin_outlined, size: 18),
-                      label: Text(hasDuress ? 'Ubah Duress PIN' : 'Konfigurasi Duress PIN'),
-                      onPressed: () {
-                        Navigator.of(sheetContext).pop();
-                        _openDuressPinDialog();
-                      },
-                    ),
-                  ),
-                ],
-              ),
-            );
-          },
-        );
-      },
+  void _openSecuritySettings() {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => const SecurityVaultSettingsPage(),
+      ),
     );
   }
 
@@ -347,138 +220,106 @@ class _VaultListScreenState extends ConsumerState<VaultListScreen> {
     final query = ref.watch(vaultSearchQueryProvider);
     final vaultLock = ref.watch(vaultLockControllerProvider);
     final isDecoy = vaultLock.isDecoyMode;
-    final theme = Theme.of(context);
+    final primary = AppTokens.primary(context);
 
-    return GlassScaffold(
-      appBar: GlassAppBar(
+    return Scaffold(
+      backgroundColor: AppTokens.canvas(context),
+      appBar: AppBar(
         title: const Text('Brankas Kata Sandi'),
+        backgroundColor: AppTokens.canvas(context),
+        centerTitle: false,
+        elevation: 0,
         actions: [
           IconButton(
             tooltip: 'Pengaturan Brankas & Duress PIN',
-            icon: const Icon(Icons.shield_outlined),
-            onPressed: _openVaultSecuritySettings,
+            icon: const Icon(LucideIcons.shieldCheck),
+            onPressed: _openSecuritySettings,
           ),
           IconButton(
             tooltip: 'Kunci brankas sekarang',
-            icon: const Icon(Icons.lock_outline_rounded),
+            icon: const Icon(LucideIcons.lock),
             onPressed: () {
-              setState(() {
-                _revealedIds.clear();
-              });
               ref.read(vaultLockControllerProvider).lock();
             },
           ),
         ],
       ),
-      floatingActionButton: GlassFabAnchor(
-        child: Container(
-          decoration: BoxDecoration(
-            gradient: RefleqPalette.lavenderCloud,
-            borderRadius: BorderRadius.circular(20),
-            boxShadow: [
-              BoxShadow(
-                color: const Color(0xFF8B5CF6).withValues(alpha: 0.42),
-                blurRadius: 18,
-                offset: const Offset(0, 6),
-              ),
-            ],
-          ),
-          child: Material(
-            color: Colors.transparent,
-            child: InkWell(
-              borderRadius: BorderRadius.circular(20),
-              onTap: () => _openEntryForm(),
-              child: const Padding(
-                padding: EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+      floatingActionButton: FloatingActionButton.extended(
+        backgroundColor: primary,
+        foregroundColor: Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: HubRadius.rPill),
+        icon: const Icon(LucideIcons.plus, size: 20),
+        label: const Text(
+          'Tambah Akun',
+          style: TextStyle(fontWeight: FontWeight.w700),
+        ),
+        onPressed: () => _openEntryForm(),
+      ),
+      body: SafeArea(
+        child: Column(
+          children: [
+            // Decoy Mode Banner
+            if (isDecoy)
+              Container(
+                margin: const EdgeInsets.fromLTRB(16, 6, 16, 8),
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                decoration: BoxDecoration(
+                  color: AppTokens.warning(context).withValues(alpha: 0.15),
+                  borderRadius: HubRadius.rSm,
+                  border: Border.all(
+                    color: AppTokens.warning(context).withValues(alpha: 0.4),
+                  ),
+                ),
                 child: Row(
-                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(Icons.add_rounded, color: Colors.white, size: 22),
-                    SizedBox(width: 8),
-                    Text(
-                      'Tambah Akun',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w700,
-                        fontSize: 15,
-                        letterSpacing: -0.2,
+                    Icon(
+                      LucideIcons.shieldAlert,
+                      size: 20,
+                      color: AppTokens.warning(context),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Decoy Mode Aktif',
+                            style: TextStyle(
+                              fontWeight: FontWeight.w700,
+                              fontSize: 13,
+                              color: AppTokens.textPrimary(context),
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            'Brankas sekunder dibuka. Data sensitif asli Anda tetap aman terisolasi.',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: AppTokens.textSecondary(context),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ],
                 ),
               ),
-            ),
-          ),
-        ),
-      ),
-      body: SafeArea(
-        top: false,
-        child: Column(
-          children: [
-            if (isDecoy) ...[
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 6, 16, 4),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                  decoration: BoxDecoration(
-                    color: theme.colorScheme.secondaryContainer.withValues(alpha: 0.55),
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(
-                      color: theme.colorScheme.secondary.withValues(alpha: 0.28),
-                    ),
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(
-                        Icons.shield_outlined,
-                        size: 18,
-                        color: theme.colorScheme.secondary,
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Decoy Mode Aktif',
-                              style: theme.textTheme.labelMedium?.copyWith(
-                                fontWeight: FontWeight.w700,
-                                color: theme.colorScheme.onSecondaryContainer,
-                              ),
-                            ),
-                            const SizedBox(height: 2),
-                            Text(
-                              'Brankas sekunder dibuka. Data sensitif asli Anda tetap aman dan terisolasi.',
-                              style: theme.textTheme.bodySmall?.copyWith(
-                                color: theme.colorScheme.onSecondaryContainer.withValues(alpha: 0.85),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const GlassBadge(
-                        label: 'Aman',
-                        icon: Icons.check_circle_outline,
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ],
+
+            // Search Bar
             Padding(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
               child: TextField(
                 controller: _searchController,
                 onChanged: (value) {
                   ref.read(vaultSearchQueryProvider.notifier).setQuery(value);
                 },
                 decoration: InputDecoration(
-                  hintText: 'Cari judul akun, username, atau URL...',
-                  prefixIcon: const Icon(Icons.search_rounded),
+                  hintText: 'Cari akun, username, atau URL...',
+                  prefixIcon: const Icon(LucideIcons.search, size: 18),
                   suffixIcon: query.isNotEmpty
                       ? IconButton(
                           tooltip: 'Hapus pencarian',
-                          icon: const Icon(Icons.close_rounded),
+                          icon: const Icon(LucideIcons.x, size: 18),
                           onPressed: () {
                             _searchController.clear();
                             ref
@@ -490,6 +331,39 @@ class _VaultListScreenState extends ConsumerState<VaultListScreen> {
                 ),
               ),
             ),
+
+            // Category Filter Chips
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+              child: Row(
+                children: _categories.map((category) {
+                  final isSelected = _selectedCategory == category;
+                  return Padding(
+                    padding: const EdgeInsets.only(right: 8),
+                    child: ChoiceChip(
+                      label: Text(category),
+                      selected: isSelected,
+                      selectedColor: primary.withValues(alpha: 0.18),
+                      labelStyle: TextStyle(
+                        fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                        color: isSelected ? primary : AppTokens.textSecondary(context),
+                      ),
+                      onSelected: (selected) {
+                        if (selected) {
+                          setState(() {
+                            _selectedCategory = category;
+                          });
+                        }
+                      },
+                    ),
+                  );
+                }).toList(),
+              ),
+            ),
+            const SizedBox(height: 4),
+
+            // Entries List
             Expanded(
               child: entriesAsync.when(
                 loading: () => const Center(child: CircularProgressIndicator()),
@@ -500,14 +374,14 @@ class _VaultListScreenState extends ConsumerState<VaultListScreen> {
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Icon(
-                          Icons.error_outline_rounded,
+                          LucideIcons.alertCircle,
                           size: 40,
-                          color: theme.colorScheme.error,
+                          color: AppTokens.error(context),
                         ),
                         const SizedBox(height: 12),
-                        Text(
+                        const Text(
                           'Gagal memuat data brankas.',
-                          style: theme.textTheme.titleMedium,
+                          style: TextStyle(fontWeight: FontWeight.w600),
                         ),
                         const SizedBox(height: 8),
                         FilledButton(
@@ -519,7 +393,14 @@ class _VaultListScreenState extends ConsumerState<VaultListScreen> {
                     ),
                   ),
                 ),
-                data: (entries) {
+                data: (allEntries) {
+                  // Filter by category
+                  final entries = _selectedCategory == 'Semua'
+                      ? allEntries
+                      : allEntries
+                          .where((e) => resolveEntryCategory(e) == _selectedCategory)
+                          .toList();
+
                   if (entries.isEmpty) {
                     return Center(
                       child: Padding(
@@ -527,31 +408,40 @@ class _VaultListScreenState extends ConsumerState<VaultListScreen> {
                         child: Column(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            CircleAvatar(
-                              radius: 30,
-                              backgroundColor:
-                                  theme.colorScheme.primaryContainer,
-                              foregroundColor:
-                                  theme.colorScheme.onPrimaryContainer,
-                              child: const Icon(Icons.vpn_key_outlined, size: 28),
+                            Container(
+                              width: 60,
+                              height: 60,
+                              decoration: BoxDecoration(
+                                color: primary.withValues(alpha: 0.12),
+                                shape: BoxShape.circle,
+                              ),
+                              child: Icon(
+                                LucideIcons.keyRound,
+                                size: 28,
+                                color: primary,
+                              ),
                             ),
                             const SizedBox(height: 16),
                             Text(
                               query.isEmpty
-                                  ? 'Brankas masih kosong'
+                                  ? (_selectedCategory == 'Semua'
+                                      ? 'Brankas masih kosong'
+                                      : 'Tidak ada akun di kategori "$_selectedCategory"')
                                   : 'Akun tidak ditemukan',
-                              style: theme.textTheme.titleMedium?.copyWith(
-                                fontWeight: FontWeight.w600,
+                              style: const TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w700,
                               ),
                             ),
                             const SizedBox(height: 6),
                             Text(
                               query.isEmpty
-                                  ? 'Simpan kata sandi penting Anda dengan enkripsi AES-256-GCM lokal.'
+                                  ? 'Simpan kata sandi Anda dengan aman terlindungi enkripsi AES-256-GCM.'
                                   : 'Coba ubah kata kunci pencarian Anda.',
                               textAlign: TextAlign.center,
-                              style: theme.textTheme.bodyMedium?.copyWith(
-                                color: theme.colorScheme.onSurfaceVariant,
+                              style: TextStyle(
+                                fontSize: 13,
+                                color: AppTokens.textSecondary(context),
                               ),
                             ),
                           ],
@@ -561,36 +451,23 @@ class _VaultListScreenState extends ConsumerState<VaultListScreen> {
                   }
 
                   return ListView.separated(
-                    padding: const EdgeInsets.fromLTRB(16, 4, 16, 96),
+                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 96),
                     itemCount: entries.length,
-                    separatorBuilder: (_, _) => const SizedBox(height: 12),
+                    separatorBuilder: (_, _) => const SizedBox(height: 10),
                     itemBuilder: (context, index) {
                       final entry = entries[index];
-                      final isRevealed = _revealedIds.contains(entry.id);
-                      return _VaultEntryCard(
+                      final category = resolveEntryCategory(entry);
+                      final catColor = getCategoryColor(category, context);
+
+                      return _VaultCompactCard(
                         entry: entry,
-                        isRevealed: isRevealed,
-                        onToggleReveal: () {
-                          setState(() {
-                            if (isRevealed) {
-                              _revealedIds.remove(entry.id);
-                            } else {
-                              _revealedIds.add(entry.id);
-                            }
-                          });
-                        },
+                        category: category,
+                        categoryColor: catColor,
+                        onTap: () => _openDetailSheet(entry),
                         onCopyPassword: () => _copyWithGuard(
                           entry.password,
                           label: 'Kata sandi',
                         ),
-                        onCopyUsername: entry.username.isEmpty
-                            ? null
-                            : () => _copyWithGuard(
-                                entry.username,
-                                label: 'Username',
-                              ),
-                        onEdit: () => _openEntryForm(existing: entry),
-                        onDelete: () => _confirmDelete(entry),
                       );
                     },
                   );
@@ -604,264 +481,412 @@ class _VaultListScreenState extends ConsumerState<VaultListScreen> {
   }
 }
 
-class _VaultEntryCard extends StatelessWidget {
-  const _VaultEntryCard({
+/// Compact tactile Vault Account Card with 1 main copy button (48x48dp).
+class _VaultCompactCard extends StatelessWidget {
+  const _VaultCompactCard({
     required this.entry,
-    required this.isRevealed,
-    required this.onToggleReveal,
+    required this.category,
+    required this.categoryColor,
+    required this.onTap,
     required this.onCopyPassword,
-    required this.onCopyUsername,
-    required this.onEdit,
-    required this.onDelete,
   });
 
   final VaultEntry entry;
-  final bool isRevealed;
-  final VoidCallback onToggleReveal;
+  final String category;
+  final Color categoryColor;
+  final VoidCallback onTap;
   final VoidCallback onCopyPassword;
-  final VoidCallback? onCopyUsername;
-  final VoidCallback onEdit;
-  final VoidCallback onDelete;
-
-  static Color resolveCategoryColor(VaultEntry entry) {
-    final title = entry.title.toLowerCase();
-    final url = entry.url.toLowerCase();
-    final username = entry.username.toLowerCase();
-    final combined = '$title $url $username';
-
-    if (combined.contains('google') ||
-        combined.contains('github') ||
-        combined.contains('work') ||
-        combined.contains('slack') ||
-        combined.contains('jira') ||
-        combined.contains('office') ||
-        combined.contains('gitlab')) {
-      return RefleqPalette.skyCyan;
-    }
-    if (combined.contains('bank') ||
-        combined.contains('bca') ||
-        combined.contains('mandiri') ||
-        combined.contains('paypal') ||
-        combined.contains('crypto') ||
-        combined.contains('finance') ||
-        combined.contains('wallet') ||
-        combined.contains('kartu')) {
-      return RefleqPalette.rosePink;
-    }
-    if (combined.contains('personal') ||
-        combined.contains('pribadi') ||
-        combined.contains('vault') ||
-        combined.contains('master') ||
-        combined.contains('email')) {
-      return RefleqPalette.lavender;
-    }
-    final hash = (entry.id.hashCode ^ entry.title.hashCode).abs();
-    const cycle = [
-      RefleqPalette.lavender,
-      RefleqPalette.skyCyan,
-      RefleqPalette.rosePink,
-      RefleqPalette.emeraldMint,
-    ];
-    return cycle[hash % cycle.length];
-  }
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-    final categoryColor = resolveCategoryColor(entry);
+    final initial = entry.title.trim().isNotEmpty
+        ? entry.title.trim().characters.first.toUpperCase()
+        : '?';
 
-    return GlassCard(
-      padding: EdgeInsets.zero,
-      borderRadius: BorderRadius.circular(18),
-      borderColor: isDark
-          ? Colors.white.withValues(alpha: 0.10)
-          : Colors.black.withValues(alpha: 0.08),
-      tintColor: isDark
-          ? RefleqPalette.surfaceCard.withValues(alpha: 0.72)
-          : Colors.white.withValues(alpha: 0.72),
-      child: IntrinsicHeight(
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            // Category Pastel Stripe
-            Container(
-              width: 4,
-              margin: const EdgeInsets.symmetric(vertical: 12),
-              decoration: BoxDecoration(
-                color: categoryColor,
-                borderRadius: const BorderRadius.horizontal(
-                  right: Radius.circular(3),
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    color: categoryColor.withValues(alpha: 0.50),
-                    blurRadius: 8,
-                    offset: const Offset(1, 0),
-                  ),
-                ],
-              ),
+    return HubCard(
+      padding: const EdgeInsets.all(12),
+      onTap: onTap,
+      child: Row(
+        children: [
+          // Initial Avatar
+          CircleAvatar(
+            radius: 20,
+            backgroundColor: categoryColor.withValues(alpha: 0.15),
+            foregroundColor: categoryColor,
+            child: Text(
+              initial,
+              style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 16),
             ),
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+          ),
+          const SizedBox(width: 12),
+
+          // Title & Username
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Row(
                   children: [
-                    Row(
-                      children: [
-                        CircleAvatar(
-                          backgroundColor:
-                              categoryColor.withValues(alpha: 0.18),
-                          foregroundColor: isDark
-                              ? categoryColor
-                              : const Color(0xFF4C1D95),
-                          child: Text(
-                            entry.title.characters.first.toUpperCase(),
-                            style: const TextStyle(fontWeight: FontWeight.w700),
-                          ),
+                    Flexible(
+                      child: Text(
+                        entry.title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w700,
+                          fontSize: 15,
                         ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                entry.title,
-                                style: theme.textTheme.titleMedium?.copyWith(
-                                  fontWeight: FontWeight.w700,
-                                  letterSpacing: -0.2,
-                                ),
-                              ),
-                              if (entry.username.isNotEmpty)
-                                Text(
-                                  entry.username,
-                                  style: theme.textTheme.bodyMedium?.copyWith(
-                                    color: theme.colorScheme.onSurfaceVariant,
-                                  ),
-                                ),
-                            ],
-                          ),
-                        ),
-                        IconButton(
-                          tooltip: 'Edit entri',
-                          icon: const Icon(Icons.edit_outlined),
-                          onPressed: onEdit,
-                        ),
-                        IconButton(
-                          tooltip: 'Hapus entri',
-                          icon: Icon(
-                            Icons.delete_outline_rounded,
-                            color: theme.colorScheme.error,
-                          ),
-                          onPressed: onDelete,
-                        ),
-                      ],
+                      ),
                     ),
-                    const SizedBox(height: 12),
+                    const SizedBox(width: 6),
                     Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 8,
-                      ),
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                       decoration: BoxDecoration(
-                        color: isDark
-                            ? RefleqPalette.surface.withValues(alpha: 0.75)
-                            : theme.colorScheme.surfaceContainerHighest
-                                .withValues(alpha: 0.45),
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(
-                          color: isDark
-                              ? Colors.white.withValues(alpha: 0.08)
-                              : Colors.black.withValues(alpha: 0.06),
-                        ),
+                        color: categoryColor.withValues(alpha: 0.12),
+                        borderRadius: HubRadius.rPill,
                       ),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: Text(
-                              isRevealed ? entry.password : '••••••••••••',
-                              style: theme.textTheme.bodyMedium?.copyWith(
-                                fontFamily: 'monospace',
-                                letterSpacing: isRevealed ? 0.5 : 2.0,
-                                color: isRevealed
-                                    ? RefleqPalette.lavender
-                                    : null,
-                                fontWeight: isRevealed
-                                    ? FontWeight.w600
-                                    : FontWeight.w400,
-                              ),
-                            ),
-                          ),
-                          IconButton(
-                            tooltip: isRevealed
-                                ? 'Sembunyikan sandi'
-                                : 'Tampilkan sandi',
-                            icon: Icon(
-                              isRevealed
-                                  ? Icons.visibility_off_outlined
-                                  : Icons.visibility_outlined,
-                              color:
-                                  isRevealed ? RefleqPalette.lavender : null,
-                            ),
-                            onPressed: onToggleReveal,
-                          ),
-                          IconButton(
-                            tooltip: 'Salin kata sandi',
-                            icon: const Icon(Icons.copy_rounded),
-                            onPressed: onCopyPassword,
-                          ),
-                        ],
+                      child: Text(
+                        category,
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w700,
+                          color: categoryColor,
+                        ),
                       ),
                     ),
-                    if (entry.url.isNotEmpty ||
-                        entry.notes.isNotEmpty ||
-                        onCopyUsername != null) ...[
-                      const SizedBox(height: 10),
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 6,
-                        crossAxisAlignment: WrapCrossAlignment.center,
-                        children: [
-                          if (onCopyUsername != null)
-                            ActionChip(
-                              avatar:
-                                  const Icon(Icons.person_outline, size: 16),
-                              label: const Text('Salin Username'),
-                              onPressed: onCopyUsername,
-                            ),
-                          if (entry.url.isNotEmpty)
-                            Chip(
-                              avatar:
-                                  const Icon(Icons.link_rounded, size: 16),
-                              label: Text(
-                                entry.url,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                        ],
-                      ),
-                      if (entry.notes.isNotEmpty) ...[
-                        const SizedBox(height: 6),
-                        Text(
-                          entry.notes,
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: theme.colorScheme.onSurfaceVariant,
-                          ),
-                        ),
-                      ],
-                    ],
                   ],
                 ),
-              ),
+                const SizedBox(height: 3),
+                Text(
+                  entry.username.isNotEmpty ? entry.username : '••••••••••••',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: AppTokens.textSecondary(context),
+                  ),
+                ),
+              ],
             ),
-          ],
-        ),
+          ),
+
+          // 1 Main Action Button: Salin Sandi (48x48dp)
+          IconButton(
+            constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
+            tooltip: 'Salin kata sandi',
+            icon: const Icon(LucideIcons.copy, size: 20),
+            color: AppTokens.primary(context),
+            onPressed: onCopyPassword,
+          ),
+        ],
       ),
     );
   }
 }
 
+/// Detail Sheet Akun: displays full details, temporary password reveal,
+/// copy actions, edit and delete options.
+class _VaultAccountDetailSheet extends StatefulWidget {
+  const _VaultAccountDetailSheet({
+    required this.entry,
+    required this.onCopyPassword,
+    this.onCopyUsername,
+    this.onCopyUrl,
+    required this.onEdit,
+    required this.onDelete,
+  });
+
+  final VaultEntry entry;
+  final VoidCallback onCopyPassword;
+  final VoidCallback? onCopyUsername;
+  final VoidCallback? onCopyUrl;
+  final VoidCallback onEdit;
+  final VoidCallback onDelete;
+
+  @override
+  State<_VaultAccountDetailSheet> createState() =>
+      _VaultAccountDetailSheetState();
+}
+
+class _VaultAccountDetailSheetState extends State<_VaultAccountDetailSheet> {
+  bool _isPasswordRevealed = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final entry = widget.entry;
+    final category = _VaultListScreenState.resolveEntryCategory(entry);
+    final catColor = _VaultListScreenState.getCategoryColor(category, context);
+    final primary = AppTokens.primary(context);
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // Drag handle
+          Center(
+            child: Container(
+              width: 38,
+              height: 4,
+              decoration: BoxDecoration(
+                color: AppTokens.border(context),
+                borderRadius: HubRadius.rPill,
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+
+          // Header
+          Row(
+            children: [
+              CircleAvatar(
+                radius: 22,
+                backgroundColor: catColor.withValues(alpha: 0.15),
+                foregroundColor: catColor,
+                child: Text(
+                  entry.title.isNotEmpty
+                      ? entry.title.characters.first.toUpperCase()
+                      : '?',
+                  style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 18),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      entry.title,
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      category,
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: catColor,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              IconButton(
+                tooltip: 'Tutup',
+                icon: const Icon(LucideIcons.x, size: 20),
+                onPressed: () => Navigator.of(context).pop(),
+              ),
+            ],
+          ),
+          const SizedBox(height: 20),
+
+          // Username Field
+          if (entry.username.isNotEmpty) ...[
+            Text(
+              'Username / Email',
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: AppTokens.textSecondary(context),
+              ),
+            ),
+            const SizedBox(height: 6),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              decoration: BoxDecoration(
+                color: AppTokens.canvas(context),
+                borderRadius: HubRadius.rSm,
+                border: Border.all(color: AppTokens.border(context)),
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: SelectableText(
+                      entry.username,
+                      style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+                    ),
+                  ),
+                  if (widget.onCopyUsername != null)
+                    IconButton(
+                      tooltip: 'Salin username',
+                      constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
+                      icon: const Icon(LucideIcons.copy, size: 18),
+                      onPressed: widget.onCopyUsername,
+                    ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 14),
+          ],
+
+          // Password Field
+          Text(
+            'Kata Sandi',
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: AppTokens.textSecondary(context),
+            ),
+          ),
+          const SizedBox(height: 6),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            decoration: BoxDecoration(
+              color: AppTokens.canvas(context),
+              borderRadius: HubRadius.rSm,
+              border: Border.all(color: AppTokens.border(context)),
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: SelectableText(
+                    _isPasswordRevealed ? entry.password : '••••••••••••',
+                    style: TextStyle(
+                      fontFamily: 'monospace',
+                      fontSize: 15,
+                      letterSpacing: _isPasswordRevealed ? 0.5 : 2.5,
+                      fontWeight:
+                          _isPasswordRevealed ? FontWeight.w600 : FontWeight.w400,
+                      color: _isPasswordRevealed ? primary : null,
+                    ),
+                  ),
+                ),
+                IconButton(
+                  tooltip: _isPasswordRevealed ? 'Sembunyikan sandi' : 'Tampilkan sandi',
+                  constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
+                  icon: Icon(
+                    _isPasswordRevealed ? LucideIcons.eyeOff : LucideIcons.eye,
+                    size: 18,
+                  ),
+                  onPressed: () {
+                    setState(() {
+                      _isPasswordRevealed = !_isPasswordRevealed;
+                    });
+                  },
+                ),
+                IconButton(
+                  tooltip: 'Salin kata sandi',
+                  constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
+                  icon: const Icon(LucideIcons.copy, size: 18),
+                  onPressed: widget.onCopyPassword,
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 14),
+
+          // URL Field
+          if (entry.url.isNotEmpty) ...[
+            Text(
+              'Alamat Website / URL',
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: AppTokens.textSecondary(context),
+              ),
+            ),
+            const SizedBox(height: 6),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              decoration: BoxDecoration(
+                color: AppTokens.canvas(context),
+                borderRadius: HubRadius.rSm,
+                border: Border.all(color: AppTokens.border(context)),
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: SelectableText(
+                      entry.url,
+                      maxLines: 1,
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: AppTokens.info(context),
+                      ),
+                    ),
+                  ),
+                  if (widget.onCopyUrl != null)
+                    IconButton(
+                      tooltip: 'Salin URL',
+                      constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
+                      icon: const Icon(LucideIcons.copy, size: 18),
+                      onPressed: widget.onCopyUrl,
+                    ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 14),
+          ],
+
+          // Notes Field
+          if (entry.notes.isNotEmpty) ...[
+            Text(
+              'Catatan Tambahan',
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: AppTokens.textSecondary(context),
+              ),
+            ),
+            const SizedBox(height: 6),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              decoration: BoxDecoration(
+                color: AppTokens.canvas(context),
+                borderRadius: HubRadius.rSm,
+                border: Border.all(color: AppTokens.border(context)),
+              ),
+              child: SelectableText(
+                entry.notes,
+                style: const TextStyle(fontSize: 13, height: 1.35),
+              ),
+            ),
+            const SizedBox(height: 18),
+          ],
+
+          // Action Buttons: Edit and Delete
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton.icon(
+                  style: OutlinedButton.styleFrom(
+                    minimumSize: const Size.fromHeight(46),
+                    shape: RoundedRectangleBorder(borderRadius: HubRadius.rSm),
+                  ),
+                  icon: const Icon(LucideIcons.pencil, size: 16),
+                  label: const Text('Edit Akun'),
+                  onPressed: widget.onEdit,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: FilledButton.icon(
+                  style: FilledButton.styleFrom(
+                    backgroundColor: AppTokens.error(context),
+                    foregroundColor: Colors.white,
+                    minimumSize: const Size.fromHeight(46),
+                    shape: RoundedRectangleBorder(borderRadius: HubRadius.rSm),
+                  ),
+                  icon: const Icon(LucideIcons.trash2, size: 16),
+                  label: const Text('Hapus Akun'),
+                  onPressed: widget.onDelete,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Form sheet for creating or updating a VaultEntry.
 class _VaultEntryFormSheet extends ConsumerStatefulWidget {
   const _VaultEntryFormSheet({this.existing});
 
@@ -873,6 +898,7 @@ class _VaultEntryFormSheet extends ConsumerStatefulWidget {
 }
 
 class _VaultEntryFormSheetState extends ConsumerState<_VaultEntryFormSheet> {
+  final _formKey = GlobalKey<FormState>();
   late final TextEditingController _titleController;
   late final TextEditingController _usernameController;
   late final TextEditingController _passwordController;
@@ -880,25 +906,21 @@ class _VaultEntryFormSheetState extends ConsumerState<_VaultEntryFormSheet> {
   late final TextEditingController _notesController;
 
   bool _obscurePassword = true;
-  bool _showGenerator = false;
   bool _isSaving = false;
   String? _errorMessage;
-
-  int _genLength = 16;
-  bool _genUpper = true;
-  bool _genLower = true;
-  bool _genDigits = true;
-  bool _genSymbols = true;
 
   @override
   void initState() {
     super.initState();
-    final entry = widget.existing;
-    _titleController = TextEditingController(text: entry?.title ?? '');
-    _usernameController = TextEditingController(text: entry?.username ?? '');
-    _passwordController = TextEditingController(text: entry?.password ?? '');
-    _urlController = TextEditingController(text: entry?.url ?? '');
-    _notesController = TextEditingController(text: entry?.notes ?? '');
+    _titleController =
+        TextEditingController(text: widget.existing?.title ?? '');
+    _usernameController =
+        TextEditingController(text: widget.existing?.username ?? '');
+    _passwordController =
+        TextEditingController(text: widget.existing?.password ?? '');
+    _urlController = TextEditingController(text: widget.existing?.url ?? '');
+    _notesController =
+        TextEditingController(text: widget.existing?.notes ?? '');
   }
 
   @override
@@ -912,27 +934,22 @@ class _VaultEntryFormSheetState extends ConsumerState<_VaultEntryFormSheet> {
   }
 
   void _generatePassword() {
-    try {
-      final generated = PasswordGenerator.generate(
-        length: _genLength,
-        upper: _genUpper,
-        lower: _genLower,
-        digits: _genDigits,
-        symbols: _genSymbols,
-      );
-      setState(() {
-        _passwordController.text = generated;
-        _obscurePassword = false;
-        _errorMessage = null;
-      });
-    } on ValidationException catch (error) {
-      setState(() {
-        _errorMessage = error.message;
-      });
-    }
+    final generated = PasswordGenerator.generate(
+      length: 16,
+      upper: true,
+      lower: true,
+      digits: true,
+      symbols: true,
+    );
+    setState(() {
+      _passwordController.text = generated;
+      _obscurePassword = false;
+    });
   }
 
-  Future<void> _save() async {
+  Future<void> _handleSave() async {
+    if (!_formKey.currentState!.validate()) return;
+
     setState(() {
       _isSaving = true;
       _errorMessage = null;
@@ -940,33 +957,39 @@ class _VaultEntryFormSheetState extends ConsumerState<_VaultEntryFormSheet> {
 
     try {
       final notifier = ref.read(vaultEntriesProvider.notifier);
-      final existing = widget.existing;
-      if (existing == null) {
-        await notifier.createEntry(
-          title: _titleController.text,
-          username: _usernameController.text,
-          password: _passwordController.text,
-          url: _urlController.text,
-          notes: _notesController.text,
-        );
-      } else {
+      if (widget.existing != null) {
         await notifier.updateEntry(
-          existing.copyWith(
-            title: _titleController.text,
-            username: _usernameController.text,
+          widget.existing!.copyWith(
+            title: _titleController.text.trim(),
+            username: _usernameController.text.trim(),
             password: _passwordController.text,
-            url: _urlController.text,
-            notes: _notesController.text,
+            url: _urlController.text.trim(),
+            notes: _notesController.text.trim(),
           ),
         );
+      } else {
+        await notifier.createEntry(
+          title: _titleController.text.trim(),
+          username: _usernameController.text.trim(),
+          password: _passwordController.text,
+          url: _urlController.text.trim(),
+          notes: _notesController.text.trim(),
+        );
       }
+
       if (mounted) {
         Navigator.of(context).pop();
       }
-    } on ValidationException catch (error) {
+    } on ValidationException catch (e) {
       if (mounted) {
         setState(() {
-          _errorMessage = error.message;
+          _errorMessage = e.message;
+        });
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _errorMessage = 'Gagal menyimpan entri brankas. Coba lagi.';
         });
       }
     } finally {
@@ -980,184 +1003,175 @@ class _VaultEntryFormSheetState extends ConsumerState<_VaultEntryFormSheet> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
     final isEditing = widget.existing != null;
+    final primary = AppTokens.primary(context);
 
     return Padding(
-      padding: EdgeInsets.fromLTRB(20, 20, 20, 20 + bottomInset),
-      child: SingleChildScrollView(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Text(
-              isEditing ? 'Edit Akun Brankas' : 'Tambah Akun Brankas',
-              style: theme.textTheme.titleLarge?.copyWith(
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-            const SizedBox(height: 16),
-            TextField(
-              controller: _titleController,
-              decoration: const InputDecoration(
-                labelText: 'Judul Akun *',
-                hintText: 'Contoh: Email Kantor / Bank Utama',
-              ),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: _usernameController,
-              decoration: const InputDecoration(
-                labelText: 'Username / Email',
-                hintText: 'nama@contoh.com',
-              ),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: _passwordController,
-              obscureText: _obscurePassword,
-              decoration: InputDecoration(
-                labelText: 'Kata Sandi *',
-                suffixIcon: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    IconButton(
-                      tooltip: _obscurePassword
-                          ? 'Tampilkan sandi'
-                          : 'Sembunyikan sandi',
-                      icon: Icon(
-                        _obscurePassword
-                            ? Icons.visibility_outlined
-                            : Icons.visibility_off_outlined,
-                      ),
-                      onPressed: () {
-                        setState(() {
-                          _obscurePassword = !_obscurePassword;
-                        });
-                      },
-                    ),
-                    IconButton(
-                      tooltip: 'Generator kata sandi',
-                      icon: Icon(
-                        Icons.auto_fix_high_rounded,
-                        color: _showGenerator
-                            ? theme.colorScheme.primary
-                            : null,
-                      ),
-                      onPressed: () {
-                        setState(() {
-                          _showGenerator = !_showGenerator;
-                        });
-                      },
-                    ),
-                  ],
+      padding: EdgeInsets.only(
+        bottom: MediaQuery.of(context).viewInsets.bottom,
+        left: 20,
+        right: 20,
+        top: 16,
+      ),
+      child: Form(
+        key: _formKey,
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Center(
+                child: Container(
+                  width: 38,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: AppTokens.border(context),
+                    borderRadius: HubRadius.rPill,
+                  ),
                 ),
               ),
-            ),
-            if (_showGenerator) ...[
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  Icon(
+                    isEditing ? LucideIcons.pencil : LucideIcons.plusCircle,
+                    size: 22,
+                    color: primary,
+                  ),
+                  const SizedBox(width: 10),
+                  Text(
+                    isEditing ? 'Edit Akun' : 'Tambah Akun Baru',
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: _titleController,
+                decoration: const InputDecoration(
+                  labelText: 'Judul Akun *',
+                  hintText: 'Misal: GitHub, Email Kantor, dsb.',
+                  prefixIcon: Icon(LucideIcons.tag),
+                ),
+                validator: (val) {
+                  if (val == null || val.trim().isEmpty) {
+                    return 'Judul akun tidak boleh kosong.';
+                  }
+                  return null;
+                },
+              ),
               const SizedBox(height: 12),
-              Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(12),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
+              TextFormField(
+                controller: _usernameController,
+                decoration: const InputDecoration(
+                  labelText: 'Username / Email',
+                  hintText: 'user@example.com',
+                  prefixIcon: Icon(LucideIcons.user),
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextFormField(
+                controller: _passwordController,
+                obscureText: _obscurePassword,
+                decoration: InputDecoration(
+                  labelText: 'Kata Sandi *',
+                  hintText: 'Sandi rahasia',
+                  prefixIcon: const Icon(LucideIcons.lock),
+                  suffixIcon: Row(
+                    mainAxisSize: MainAxisSize.min,
                     children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text(
-                            'Generator Kata Sandi',
-                            style: theme.textTheme.titleSmall?.copyWith(
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                          Text('$_genLength karakter'),
-                        ],
+                      IconButton(
+                        tooltip: 'Buat sandi acak kuat',
+                        icon: const Icon(LucideIcons.sparkles, size: 18),
+                        onPressed: _generatePassword,
                       ),
-                      Slider(
-                        value: _genLength.toDouble(),
-                        min: 8,
-                        max: 32,
-                        divisions: 24,
-                        label: '$_genLength',
-                        onChanged: (value) {
+                      IconButton(
+                        tooltip: _obscurePassword
+                            ? 'Tampilkan sandi'
+                            : 'Sembunyikan sandi',
+                        icon: Icon(
+                          _obscurePassword
+                              ? LucideIcons.eye
+                              : LucideIcons.eyeOff,
+                          size: 18,
+                        ),
+                        onPressed: () {
                           setState(() {
-                            _genLength = value.round();
+                            _obscurePassword = !_obscurePassword;
                           });
                         },
-                      ),
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 4,
-                        children: [
-                          FilterChip(
-                            label: const Text('A-Z'),
-                            selected: _genUpper,
-                            onSelected: (v) => setState(() => _genUpper = v),
-                          ),
-                          FilterChip(
-                            label: const Text('a-z'),
-                            selected: _genLower,
-                            onSelected: (v) => setState(() => _genLower = v),
-                          ),
-                          FilterChip(
-                            label: const Text('0-9'),
-                            selected: _genDigits,
-                            onSelected: (v) => setState(() => _genDigits = v),
-                          ),
-                          FilterChip(
-                            label: const Text('Simbol'),
-                            selected: _genSymbols,
-                            onSelected: (v) => setState(() => _genSymbols = v),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 8),
-                      OutlinedButton.icon(
-                        onPressed: _generatePassword,
-                        icon: const Icon(Icons.casino_outlined),
-                        label: const Text('Buat Kata Sandi Acak'),
                       ),
                     ],
                   ),
                 ),
+                validator: (val) {
+                  if (val == null || val.isEmpty) {
+                    return 'Kata sandi tidak boleh kosong.';
+                  }
+                  return null;
+                },
               ),
-            ],
-            const SizedBox(height: 12),
-            TextField(
-              controller: _urlController,
-              keyboardType: TextInputType.url,
-              decoration: const InputDecoration(
-                labelText: 'URL / Situs Web',
-                hintText: 'https://...',
-              ),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: _notesController,
-              maxLines: 3,
-              decoration: const InputDecoration(
-                labelText: 'Catatan Tambahan',
-                hintText: 'Pertanyaan keamanan, kode pemulihan, dll.',
-              ),
-            ),
-            if (_errorMessage != null) ...[
               const SizedBox(height: 12),
-              Text(
-                _errorMessage!,
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: theme.colorScheme.error,
-                  fontWeight: FontWeight.w600,
+              TextFormField(
+                controller: _urlController,
+                keyboardType: TextInputType.url,
+                decoration: const InputDecoration(
+                  labelText: 'Alamat Website / URL',
+                  hintText: 'https://...',
+                  prefixIcon: Icon(LucideIcons.globe),
                 ),
               ),
+              const SizedBox(height: 12),
+              TextFormField(
+                controller: _notesController,
+                maxLines: 2,
+                decoration: const InputDecoration(
+                  labelText: 'Catatan (Opsional)',
+                  hintText: 'Pertanyaan keamanan, nomor pemulihan, dsb.',
+                  prefixIcon: Icon(LucideIcons.fileText),
+                ),
+              ),
+              if (_errorMessage != null) ...[
+                const SizedBox(height: 12),
+                Text(
+                  _errorMessage!,
+                  style: TextStyle(
+                    color: AppTokens.error(context),
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+              const SizedBox(height: 20),
+              FilledButton.icon(
+                style: FilledButton.styleFrom(
+                  backgroundColor: primary,
+                  foregroundColor: Colors.white,
+                  minimumSize: const Size.fromHeight(48),
+                  shape: RoundedRectangleBorder(borderRadius: HubRadius.rSm),
+                ),
+                onPressed: _isSaving ? null : _handleSave,
+                icon: _isSaving
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
+                      )
+                    : const Icon(LucideIcons.check, size: 18),
+                label: Text(
+                  isEditing ? 'Simpan Perubahan' : 'Simpan ke Brankas',
+                  style: const TextStyle(fontWeight: FontWeight.w700),
+                ),
+              ),
+              const SizedBox(height: 16),
             ],
-            const SizedBox(height: 20),
-            FilledButton(
-              onPressed: _isSaving ? null : _save,
-              child: Text(_isSaving ? 'Menyimpan...' : 'Simpan ke Brankas'),
-            ),
-          ],
+          ),
         ),
       ),
     );

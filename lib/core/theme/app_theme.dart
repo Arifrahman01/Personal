@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:personal_hub/core/theme/app_tokens.dart';
+
+export 'package:personal_hub/core/theme/app_tokens.dart';
+export 'package:personal_hub/core/theme/hub_widgets.dart';
 
 /// Holds and updates the active application [ThemeMode].
 class ThemeModeNotifier extends Notifier<ThemeMode> {
@@ -31,7 +35,8 @@ abstract final class RefleqPalette {
   static const Color surfaceCard = Color(0xFF182035);
 
   /// Frosted Card Glass (rgba(24, 32, 53, 0.72) / #182035 with 72% opacity).
-  static final Color surfaceCardGlass = const Color(0xFF182035).withValues(alpha: 0.72);
+  static final Color surfaceCardGlass =
+      const Color(0xFF182035).withValues(alpha: 0.72);
 
   /// Specular Glass Border (rgba(255, 255, 255, 0.10) / 10% white).
   static final Color surfaceBorder = Colors.white.withValues(alpha: 0.10);
@@ -84,7 +89,7 @@ abstract final class RefleqPalette {
   );
 }
 
-/// Material 3 Light Glass and Dark Glass themes with Plus Jakarta Sans typography.
+/// Material 3 Light and Dark themes with Plus Jakarta Sans typography.
 abstract final class AppTheme {
   // Aliases for quick access to Refleq tokens
   static const Color canvasObsidian = RefleqPalette.background;
@@ -103,43 +108,41 @@ abstract final class AppTheme {
   static const LinearGradient sunsetWarm = RefleqPalette.sunsetWarm;
   static const LinearGradient lavenderCloud = RefleqPalette.lavenderCloud;
 
-  static const Color _warmSandLight = Color(0xFFEFF6F5);
-
   static ThemeData get light {
     final scheme = ColorScheme.fromSeed(
-      seedColor: RefleqPalette.royalViolet,
+      seedColor: AppTokens.primaryLight,
       brightness: Brightness.light,
-      primary: RefleqPalette.royalViolet,
-      secondary: RefleqPalette.skyCyan,
-      tertiary: RefleqPalette.rosePink,
-      surface: _warmSandLight,
+      primary: AppTokens.primaryLight,
+      surface: AppTokens.cardLight,
+      surfaceContainerLowest: AppTokens.canvasLight,
+      outlineVariant: AppTokens.borderLight,
     );
 
     return _buildTheme(
       scheme: scheme,
-      scaffoldBackground: _warmSandLight,
-      cardColor: Colors.white.withValues(alpha: 0.72),
-      navBackground: Colors.white.withValues(alpha: 0.80),
-      glassBorder: Colors.white.withValues(alpha: 0.85),
+      scaffoldBackground: AppTokens.canvasLight,
+      cardColor: AppTokens.cardLight,
+      navBackground: AppTokens.cardLight,
+      glassBorder: AppTokens.borderLight,
     );
   }
 
   static ThemeData get dark {
     final scheme = ColorScheme.fromSeed(
-      seedColor: RefleqPalette.royalViolet,
+      seedColor: AppTokens.primaryDark,
       brightness: Brightness.dark,
-      primary: RefleqPalette.royalViolet,
-      secondary: RefleqPalette.skyCyan,
-      tertiary: RefleqPalette.rosePink,
-      surface: RefleqPalette.surface,
+      primary: AppTokens.primaryDark,
+      surface: AppTokens.cardDark,
+      surfaceContainerLowest: AppTokens.canvasDark,
+      outlineVariant: AppTokens.borderDark,
     );
 
     return _buildTheme(
       scheme: scheme,
-      scaffoldBackground: RefleqPalette.background,
-      cardColor: const Color(0xFF182035).withValues(alpha: 0.72),
-      navBackground: RefleqPalette.surface.withValues(alpha: 0.92),
-      glassBorder: Colors.white.withValues(alpha: 0.10),
+      scaffoldBackground: AppTokens.canvasDark,
+      cardColor: AppTokens.cardDark,
+      navBackground: AppTokens.cardDark,
+      glassBorder: AppTokens.borderDark,
     );
   }
 
@@ -154,11 +157,17 @@ abstract final class AppTheme {
       useMaterial3: true,
       colorScheme: scheme,
       scaffoldBackgroundColor: scaffoldBackground,
+      extensions: [
+        scheme.brightness == Brightness.dark ? HubColors.dark : HubColors.light,
+      ],
     );
 
     final textTheme = _safePlusJakartaTextTheme(base.textTheme, scheme);
 
     return base.copyWith(
+      extensions: [
+        scheme.brightness == Brightness.dark ? HubColors.dark : HubColors.light,
+      ],
       textTheme: textTheme,
       appBarTheme: AppBarTheme(
         backgroundColor: Colors.transparent,

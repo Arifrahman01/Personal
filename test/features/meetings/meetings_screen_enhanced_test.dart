@@ -3,12 +3,26 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:personal_hub/features/meetings/models/meeting.dart';
 import 'package:personal_hub/features/meetings/providers/meetings_providers.dart';
+import 'package:personal_hub/features/meetings/providers/schedule_guardian_providers.dart';
 import 'package:personal_hub/features/meetings/ui/meetings_screen.dart';
 import 'package:personal_hub/features/prayer/models/prayer_models.dart';
 import 'package:personal_hub/features/prayer/providers/prayer_providers.dart';
 
-DailyPrayerTimes _createSamplePrayerTimes(DateTime date) {
+DailyPrayerTimes _createSamplePrayerTimes(DateTime date, {bool withConflict = false}) {
   final d = DateTime(date.year, date.month, date.day);
+  if (!withConflict) {
+    // Set prayer times well away from date so regular UI tests never experience time-of-day flakiness
+    final farAway = date.add(const Duration(hours: 10));
+    return DailyPrayerTimes(
+      date: d,
+      subuh: farAway.add(const Duration(hours: 1)),
+      syuruq: farAway.add(const Duration(hours: 2)),
+      dzuhur: farAway.add(const Duration(hours: 3)),
+      ashar: farAway.add(const Duration(hours: 4)),
+      maghrib: farAway.add(const Duration(hours: 5)),
+      isya: farAway.add(const Duration(hours: 6)),
+    );
+  }
   return DailyPrayerTimes(
     date: d,
     subuh: d.add(const Duration(hours: 4, minutes: 30)),
@@ -38,6 +52,11 @@ void main() {
     testWidgets(
       'renders Horizontal Date Picker Strip with active purple pill and filters meetings',
       (WidgetTester tester) async {
+        tester.view.physicalSize = const Size(800, 1400);
+        tester.view.devicePixelRatio = 1.0;
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+
         final meetingToday = Meeting(
           id: 'm-today',
           title: 'Design Review Sprint UI/UX',
@@ -63,6 +82,9 @@ void main() {
             overrides: [
               meetingsProvider.overrideWith(
                 () => _FakeMeetingsNotifier([meetingToday, meetingTomorrow]),
+              ),
+              scheduleGuardianConflictsProvider.overrideWithValue(
+                const AsyncData([]),
               ),
               todayPrayerTimesProvider.overrideWithValue(
                 AsyncData(_createSamplePrayerTimes(today)),
@@ -107,6 +129,11 @@ void main() {
     testWidgets(
       'renders Color-Coded Category badges, attendee avatars, and Join Online action',
       (WidgetTester tester) async {
+        tester.view.physicalSize = const Size(800, 1400);
+        tester.view.devicePixelRatio = 1.0;
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+
         final designMeeting = Meeting(
           id: 'm-design',
           title: 'Figma Design Review',
@@ -132,6 +159,9 @@ void main() {
             overrides: [
               meetingsProvider.overrideWith(
                 () => _FakeMeetingsNotifier([designMeeting, clientMeeting]),
+              ),
+              scheduleGuardianConflictsProvider.overrideWithValue(
+                const AsyncData([]),
               ),
               todayPrayerTimesProvider.overrideWithValue(
                 AsyncData(_createSamplePrayerTimes(today)),
@@ -244,7 +274,7 @@ void main() {
                 () => _FakeMeetingsNotifier([conflictMeeting]),
               ),
               todayPrayerTimesProvider.overrideWithValue(
-                AsyncData(_createSamplePrayerTimes(today)),
+                AsyncData(_createSamplePrayerTimes(today, withConflict: true)),
               ),
             ],
             child: const MaterialApp(

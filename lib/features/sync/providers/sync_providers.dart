@@ -174,8 +174,16 @@ class SyncNotifier extends AsyncNotifier<SyncState> {
       rethrow;
     }
   }
+
+  /// Convenience method to sync with optional or empty passphrase.
+  Future<void> syncAll({String passphrase = ''}) async {
+    return syncNow(passphrase: passphrase);
+  }
 }
 
 /// Provides reactive [SyncState] and actions via [SyncNotifier].
 final syncNotifierProvider =
     AsyncNotifierProvider<SyncNotifier, SyncState>(SyncNotifier.new);
+
+/// Alias for [syncNotifierProvider].
+final syncControllerProvider = syncNotifierProvider;

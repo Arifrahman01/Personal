@@ -4,7 +4,9 @@ import 'package:personal_hub/features/ai/providers/ai_providers.dart';
 import 'package:personal_hub/features/meetings/data/meetings_repository.dart';
 import 'package:personal_hub/features/meetings/models/meeting.dart';
 import 'package:personal_hub/features/meetings/services/meeting_ai_parser.dart';
+import 'package:personal_hub/features/meetings/services/meeting_note_composer_service.dart';
 import 'package:personal_hub/features/meetings/services/meeting_reminder_service.dart';
+import 'package:personal_hub/features/notes/providers/notes_providers.dart';
 import 'package:uuid/uuid.dart';
 
 /// Result returned after summarizing a meeting and merging extracted action items.
@@ -33,6 +35,16 @@ final meetingsRepositoryProvider = Provider<MeetingsRepository>((ref) {
 final meetingReminderServiceProvider = Provider<MeetingReminderService>((ref) {
   return MeetingReminderService();
 });
+
+/// Provides [MeetingNoteComposerService] for composing and dual-persisting meeting notes.
+final meetingNoteComposerServiceProvider =
+    Provider<MeetingNoteComposerService>((ref) {
+      return MeetingNoteComposerService(
+        aiClient: ref.watch(aiClientProvider),
+        meetingsRepository: ref.watch(meetingsRepositoryProvider),
+        notesRepository: ref.watch(notesRepositoryProvider),
+      );
+    });
 
 /// Manages the persisted list of meetings, action items, reminders, and AI extraction.
 class MeetingsNotifier extends AsyncNotifier<List<Meeting>> {

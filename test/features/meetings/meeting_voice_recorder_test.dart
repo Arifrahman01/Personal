@@ -58,6 +58,10 @@ class _FakeSpeechRecognizerGateway implements SpeechRecognizerGateway {
   void emitResult(String text, {required bool isFinal}) {
     _onResult?.call(text, isFinal);
   }
+
+  void emitStatus(String status) {
+    _onStatus?.call(status);
+  }
 }
 
 class _InMemoryMeetingsRepository implements MeetingsRepository {
@@ -257,6 +261,117 @@ void main() {
       expect(gateway.cancelCount, 0);
     },
   );
+
+  test(
+    'silent pause does not stop recording session (continuous recording loop)',
+    () async {
+      final gateway = _FakeSpeechRecognizerGateway();
+      final recorder = MeetingVoiceRecorder(gateway);
+      addTearDown(recorder.dispose);
+
+      final started = await recorder.start();
+      expect(started, isTrue);
+      expect(recorder.state.isRecording, isTrue);
+
+      gateway.emitResult('Bagian pertama rapat selesai', isFinal: true);
+      gateway.emitResult('Lalu hening sejenak', isFinal: false);
+
+      // Simulate timeout from speech-to-text engine
+      gateway.emitStatus('error:error_speech_timeout');
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+
+      // Session remains active and recording!
+      expect(recorder.state.isRecording, isTrue);
+      expect(
+        recorder.state.finalizedTranscript,
+        'Bagian pertama rapat selesai Lalu hening sejenak',
+      );
+      expect(recorder.state.partialTranscript, isEmpty);
+
+      // Simulate done status
+      gateway.emitStatus('done');
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+
+      expect(recorder.state.isRecording, isTrue);
+
+      // Can stop explicitly
+      final finalResult = await recorder.stop();
+      expect(recorder.state.isRecording, isFalse);
+      expect(
+        finalResult,
+        'Bagian pertama rapat selesai Lalu hening sejenak',
+      );
+    },
+  );
+
+  test('pause and resume manages state, timer, and wakelock', () async {
+    final gateway = _FakeSpeechRecognizerGateway();
+    final wakelock = NoOpRecordingWakelockGateway();
+    final draftStore = InMemoryMeetingDraftStore();
+    final recorder = MeetingVoiceRecorder(
+      gateway,
+      wakelock: wakelock,
+      draftStore: draftStore,
+    );
+    addTearDown(recorder.dispose);
+
+    await recorder.start(title: 'Rapat Koordinasi');
+    expect(recorder.state.isRecording, isTrue);
+    expect(recorder.state.isPaused, isFalse);
+    expect(recorder.state.isActiveSession, isTrue);
+    expect(wakelock.isEnabled, isTrue);
+
+    gateway.emitResult('Poin 1 disepakati', isFinal: true);
+    await recorder.pause();
+
+    expect(recorder.state.isRecording, isFalse);
+    expect(recorder.state.isPaused, isTrue);
+    expect(recorder.state.isActiveSession, isTrue);
+    expect(wakelock.isEnabled, isFalse);
+
+    // Draft was auto-saved on pause
+    final savedDraft = await draftStore.loadDraft();
+    expect(savedDraft, isNotNull);
+    expect(savedDraft!.transcript, 'Poin 1 disepakati');
+    expect(savedDraft.title, 'Rapat Koordinasi');
+
+    final resumed = await recorder.resume();
+    expect(resumed, isTrue);
+    expect(recorder.state.isRecording, isTrue);
+    expect(recorder.state.isPaused, isFalse);
+    expect(wakelock.isEnabled, isTrue);
+    expect(recorder.state.finalizedTranscript, 'Poin 1 disepakati');
+
+    await recorder.stop();
+    expect(recorder.state.isActiveSession, isFalse);
+    expect(wakelock.isEnabled, isFalse);
+  });
+
+  test('updateTranscript and appendManualNote update finalized transcript and draft', () async {
+    final gateway = _FakeSpeechRecognizerGateway();
+    final draftStore = InMemoryMeetingDraftStore();
+    final recorder = MeetingVoiceRecorder(
+      gateway,
+      draftStore: draftStore,
+    );
+    addTearDown(recorder.dispose);
+
+    recorder.updateTranscript('Teks baru hasil paste dari Zoom');
+    expect(recorder.state.finalizedTranscript, 'Teks baru hasil paste dari Zoom');
+
+    recorder.appendManualNote('Pak Joko bergabung via telepon');
+    expect(
+      recorder.state.finalizedTranscript,
+      'Teks baru hasil paste dari Zoom [Catatan]: Pak Joko bergabung via telepon',
+    );
+
+    final draft = await draftStore.loadDraft();
+    expect(draft, isNotNull);
+    expect(
+      draft!.transcript,
+      'Teks baru hasil paste dari Zoom [Catatan]: Pak Joko bergabung via telepon',
+    );
+  });
 
   testWidgets(
     'MeetingDetailScreen records live transcript and summarizes with AI in 1 tap',

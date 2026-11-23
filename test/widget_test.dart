@@ -5,7 +5,6 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:personal_hub/app.dart';
 import 'package:personal_hub/core/config/secure_config_store.dart';
 import 'package:personal_hub/core/database/app_database.dart';
-import 'package:personal_hub/core/theme/glass_widgets.dart';
 import 'package:personal_hub/features/vault/providers/vault_lock_controller.dart';
 import 'package:personal_hub/features/vault/providers/vault_providers.dart';
 import 'package:personal_hub/features/vault/services/clipboard_guard.dart';
@@ -51,8 +50,13 @@ void main() {
   });
 
   testWidgets(
-    'PersonalHubApp renders 5-tab Indonesian GlassBottomNavBar and navigates tabs',
+    'PersonalHubApp renders 5-tab docked NavigationBar on mobile screens (<600dp) and navigates tabs',
     (WidgetTester tester) async {
+      tester.view.physicalSize = const Size(540, 960);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
       final appDb = await AppDatabase.open(
         pathOverride: inMemoryDatabasePath,
         factoryOverride: databaseFactoryFfiNoIsolate,
@@ -79,15 +83,22 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      final navBar = find.byType(GlassBottomNavBar);
+      final navBar = find.byType(NavigationBar);
       expect(navBar, findsOneWidget);
 
-      for (final label in ['Beranda', 'Catatan', 'Meeting', 'Vault', 'AI']) {
+      for (final label in ['Hari Ini', 'Agenda', 'Catatan', 'Keuangan', 'Vault']) {
         expect(
           find.descendant(of: navBar, matching: find.text(label)),
           findsOneWidget,
         );
       }
+
+      await tester.tap(
+        find.descendant(of: navBar, matching: find.text('Agenda')),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('Agenda'), findsWidgets);
+      expect(find.text('Meeting'), findsWidgets);
 
       await tester.tap(
         find.descendant(of: navBar, matching: find.text('Catatan')),
@@ -96,15 +107,62 @@ void main() {
       expect(find.text('Belum ada catatan'), findsOneWidget);
 
       await tester.tap(
+        find.descendant(of: navBar, matching: find.text('Keuangan')),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('Keuangan & Zakat'), findsOneWidget);
+
+      await tester.tap(
         find.descendant(of: navBar, matching: find.text('Vault')),
       );
       await tester.pumpAndSettle();
       expect(find.text('Buat PIN Brankas'), findsOneWidget);
 
-      await tester.tap(find.descendant(of: navBar, matching: find.text('AI')));
+      await tester.tap(
+        find.descendant(of: navBar, matching: find.text('Hari Ini')),
+      );
       await tester.pumpAndSettle();
-      expect(find.text('Asisten AI'), findsOneWidget);
-      expect(find.text('Asisten AI Samudra'), findsOneWidget);
+      expect(find.text('Personal Hub'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'PersonalHubApp renders NavigationRail on wide screens (>=600dp)',
+    (WidgetTester tester) async {
+      tester.view.physicalSize = const Size(800, 800);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      final appDb = await AppDatabase.open(
+        pathOverride: inMemoryDatabasePath,
+        factoryOverride: databaseFactoryFfiNoIsolate,
+      );
+      addTearDown(() async => appDb.close());
+
+      final clipboardGuard = ClipboardGuard(_FakeClipboardAdapter());
+      addTearDown(clipboardGuard.dispose);
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            appDatabaseProvider.overrideWithValue(appDb),
+            secureConfigStoreProvider.overrideWithValue(
+              SecureConfigStore(_InMemorySecureStorage()),
+            ),
+            biometricAuthAdapterProvider.overrideWithValue(
+              _FakeBiometricAdapter(),
+            ),
+            clipboardGuardProvider.overrideWithValue(clipboardGuard),
+          ],
+          child: const PersonalHubApp(),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final navRail = find.byType(NavigationRail);
+      expect(navRail, findsOneWidget);
+      expect(find.byType(NavigationBar), findsNothing);
     },
   );
 

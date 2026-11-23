@@ -49,6 +49,10 @@
 	</dict>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Aplikasi memerlukan akses mikrofon untuk merekam percakapan dan notulensi rapat.</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>Aplikasi memerlukan pengenalan suara untuk mengubah rekaman rapat menjadi transkrip teks otomatis.</string>
 	<key>UILaunchStoryboardName</key>
 	<string>LaunchScreen</string>
 	<key>UIMainStoryboardFile</key>

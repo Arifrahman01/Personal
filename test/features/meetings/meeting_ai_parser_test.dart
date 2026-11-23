@@ -100,5 +100,115 @@ Tindak Lanjut:
         contains('Budi akan menyelesaikan modul meeting hari Rabu.'),
       );
     });
+
+    test('StructuredMeetingNote toMarkdown formats markdown with collapsed transcript', () {
+      final note = const StructuredMeetingNote(
+        title: 'Sprint Planning 12',
+        summary: 'Fokus sprint adalah menyelesaikan fitur P0 Rekam Meeting.',
+        keyPoints: [
+          'Arsitektur audio recording menggunakan continuous loop',
+          'Dual-persists ke SQLite Meetings dan Notes',
+        ],
+        decisions: [
+          'Jadwal rilis disetujui akhir pekan ini',
+        ],
+        actionItems: [
+          'Rifqi: Implementasikan LiveMeetingRecorderScreen',
+          'Tim: Jalankan test integrasi',
+        ],
+      );
+
+      final markdown = note.toMarkdown(
+        rawTranscript: 'Kita sepakat menyelesaikan modul rekam rapat.',
+        recordedAt: DateTime.utc(2026, 11, 24, 14, 30),
+      );
+
+      expect(markdown, contains('## Ringkasan'));
+      expect(markdown, contains('Fokus sprint adalah menyelesaikan fitur P0 Rekam Meeting.'));
+      expect(markdown, contains('## Poin Pembahasan'));
+      expect(markdown, contains('- Arsitektur audio recording menggunakan continuous loop'));
+      expect(markdown, contains('## Keputusan'));
+      expect(markdown, contains('- Jadwal rilis disetujui akhir pekan ini'));
+      expect(markdown, contains('## Tindak Lanjut'));
+      expect(markdown, contains('- [ ] Rifqi: Implementasikan LiveMeetingRecorderScreen'));
+      expect(markdown, contains('<details>'));
+      expect(markdown, contains('<summary>Transkrip Asli'));
+      expect(markdown, contains('Kita sepakat menyelesaikan modul rekam rapat.'));
+      expect(markdown, contains('</details>'));
+    });
+
+    test('buildStructuredNotePrompt customizes instructions for MeetingNoteStyle', () {
+      final promptStandard = MeetingAiParser.buildStructuredNotePrompt(
+        title: 'Rapat Standar',
+        transcript: 'Percakapan umum.',
+        style: MeetingNoteStyle.standard,
+      );
+      final textStandard = promptStandard.map((m) => m.content).join('\n');
+      expect(textStandard, contains('Standar'));
+
+      final promptClient = MeetingAiParser.buildStructuredNotePrompt(
+        title: 'Meeting Bersama Klien PT Maju',
+        transcript: 'Klien meminta penyesuaian deadline.',
+        style: MeetingNoteStyle.clientMeeting,
+      );
+      final textClient = promptClient.map((m) => m.content).join('\n');
+      expect(textClient, contains('klien'));
+      expect(textClient, contains('Rapat Klien'));
+
+      final promptBrainstorm = MeetingAiParser.buildStructuredNotePrompt(
+        title: 'Ideasi Desain Baru',
+        transcript: 'Bagaimana jika kita menggunakan calm clarity?',
+        style: MeetingNoteStyle.brainstorm,
+      );
+      final textBrainstorm = promptBrainstorm.map((m) => m.content).join('\n');
+      expect(textBrainstorm, contains('ide-ide utama'));
+      expect(textBrainstorm, contains('Brainstorm'));
+    });
+
+    test('parseStructuredNoteResponse parses JSON, fenced JSON, and fallback text safely', () {
+      const rawJson = '''
+{
+  "title": "Evaluasi Q3",
+  "summary": "Target tercapai 110%.",
+  "key_points": ["Revenue meningkat", "User retention naik"],
+  "decisions": ["Bonus tim disetujui"],
+  "action_items": ["Finance: Proses pembayaran", "HR: Buat pengumuman"]
+}
+''';
+      final parsed = MeetingAiParser.parseStructuredNoteResponse(
+        rawJson,
+        fallbackTitle: 'Default Title',
+      );
+      expect(parsed.title, 'Evaluasi Q3');
+      expect(parsed.summary, 'Target tercapai 110%.');
+      expect(parsed.keyPoints, ['Revenue meningkat', 'User retention naik']);
+      expect(parsed.decisions, ['Bonus tim disetujui']);
+      expect(parsed.actionItems, ['Finance: Proses pembayaran', 'HR: Buat pengumuman']);
+
+      // Plain text fallback
+      const plainText = '''
+Ringkasan: Rapat menyepakati penambahan kapasitas server.
+
+Poin Pembahasan:
+- Beban server meningkat di jam sibuk
+- Database perlu indexing tambahan
+
+Keputusan:
+- Upgrade server ke 16 core
+
+Tindak Lanjut:
+- SRE tim jalankan migrasi
+- DB admin audit slow query
+''';
+      final parsedPlain = MeetingAiParser.parseStructuredNoteResponse(
+        plainText,
+        fallbackTitle: 'Fallback Meeting',
+      );
+      expect(parsedPlain.title, 'Fallback Meeting');
+      expect(parsedPlain.summary, 'Rapat menyepakati penambahan kapasitas server.');
+      expect(parsedPlain.keyPoints.length, 2);
+      expect(parsedPlain.decisions.length, 1);
+      expect(parsedPlain.actionItems.length, 2);
+    });
   });
 }

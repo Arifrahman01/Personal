@@ -28,14 +28,27 @@ class SamudraAiClient {
     'insufficient',
   ];
 
+  static final List<RegExp> _modelUnavailablePatterns = [
+    RegExp(r'\bmodel_not_found\b', caseSensitive: false),
+    RegExp(r'\bmodel\s+not\s+found\b', caseSensitive: false),
+    RegExp(r'\bunknown\s+model\b', caseSensitive: false),
+    RegExp(r'\binvalid\s+model\b', caseSensitive: false),
+    RegExp(r'\bdoes\s+not\s+exist\b', caseSensitive: false),
+    RegExp(
+      r'\bmodel\b.*\b(?:not\s+available|not\s+found|unsupported)\b',
+      caseSensitive: false,
+    ),
+  ];
+
   /// Sends a chat completion request using [AiConstants.freeModel] first and
-  /// falls back once to [AiConstants.fallbackModel] only on quota/limit errors.
+  /// falls back once to [AiConstants.fallbackModel] on quota/limit or unavailable free-model errors.
   Future<AiResponse> chat({
     required List<AiMessage> messages,
     String? systemPrompt,
   }) async {
-    final apiKey = await _configStore.getApiKey();
-    if (apiKey == null || apiKey.trim().isEmpty) {
+    final rawApiKey = await _configStore.getApiKey();
+    final apiKey = SecureConfigStore.normalizeApiKey(rawApiKey ?? '');
+    if (apiKey.isEmpty) {
       throw const AiException(
         AiErrorType.emptyKey,
         'API key AI belum diatur di Pengaturan.',
@@ -50,7 +63,7 @@ class SamudraAiClient {
 
     final primaryResponse = await _postCompletion(
       endpoint: endpoint,
-      apiKey: apiKey.trim(),
+      apiKey: apiKey,
       model: AiConstants.freeModel,
       messages: payloadMessages,
     );
@@ -63,17 +76,18 @@ class SamudraAiClient {
       );
     }
 
-    // Fail fast on auth, bad request, or non-quota errors.
-    _throwIfFailFast(primaryResponse);
+    // Fail fast on auth, bad request, or non-quota errors (unless free model alias is unavailable).
+    _throwIfFailFast(primaryResponse, allowModelFallback: true);
 
-    if (!_shouldFallback(primaryResponse)) {
+    if (!_shouldFallback(primaryResponse) &&
+        !_isModelUnavailableError(primaryResponse)) {
       throw _mapNonQuotaError(primaryResponse);
     }
 
     final fallbackReason = _buildFallbackReason(primaryResponse);
     final fallbackResponse = await _postCompletion(
       endpoint: endpoint,
-      apiKey: apiKey.trim(),
+      apiKey: apiKey,
       model: AiConstants.fallbackModel,
       messages: payloadMessages,
     );
@@ -87,7 +101,7 @@ class SamudraAiClient {
       );
     }
 
-    _throwIfFailFast(fallbackResponse);
+    _throwIfFailFast(fallbackResponse, allowModelFallback: false);
 
     if (_shouldFallback(fallbackResponse)) {
       throw const AiException(
@@ -153,20 +167,43 @@ class SamudraAiClient {
   bool _isSuccessStatus(int statusCode) =>
       statusCode >= 200 && statusCode < 300;
 
-  void _throwIfFailFast(http.Response response) {
+  void _throwIfFailFast(
+    http.Response response, {
+    required bool allowModelFallback,
+  }) {
     if (response.statusCode == 401 || response.statusCode == 403) {
-      throw const AiException(
+      final serverMessage = _extractErrorText(response.body);
+      throw AiException(
         AiErrorType.unauthorized,
-        'API key tidak valid atau tidak memiliki akses.',
+        serverMessage != null
+            ? 'API key tidak valid atau tidak memiliki akses (HTTP ${response.statusCode}: $serverMessage).'
+            : 'API key tidak valid atau tidak memiliki akses (HTTP ${response.statusCode}).',
       );
     }
     if (response.statusCode == 400) {
+      if (allowModelFallback && _isModelUnavailableError(response)) {
+        return;
+      }
       final serverMessage = _extractErrorText(response.body);
       throw AiException(
         AiErrorType.badRequest,
         serverMessage ?? 'Permintaan ke server AI tidak valid.',
       );
     }
+  }
+
+  bool _isModelUnavailableError(http.Response response) {
+    if (response.statusCode == 404) {
+      return true;
+    }
+    if (response.statusCode != 400) {
+      return false;
+    }
+    final errorText = _extractErrorSearchText(response.body);
+    if (errorText == null) {
+      return false;
+    }
+    return _modelUnavailablePatterns.any((pattern) => pattern.hasMatch(errorText));
   }
 
   bool _shouldFallback(http.Response response) {

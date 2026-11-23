@@ -1,29 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:personal_hub/core/errors/app_exceptions.dart';
-import 'package:personal_hub/core/theme/glass_widgets.dart';
+import 'package:personal_hub/core/theme/app_tokens.dart';
+import 'package:personal_hub/core/theme/hub_widgets.dart';
 import 'package:personal_hub/features/vault/providers/vault_providers.dart';
-import 'package:personal_hub/features/vault/ui/vault_list_screen.dart';
 
-/// Root Vault tab widget switching between [VaultGateScreen] and [VaultListScreen].
-class VaultTabView extends ConsumerWidget {
-  const VaultTabView({super.key});
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final lockController = ref.watch(vaultLockControllerProvider);
-
-    return ListenableBuilder(
-      listenable: lockController,
-      builder: (context, _) {
-        if (lockController.isUnlocked) {
-          return const VaultListScreen();
-        }
-        return const VaultGateScreen();
-      },
-    );
-  }
-}
+export 'vault_tab_view.dart';
 
 /// Biometric and PIN gate displayed whenever the password vault is locked.
 class VaultGateScreen extends ConsumerStatefulWidget {
@@ -36,6 +20,7 @@ class VaultGateScreen extends ConsumerStatefulWidget {
 class _VaultGateScreenState extends ConsumerState<VaultGateScreen> {
   final TextEditingController _pinController = TextEditingController();
   final TextEditingController _confirmPinController = TextEditingController();
+  final FocusNode _keyboardFocusNode = FocusNode();
 
   bool _isLoading = true;
   bool _isSubmitting = false;
@@ -54,7 +39,23 @@ class _VaultGateScreenState extends ConsumerState<VaultGateScreen> {
   void dispose() {
     _pinController.dispose();
     _confirmPinController.dispose();
+    _keyboardFocusNode.dispose();
     super.dispose();
+  }
+
+  void _handleKeyEvent(KeyEvent event) {
+    if (event is! KeyDownEvent) return;
+    final keyLabel = event.logicalKey.keyLabel;
+    if (RegExp(r'^[0-9]$').hasMatch(keyLabel)) {
+      _onKeypadDigit(keyLabel);
+    } else if (event.logicalKey == LogicalKeyboardKey.backspace) {
+      _onKeypadBackspace();
+    } else if (event.logicalKey == LogicalKeyboardKey.enter ||
+        event.logicalKey == LogicalKeyboardKey.numpadEnter) {
+      if (!_isSubmitting) {
+        _handleUnlockWithPin();
+      }
+    }
   }
 
   Future<void> _loadGateState() async {
@@ -186,51 +187,12 @@ class _VaultGateScreenState extends ConsumerState<VaultGateScreen> {
     }
   }
 
-  Widget _buildCircularKeypadButton({
-    required Widget content,
-    required VoidCallback onTap,
-  }) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(40),
-        splashColor: RefleqPalette.lavender.withValues(alpha: 0.30),
-        highlightColor: RefleqPalette.lavender.withValues(alpha: 0.15),
-        onTap: onTap,
-        child: Container(
-          width: 66,
-          height: 66,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            color: RefleqPalette.surfaceCard.withValues(alpha: 0.85),
-            border: Border.all(
-              color: Colors.white.withValues(alpha: 0.12),
-              width: 1.2,
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.28),
-                blurRadius: 10,
-                offset: const Offset(0, 4),
-              ),
-            ],
-          ),
-          alignment: Alignment.center,
-          child: content,
-        ),
-      ),
-    );
-  }
-
   void _onKeypadDigit(String digit) {
     if (_pinController.text.length < 8) {
       setState(() {
         _pinController.text = '${_pinController.text}$digit';
         _errorMessage = null;
       });
-      if (_hasPin && _pinController.text.length == 4) {
-        _handleUnlockWithPin();
-      }
     }
   }
 
@@ -252,150 +214,193 @@ class _VaultGateScreenState extends ConsumerState<VaultGateScreen> {
     });
   }
 
+  Widget _buildKeypadButton({
+    required Widget content,
+    required VoidCallback onTap,
+    Color? backgroundColor,
+    Color? borderColor,
+  }) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final cardBg = backgroundColor ?? AppTokens.card(context);
+    final border = borderColor ?? AppTokens.border(context);
+    final primary = AppTokens.primary(context);
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(32),
+        splashColor: primary.withValues(alpha: 0.20),
+        highlightColor: primary.withValues(alpha: 0.10),
+        onTap: onTap,
+        child: Container(
+          width: 64,
+          height: 64,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: cardBg,
+            border: Border.all(color: border, width: 1.2),
+            boxShadow: [
+              BoxShadow(
+                color: isDark
+                    ? Colors.black.withValues(alpha: 0.35)
+                    : Colors.black.withValues(alpha: 0.06),
+                blurRadius: 6,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          alignment: Alignment.center,
+          child: content,
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final primary = AppTokens.primary(context);
+    final textPrimary = AppTokens.textPrimary(context);
 
     if (_isLoading) {
-      return const GlassScaffold(
-        body: Center(child: CircularProgressIndicator()),
+      return Scaffold(
+        backgroundColor: AppTokens.canvas(context),
+        body: const Center(child: CircularProgressIndicator()),
       );
     }
 
-    return GlassScaffold(
-      appBar: const GlassAppBar(title: Text('Brankas Kata Sandi')),
+    final pinLength = _pinController.text.length;
+    final dotCount = pinLength > 4 ? pinLength : 4;
+
+    return Scaffold(
+      backgroundColor: AppTokens.canvas(context),
+      appBar: AppBar(
+        title: const Text('Brankas Kata Sandi'),
+        backgroundColor: AppTokens.canvas(context),
+        centerTitle: false,
+        elevation: 0,
+      ),
       body: SafeArea(
-        top: false,
-        child: Center(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 420),
-              child: GlassCard(
-                borderRadius: BorderRadius.circular(24),
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Center(
-                      child: GlassIconTile(
-                        icon: _hasPin
-                            ? Icons.lock_outline_rounded
-                            : Icons.shield_outlined,
-                        size: 48,
-                        iconSize: 24,
-                        color: RefleqPalette.lavender,
-                        backgroundColor: RefleqPalette.lavenderSurface,
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-                    // High-contrast security badge
-                    Center(
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 14,
-                          vertical: 6,
-                        ),
-                        decoration: BoxDecoration(
-                          color: RefleqPalette.surfaceCard,
-                          borderRadius: BorderRadius.circular(100),
-                          border: Border.all(
-                            color: RefleqPalette.lavender.withValues(
-                              alpha: 0.45,
-                            ),
-                            width: 1.2,
+        child: KeyboardListener(
+          focusNode: _keyboardFocusNode,
+          autofocus: true,
+          onKeyEvent: _hasPin ? _handleKeyEvent : null,
+          child: Center(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 400),
+                child: HubCard(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      // Shield Icon
+                      Center(
+                        child: Container(
+                          width: 46,
+                          height: 46,
+                          decoration: BoxDecoration(
+                            color: primary.withValues(alpha: 0.12),
+                            shape: BoxShape.circle,
                           ),
-                          boxShadow: [
-                            BoxShadow(
-                              color: RefleqPalette.lavender.withValues(
-                                alpha: 0.20,
-                              ),
-                              blurRadius: 10,
-                              offset: const Offset(0, 2),
-                            ),
-                          ],
-                        ),
-                        child: const Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              Icons.shield_rounded,
-                              size: 14,
-                              color: RefleqPalette.lavender,
-                            ),
-                            SizedBox(width: 6),
-                            Text(
-                              'AES-256-GCM Zero-Knowledge',
-                              style: TextStyle(
-                                color: RefleqPalette.lavender,
-                                fontWeight: FontWeight.w800,
-                                fontSize: 12,
-                                letterSpacing: 0.4,
-                              ),
-                            ),
-                          ],
+                          child: Icon(
+                            _hasPin ? LucideIcons.lock : LucideIcons.shieldCheck,
+                            size: 24,
+                            color: primary,
+                          ),
                         ),
                       ),
-                    ),
-                    const SizedBox(height: 12),
+                      const SizedBox(height: 8),
+                      // Security Badge
+                      Center(
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 4,
+                          ),
+                          decoration: BoxDecoration(
+                            color: primary.withValues(alpha: 0.10),
+                            borderRadius: HubRadius.rPill,
+                            border: Border.all(
+                              color: primary.withValues(alpha: 0.35),
+                              width: 1,
+                            ),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(LucideIcons.shield, size: 12, color: primary),
+                              const SizedBox(width: 5),
+                              Text(
+                                'Terkunci Aman',
+                                style: TextStyle(
+                                  color: primary,
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 11,
+                                  letterSpacing: 0.2,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    const SizedBox(height: 10),
                     Text(
                       _hasPin ? 'Brankas Terkunci' : 'Buat PIN Brankas',
                       textAlign: TextAlign.center,
-                      style: theme.textTheme.titleLarge?.copyWith(
+                      style: theme.textTheme.titleMedium?.copyWith(
                         fontWeight: FontWeight.w800,
-                        letterSpacing: -0.5,
+                        letterSpacing: -0.3,
                       ),
                     ),
-                    const SizedBox(height: 6),
+                    const SizedBox(height: 4),
                     Text(
                       _hasPin
-                          ? 'Masukkan PIN atau gunakan biometrik untuk membuka data kata sandi terenkripsi AES-256-GCM.'
-                          : 'Atur PIN minimal 4 digit angka untuk melindungi brankas kata sandi lokal Anda.',
+                          ? 'Masukkan PIN (4-8 digit) atau gunakan biometrik.'
+                          : 'Atur PIN minimal 4 digit angka untuk melindungi brankas.',
                       textAlign: TextAlign.center,
                       style: theme.textTheme.bodySmall?.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant,
-                        height: 1.35,
+                        color: AppTokens.textSecondary(context),
+                        height: 1.3,
                       ),
                     ),
                     if (_hasPin) ...[
-                      const SizedBox(height: 16),
-                      // Lavender glow PIN dots
+                      const SizedBox(height: 12),
+                      // PIN dots indicator with primary emerald-teal glow
                       Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 8),
+                        padding: const EdgeInsets.symmetric(vertical: 4),
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.center,
-                          children: List.generate(4, (index) {
-                            final isFilled =
-                                index < _pinController.text.length;
+                          children: List.generate(dotCount, (index) {
+                            final isFilled = index < pinLength;
                             return AnimatedContainer(
                               duration: const Duration(milliseconds: 180),
                               curve: Curves.easeOutCubic,
-                              margin:
-                                  const EdgeInsets.symmetric(horizontal: 10),
-                              width: isFilled ? 18 : 16,
-                              height: isFilled ? 18 : 16,
+                              margin: const EdgeInsets.symmetric(horizontal: 7),
+                              width: isFilled ? 16 : 14,
+                              height: isFilled ? 16 : 14,
                               decoration: BoxDecoration(
                                 shape: BoxShape.circle,
-                                gradient: isFilled
-                                    ? RefleqPalette.lavenderCloud
-                                    : null,
                                 color: isFilled
-                                    ? null
-                                    : Colors.white.withValues(alpha: 0.08),
+                                    ? primary
+                                    : (isDark
+                                        ? Colors.white.withValues(alpha: 0.08)
+                                        : Colors.black.withValues(alpha: 0.06)),
                                 border: Border.all(
                                   color: isFilled
-                                      ? const Color(0xFFC4B5FD)
-                                      : Colors.white.withValues(alpha: 0.25),
+                                      ? primary
+                                      : AppTokens.border(context),
                                   width: 1.5,
                                 ),
                                 boxShadow: isFilled
                                     ? [
                                         BoxShadow(
-                                          color: const Color(0xFFA78BFA)
-                                              .withValues(alpha: 0.70),
-                                          blurRadius: 14,
-                                          spreadRadius: 2,
+                                          color: primary.withValues(alpha: 0.45),
+                                          blurRadius: 8,
+                                          spreadRadius: 1,
                                         ),
                                       ]
                                     : null,
@@ -404,28 +409,10 @@ class _VaultGateScreenState extends ConsumerState<VaultGateScreen> {
                           }),
                         ),
                       ),
-                      // Accessible text field keeping controller in sync with keyboard/tests
-                      SizedBox(
-                        height: 0,
-                        width: 0,
-                        child: Opacity(
-                          opacity: 0,
-                          child: TextField(
-                            controller: _pinController,
-                            obscureText: _obscurePin,
-                            keyboardType: TextInputType.number,
-                            onChanged: (_) => setState(() {}),
-                            onSubmitted: (_) {
-                              if (!_isSubmitting) {
-                                _handleUnlockWithPin();
-                              }
-                            },
-                          ),
-                        ),
-                      ),
-                      // Obsidian glass keypad with circular number buttons
+                      const SizedBox(height: 10),
+                      // Adaptive tactile keypad
                       Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 8),
+                        padding: const EdgeInsets.symmetric(vertical: 2),
                         child: Column(
                           mainAxisSize: MainAxisSize.min,
                           children: [
@@ -433,93 +420,109 @@ class _VaultGateScreenState extends ConsumerState<VaultGateScreen> {
                               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                               children: [
                                 for (final d in ['1', '2', '3'])
-                                  _buildCircularKeypadButton(
+                                  _buildKeypadButton(
                                     content: Text(
                                       d,
-                                      style: const TextStyle(
-                                        fontSize: 26,
+                                      style: TextStyle(
+                                        fontSize: 24,
                                         fontWeight: FontWeight.w600,
-                                        color: Colors.white,
+                                        color: textPrimary,
                                       ),
                                     ),
                                     onTap: () => _onKeypadDigit(d),
                                   ),
                               ],
                             ),
-                            const SizedBox(height: 12),
+                            const SizedBox(height: 10),
                             Row(
                               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                               children: [
                                 for (final d in ['4', '5', '6'])
-                                  _buildCircularKeypadButton(
+                                  _buildKeypadButton(
                                     content: Text(
                                       d,
-                                      style: const TextStyle(
-                                        fontSize: 26,
+                                      style: TextStyle(
+                                        fontSize: 24,
                                         fontWeight: FontWeight.w600,
-                                        color: Colors.white,
+                                        color: textPrimary,
                                       ),
                                     ),
                                     onTap: () => _onKeypadDigit(d),
                                   ),
                               ],
                             ),
-                            const SizedBox(height: 12),
+                            const SizedBox(height: 10),
                             Row(
                               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                               children: [
                                 for (final d in ['7', '8', '9'])
-                                  _buildCircularKeypadButton(
+                                  _buildKeypadButton(
                                     content: Text(
                                       d,
-                                      style: const TextStyle(
-                                        fontSize: 26,
+                                      style: TextStyle(
+                                        fontSize: 24,
                                         fontWeight: FontWeight.w600,
-                                        color: Colors.white,
+                                        color: textPrimary,
                                       ),
                                     ),
                                     onTap: () => _onKeypadDigit(d),
                                   ),
                               ],
                             ),
-                            const SizedBox(height: 12),
+                            const SizedBox(height: 10),
                             Row(
                               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                               children: [
-                                if (_canUseBiometrics)
-                                  _buildCircularKeypadButton(
-                                    content: const Icon(
-                                      Icons.fingerprint_rounded,
-                                      color: RefleqPalette.lavender,
-                                      size: 28,
+                                // Action / Confirm / Biometric button on left
+                                if (pinLength > 0)
+                                  _buildKeypadButton(
+                                    backgroundColor: primary.withValues(alpha: 0.15),
+                                    borderColor: primary.withValues(alpha: 0.5),
+                                    content: Icon(
+                                      LucideIcons.check,
+                                      color: primary,
+                                      size: 24,
+                                    ),
+                                    onTap: _isSubmitting
+                                        ? () {}
+                                        : _handleUnlockWithPin,
+                                  )
+                                else if (_canUseBiometrics)
+                                  _buildKeypadButton(
+                                    content: Icon(
+                                      LucideIcons.fingerprint,
+                                      color: primary,
+                                      size: 24,
                                     ),
                                     onTap: _handleUnlockWithBiometrics,
                                   )
                                 else
-                                  _buildCircularKeypadButton(
-                                    content: const Icon(
-                                      Icons.clear_rounded,
-                                      color: Colors.white70,
-                                      size: 22,
+                                  _buildKeypadButton(
+                                    content: Icon(
+                                      LucideIcons.rotateCcw,
+                                      color: AppTokens.textSecondary(context),
+                                      size: 20,
                                     ),
                                     onTap: _onKeypadClear,
                                   ),
-                                _buildCircularKeypadButton(
-                                  content: const Text(
+                                // Digit 0
+                                _buildKeypadButton(
+                                  content: Text(
                                     '0',
                                     style: TextStyle(
-                                      fontSize: 26,
+                                      fontSize: 24,
                                       fontWeight: FontWeight.w600,
-                                      color: Colors.white,
+                                      color: textPrimary,
                                     ),
                                   ),
                                   onTap: () => _onKeypadDigit('0'),
                                 ),
-                                _buildCircularKeypadButton(
-                                  content: const Icon(
-                                    Icons.backspace_outlined,
-                                    color: Colors.white70,
-                                    size: 22,
+                                // Backspace button
+                                _buildKeypadButton(
+                                  content: Icon(
+                                    LucideIcons.delete,
+                                    color: AppTokens.textSecondary(context),
+                                    size: 20,
                                   ),
                                   onTap: _onKeypadBackspace,
                                 ),
@@ -537,17 +540,17 @@ class _VaultGateScreenState extends ConsumerState<VaultGateScreen> {
                         textInputAction: TextInputAction.next,
                         onChanged: (_) => setState(() {}),
                         decoration: InputDecoration(
-                          labelText: 'PIN Baru',
+                          labelText: 'Buat PIN (min. 4 digit)',
                           hintText: 'Minimal 4 digit angka',
-                          prefixIcon: const Icon(Icons.pin_outlined),
+                          prefixIcon: const Icon(LucideIcons.keyRound),
                           suffixIcon: IconButton(
                             tooltip: _obscurePin
                                 ? 'Tampilkan PIN'
                                 : 'Sembunyikan PIN',
                             icon: Icon(
                               _obscurePin
-                                  ? Icons.visibility_outlined
-                                  : Icons.visibility_off_outlined,
+                                  ? LucideIcons.eye
+                                  : LucideIcons.eyeOff,
                             ),
                             onPressed: () {
                               setState(() {
@@ -557,7 +560,7 @@ class _VaultGateScreenState extends ConsumerState<VaultGateScreen> {
                           ),
                         ),
                       ),
-                      const SizedBox(height: 10),
+                      const SizedBox(height: 12),
                       TextField(
                         controller: _confirmPinController,
                         obscureText: _obscurePin,
@@ -569,37 +572,38 @@ class _VaultGateScreenState extends ConsumerState<VaultGateScreen> {
                           }
                         },
                         decoration: const InputDecoration(
-                          labelText: 'Konfirmasi PIN Baru',
+                          labelText: 'Ulangi PIN',
                           hintText: 'Ulangi PIN yang sama',
-                          prefixIcon: Icon(Icons.verified_user_outlined),
+                          prefixIcon: Icon(LucideIcons.shieldCheck),
                         ),
                       ),
                     ],
                     if (_errorMessage != null) ...[
-                      const SizedBox(height: 10),
+                      const SizedBox(height: 12),
                       Text(
                         _errorMessage!,
                         textAlign: TextAlign.center,
                         style: theme.textTheme.bodySmall?.copyWith(
-                          color: theme.colorScheme.error,
+                          color: AppTokens.error(context),
                           fontWeight: FontWeight.w600,
                         ),
                       ),
                     ],
-                    const SizedBox(height: 14),
+                    const SizedBox(height: 18),
                     FilledButton.icon(
                       style: FilledButton.styleFrom(
-                        backgroundColor: RefleqPalette.lavender,
+                        backgroundColor: primary,
                         foregroundColor: Colors.white,
+                        minimumSize: const Size.fromHeight(48),
                         shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(16),
+                          borderRadius: HubRadius.rSm,
                         ),
                       ),
                       onPressed: _isSubmitting
                           ? null
                           : (_hasPin
-                                ? _handleUnlockWithPin
-                                : _handleSetupPin),
+                              ? _handleUnlockWithPin
+                              : _handleSetupPin),
                       icon: _isSubmitting
                           ? const SizedBox(
                               width: 18,
@@ -611,8 +615,9 @@ class _VaultGateScreenState extends ConsumerState<VaultGateScreen> {
                             )
                           : Icon(
                               _hasPin
-                                  ? Icons.lock_open_rounded
-                                  : Icons.check_circle_outline_rounded,
+                                  ? LucideIcons.lockOpen
+                                  : LucideIcons.checkCircle,
+                              size: 18,
                             ),
                       label: Text(
                         _hasPin ? 'Buka Brankas' : 'Simpan PIN & Buka',
@@ -622,10 +627,16 @@ class _VaultGateScreenState extends ConsumerState<VaultGateScreen> {
                     if (_hasPin && _canUseBiometrics) ...[
                       const SizedBox(height: 10),
                       OutlinedButton.icon(
+                        style: OutlinedButton.styleFrom(
+                          minimumSize: const Size.fromHeight(48),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: HubRadius.rSm,
+                          ),
+                        ),
                         onPressed: _isSubmitting
                             ? null
                             : _handleUnlockWithBiometrics,
-                        icon: const Icon(Icons.fingerprint_rounded),
+                        icon: const Icon(LucideIcons.fingerprint, size: 18),
                         label: const Text('Buka dengan Biometrik'),
                       ),
                     ],
@@ -636,6 +647,7 @@ class _VaultGateScreenState extends ConsumerState<VaultGateScreen> {
           ),
         ),
       ),
-    );
-  }
+    ),
+  );
+}
 }

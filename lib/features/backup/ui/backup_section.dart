@@ -6,7 +6,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:personal_hub/core/errors/app_exceptions.dart';
-import 'package:personal_hub/core/theme/glass_widgets.dart';
+import 'package:personal_hub/core/theme/app_tokens.dart';
+import 'package:personal_hub/core/theme/hub_widgets.dart';
 import 'package:personal_hub/core/utils/file_export_helper.dart';
 import 'package:personal_hub/features/backup/providers/backup_providers.dart';
 import 'package:personal_hub/features/backup/services/backup_crypto_service.dart';
@@ -20,7 +21,8 @@ typedef BackupExportHandler =
 /// or `null` if the user cancels.
 typedef BackupPickHandler = Future<Uint8List?> Function();
 
-/// Settings section providing encrypted `.phub` backup export and restore.
+/// Settings section providing encrypted `.phub` backup export and restore,
+/// and clear human explanation of backup rotation.
 class BackupSection extends ConsumerStatefulWidget {
   const BackupSection({
     super.key,
@@ -41,18 +43,19 @@ class _BackupSectionState extends ConsumerState<BackupSection> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final primary = AppTokens.primary(context);
 
-    return GlassCard(
-      padding: const EdgeInsets.all(16),
+    return HubCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              const GlassIconTile(
-                icon: LucideIcons.shieldCheck,
-                size: 40,
-                iconSize: 20,
+              CircleAvatar(
+                radius: 20,
+                backgroundColor: primary.withValues(alpha: 0.15),
+                foregroundColor: primary,
+                child: const Icon(LucideIcons.shieldCheck, size: 20),
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -69,7 +72,7 @@ class _BackupSectionState extends ConsumerState<BackupSection> {
                     Text(
                       'Enkripsi AES-256-GCM dengan passphrase pribadi Anda.',
                       style: theme.textTheme.bodySmall?.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant,
+                        color: AppTokens.textSecondary(context),
                       ),
                     ),
                   ],
@@ -79,9 +82,36 @@ class _BackupSectionState extends ConsumerState<BackupSection> {
           ),
           const SizedBox(height: 12),
           Text(
-            'Mencakup catatan, rapat, brankas sandi, tugas, kebiasaan, transaksi keuangan, riwayat AI, dan preferensi jadwal sholat.',
+            'Mencakup catatan, agenda meeting, brankas sandi, tugas, kebiasaan, transaksi keuangan, riwayat AI, dan jadwal sholat.',
             style: theme.textTheme.bodyMedium?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
+              color: AppTokens.textSecondary(context),
+              fontSize: 13,
+            ),
+          ),
+          const SizedBox(height: 12),
+          // Human-readable GFS rotation explanation
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: BoxDecoration(
+              color: primary.withValues(alpha: 0.08),
+              borderRadius: HubRadius.rSm,
+              border: Border.all(color: primary.withValues(alpha: 0.25)),
+            ),
+            child: Row(
+              children: [
+                Icon(LucideIcons.history, size: 16, color: primary),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Rotasi Otomatis: 7 Harian • 4 Mingguan • 3 Bulanan',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: primary,
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
           if (_isBusy) ...[
@@ -94,13 +124,21 @@ class _BackupSectionState extends ConsumerState<BackupSection> {
             runSpacing: 12,
             children: [
               FilledButton.icon(
+                style: FilledButton.styleFrom(
+                  backgroundColor: primary,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(borderRadius: HubRadius.rSm),
+                ),
                 onPressed: _isBusy ? null : _handleExport,
-                icon: const Icon(LucideIcons.upload, size: 17),
+                icon: const Icon(LucideIcons.upload, size: 16),
                 label: const Text('Ekspor Backup (.phub)'),
               ),
               OutlinedButton.icon(
+                style: OutlinedButton.styleFrom(
+                  shape: RoundedRectangleBorder(borderRadius: HubRadius.rSm),
+                ),
                 onPressed: _isBusy ? null : _handleImport,
-                icon: const Icon(LucideIcons.download, size: 17),
+                icon: const Icon(LucideIcons.download, size: 16),
                 label: const Text('Impor Backup (.phub)'),
               ),
             ],
@@ -149,15 +187,13 @@ class _BackupSectionState extends ConsumerState<BackupSection> {
       final picker = widget.onPickImportBytes ?? _defaultPickImportBytes;
       bytes = await picker();
     } catch (_) {
-      if (mounted) {
-        setState(() => _isBusy = false);
-        _showSnackBar('Gagal membaca berkas backup.', isError: true);
-      }
+      if (!mounted) return;
+      _showSnackBar('Gagal membaca berkas backup.', isError: true);
+      setState(() => _isBusy = false);
       return;
     }
 
-    if (!mounted) return;
-    if (bytes == null) {
+    if (bytes == null || !mounted) {
       setState(() => _isBusy = false);
       return;
     }
@@ -201,12 +237,12 @@ class _BackupSectionState extends ConsumerState<BackupSection> {
   }
 
   Future<Uint8List?> _defaultPickImportBytes() async {
-    final picked = await FilePicker.pickFile(
+    final files = await FilePicker.pickFiles(
       dialogTitle: 'Pilih berkas backup (.phub)',
       type: FileType.any,
     );
-    if (picked == null) return null;
-    return picked.readAsBytes();
+    if (files.isEmpty) return null;
+    return files.first.readAsBytes();
   }
 
   Future<String?> _showPassphraseDialog({required bool isExport}) {
@@ -227,14 +263,15 @@ class _BackupSectionState extends ConsumerState<BackupSection> {
   }
 
   void _showSnackBar(String message, {bool isError = false}) {
-    final messenger = ScaffoldMessenger.of(context);
-    messenger.hideCurrentSnackBar();
-    messenger.showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: isError ? Theme.of(context).colorScheme.error : null,
-      ),
-    );
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          content: Text(message),
+          backgroundColor: isError ? AppTokens.error(context) : null,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
   }
 }
 
@@ -287,8 +324,6 @@ class _PassphraseDialogState extends State<_PassphraseDialog> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
     return AlertDialog(
       title: Text(
         widget.isExport
@@ -304,8 +339,9 @@ class _PassphraseDialogState extends State<_PassphraseDialog> {
               widget.isExport
                   ? 'Simpan passphrase ini dengan aman. Tanpa passphrase, berkas .phub tidak dapat didekripsi.'
                   : 'Memulihkan backup akan menggantikan seluruh data lokal saat ini dengan isi berkas .phub.',
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
+              style: TextStyle(
+                fontSize: 12,
+                color: AppTokens.textSecondary(context),
               ),
             ),
             const SizedBox(height: 16),
@@ -327,8 +363,8 @@ class _PassphraseDialogState extends State<_PassphraseDialog> {
                   },
                   icon: Icon(
                     _obscurePassphrase
-                        ? Icons.visibility_outlined
-                        : Icons.visibility_off_outlined,
+                        ? LucideIcons.eye
+                        : LucideIcons.eyeOff,
                   ),
                 ),
               ),
@@ -351,8 +387,10 @@ class _PassphraseDialogState extends State<_PassphraseDialog> {
               const SizedBox(height: 10),
               Text(
                 _errorText!,
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: theme.colorScheme.error,
+                style: TextStyle(
+                  color: AppTokens.error(context),
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
                 ),
               ),
             ],

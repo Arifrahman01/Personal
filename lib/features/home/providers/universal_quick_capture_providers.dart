@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:personal_hub/features/finance/providers/finance_providers.dart';
+import 'package:personal_hub/features/finance/providers/predictive_cashflow_providers.dart';
 import 'package:personal_hub/features/home/services/universal_quick_capture_service.dart';
 import 'package:personal_hub/features/notes/providers/notes_providers.dart';
 import 'package:personal_hub/features/tasks/providers/tasks_providers.dart';
@@ -114,6 +115,17 @@ class QuickCaptureController extends Notifier<QuickCaptureState> {
           tags: draft.tags,
         );
       }
+
+      // Invalidate finance, tasks, habits, and notes providers
+      ref.invalidate(monthlyTransactionsProvider);
+      ref.invalidate(monthlySummaryProvider);
+      ref.invalidate(cashflowProjectionProvider);
+      ref.invalidate(recurringBillsProvider);
+      ref.invalidate(spendingAnomaliesProvider);
+      ref.invalidate(tasksProvider);
+      ref.invalidate(habitsProvider);
+      ref.invalidate(habitStatsProvider);
+      ref.invalidate(notesListProvider);
 
       state = state.copyWith(
         isSaving: false,

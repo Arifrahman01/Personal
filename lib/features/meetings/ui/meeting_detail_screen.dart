@@ -1,8 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:personal_hub/core/errors/app_exceptions.dart';
 import 'package:personal_hub/core/theme/glass_widgets.dart';
+import 'package:personal_hub/core/theme/hub_widgets.dart';
 import 'package:personal_hub/features/meetings/models/meeting.dart';
+import 'package:personal_hub/features/meetings/providers/calendar_sync_providers.dart';
 import 'package:personal_hub/features/meetings/providers/meetings_providers.dart';
 import 'package:personal_hub/features/meetings/services/meeting_voice_recorder.dart';
 import 'package:personal_hub/features/meetings/ui/meeting_form_screen.dart';
@@ -30,6 +34,8 @@ class MeetingDetailScreen extends ConsumerStatefulWidget {
 
 class _MeetingDetailScreenState extends ConsumerState<MeetingDetailScreen> {
   final TextEditingController _newItemController = TextEditingController();
+  late final TextEditingController _inlineNotesController;
+  bool _isEditingNotes = false;
   bool _isExtracting = false;
   bool _isDeleting = false;
   Meeting? _lastKnownMeeting;
@@ -39,7 +45,14 @@ class _MeetingDetailScreenState extends ConsumerState<MeetingDetailScreen> {
   String? _aiError;
 
   @override
+  void initState() {
+    super.initState();
+    _inlineNotesController = TextEditingController();
+  }
+
+  @override
   void dispose() {
+    _inlineNotesController.dispose();
     _newItemController.dispose();
     super.dispose();
   }
@@ -214,7 +227,7 @@ class _MeetingDetailScreenState extends ConsumerState<MeetingDetailScreen> {
             actions: [
               IconButton(
                 tooltip: 'Edit meeting',
-                icon: const Icon(Icons.edit_outlined),
+                icon: const Icon(LucideIcons.pencil),
                 onPressed: () {
                   Navigator.of(context).push(
                     MaterialPageRoute<void>(
@@ -225,7 +238,7 @@ class _MeetingDetailScreenState extends ConsumerState<MeetingDetailScreen> {
               ),
               IconButton(
                 tooltip: 'Hapus meeting',
-                icon: const Icon(Icons.delete_outline_rounded),
+                icon: const Icon(LucideIcons.trash2),
                 onPressed: () => _confirmDelete(meeting),
               ),
             ],
@@ -237,6 +250,8 @@ class _MeetingDetailScreenState extends ConsumerState<MeetingDetailScreen> {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   _buildHeaderCard(theme, meeting),
+                  const SizedBox(height: 12),
+                  _buildActionBar(theme, meeting),
                   const SizedBox(height: 16),
                   _buildTextSection(
                     theme: theme,
@@ -259,86 +274,189 @@ class _MeetingDetailScreenState extends ConsumerState<MeetingDetailScreen> {
     );
   }
 
+  Widget _buildActionBar(ThemeData theme, Meeting meeting) {
+    return HubCard(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          TextButton.icon(
+            onPressed: () => _openVoiceRecorderSheet(meeting),
+            icon: const Icon(LucideIcons.mic, size: 18),
+            label: const Text('Rekam Percakapan'),
+          ),
+          IconButton(
+            tooltip: 'Salin iCal (.ics)',
+            icon: const Icon(LucideIcons.calendar, size: 20),
+            onPressed: () {
+              final icalService = ref.read(icalGeneratorServiceProvider);
+              final icsContent = icalService.generateIcs([meeting]);
+              Clipboard.setData(ClipboardData(text: icsContent));
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Agenda rapat berhasil disalin (.ics)!'),
+                  duration: Duration(seconds: 2),
+                  behavior: SnackBarBehavior.floating,
+                ),
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildHeaderCard(ThemeData theme, Meeting meeting) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              meeting.title,
-              style: theme.textTheme.headlineSmall?.copyWith(
-                fontWeight: FontWeight.w700,
-              ),
+    return HubCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            meeting.title,
+            style: theme.textTheme.headlineSmall?.copyWith(
+              fontWeight: FontWeight.w700,
             ),
-            const SizedBox(height: 12),
-            _InfoRow(
-              icon: Icons.schedule_rounded,
-              text: formatMeetingDateTime(meeting.scheduledAt),
-            ),
-            if (meeting.location.isNotEmpty) ...[
-              const SizedBox(height: 6),
-              _InfoRow(icon: Icons.place_outlined, text: meeting.location),
-            ],
+          ),
+          const SizedBox(height: 12),
+          _InfoRow(
+            icon: LucideIcons.clock,
+            text: formatMeetingDateTime(meeting.scheduledAt),
+          ),
+          if (meeting.location.isNotEmpty) ...[
             const SizedBox(height: 6),
-            _InfoRow(
-              icon: Icons.notifications_outlined,
-              text: meeting.reminderMinutes > 0
-                  ? 'Pengingat ${meeting.reminderMinutes} menit sebelum'
-                  : 'Tanpa pengingat',
-            ),
-            if (meeting.attendees.isNotEmpty) ...[
-              const SizedBox(height: 12),
-              Wrap(
-                spacing: 8,
-                runSpacing: 6,
-                children: [
-                  for (final attendee in meeting.attendees)
-                    Chip(
-                      avatar: const Icon(Icons.person_outline, size: 16),
-                      label: Text(attendee),
-                      visualDensity: VisualDensity.compact,
-                    ),
-                ],
-              ),
-            ],
+            _InfoRow(icon: LucideIcons.mapPin, text: meeting.location),
           ],
-        ),
+          const SizedBox(height: 6),
+          _InfoRow(
+            icon: LucideIcons.bell,
+            text: meeting.reminderMinutes > 0
+                ? 'Pengingat ${meeting.reminderMinutes} menit sebelum'
+                : 'Tanpa pengingat',
+          ),
+          if (meeting.attendees.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 8,
+              runSpacing: 6,
+              children: [
+                for (final attendee in meeting.attendees)
+                  Chip(
+                    avatar: const Icon(LucideIcons.user, size: 16),
+                    label: Text(attendee),
+                    visualDensity: VisualDensity.compact,
+                  ),
+              ],
+            ),
+          ],
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton.icon(
+              key: const Key('start_recording_meeting_button'),
+              onPressed: () => _openVoiceRecorderSheet(meeting),
+              icon: const Icon(LucideIcons.mic),
+              label: const Text('🎙️ Mulai Rekam Rapat Ini'),
+              style: FilledButton.styleFrom(
+                minimumSize: const Size(0, 48),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
 
   Widget _buildNotesSection(ThemeData theme, Meeting meeting) {
     final hasContent = meeting.notes.trim().isNotEmpty;
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    'Catatan Rapat',
-                    style: theme.textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w700,
-                    ),
+    return HubCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  'Catatan Rapat',
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w700,
                   ),
                 ),
-                FilledButton.tonalIcon(
-                  onPressed: () => _openVoiceRecorderSheet(meeting),
-                  icon: const Icon(Icons.mic_rounded, size: 18),
-                  label: const Text('Rekam Percakapan'),
+              ),
+              if (!_isEditingNotes)
+                TextButton.icon(
+                  key: const Key('edit_inline_notes_button'),
+                  onPressed: () {
+                    setState(() {
+                      _inlineNotesController.text = meeting.notes;
+                      _isEditingNotes = true;
+                    });
+                  },
+                  icon: const Icon(LucideIcons.pencil, size: 16),
+                  label: const Text('Edit Catatan'),
+                ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton.tonalIcon(
+              key: const Key('record_and_compose_ai_button'),
+              onPressed: () => _openVoiceRecorderSheet(meeting),
+              icon: const Icon(LucideIcons.sparkles),
+              label: const Text('🎙️ Rekam & Susun Catatan AI'),
+            ),
+          ),
+          const SizedBox(height: 10),
+          if (_isEditingNotes) ...[
+            TextField(
+              key: const Key('inline_notes_field'),
+              controller: _inlineNotesController,
+              autofocus: true,
+              minLines: 3,
+              maxLines: 8,
+              decoration: const InputDecoration(
+                hintText: 'Tulis atau edit catatan/notulensi rapat di sini...',
+              ),
+            ),
+            const SizedBox(height: 10),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                TextButton(
+                  onPressed: () => setState(() => _isEditingNotes = false),
+                  child: const Text('Batal'),
+                ),
+                const SizedBox(width: 8),
+                FilledButton.icon(
+                  key: const Key('save_inline_notes_button'),
+                  onPressed: () async {
+                    final updatedMeeting = meeting.copyWith(
+                      notes: _inlineNotesController.text.trim(),
+                      updatedAt: DateTime.now().toUtc(),
+                    );
+                    await ref
+                        .read(meetingsListProvider.notifier)
+                        .updateMeeting(updatedMeeting);
+                    if (mounted) {
+                      setState(() => _isEditingNotes = false);
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Catatan meeting berhasil diperbarui.'),
+                          behavior: SnackBarBehavior.floating,
+                        ),
+                      );
+                    }
+                  },
+                  icon: const Icon(LucideIcons.check, size: 16),
+                  label: const Text('Simpan'),
                 ),
               ],
             ),
-            const SizedBox(height: 8),
+          ] else ...[
             Text(
               hasContent
                   ? meeting.notes
-                  : 'Belum ada catatan rapat. Ketuk ikon edit atau Rekam Percakapan untuk menambahkan notulensi.',
+                  : 'Belum ada catatan rapat. Ketuk "Edit Catatan" atau gunakan "Rekam Percakapan" untuk menambahkan notulensi.',
               style: theme.textTheme.bodyMedium?.copyWith(
                 color: hasContent
                     ? theme.colorScheme.onSurface
@@ -346,7 +464,7 @@ class _MeetingDetailScreenState extends ConsumerState<MeetingDetailScreen> {
               ),
             ),
           ],
-        ),
+        ],
       ),
     );
   }
@@ -358,39 +476,34 @@ class _MeetingDetailScreenState extends ConsumerState<MeetingDetailScreen> {
     required String emptyFallback,
   }) {
     final hasContent = content.trim().isNotEmpty;
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              title,
-              style: theme.textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.w700,
-              ),
+    return HubCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title,
+            style: theme.textTheme.titleMedium?.copyWith(
+              fontWeight: FontWeight.w700,
             ),
-            const SizedBox(height: 8),
-            Text(
-              hasContent ? content : emptyFallback,
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: hasContent
-                    ? theme.colorScheme.onSurface
-                    : theme.colorScheme.onSurfaceVariant,
-              ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            hasContent ? content : emptyFallback,
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: hasContent
+                  ? theme.colorScheme.onSurface
+                  : theme.colorScheme.onSurfaceVariant,
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
 
   Widget _buildAiSection(ThemeData theme, Meeting meeting) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+    return HubCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
               children: [
@@ -420,7 +533,7 @@ class _MeetingDetailScreenState extends ConsumerState<MeetingDetailScreen> {
                         height: 18,
                         child: CircularProgressIndicator(strokeWidth: 2),
                       )
-                    : const Icon(Icons.auto_awesome_rounded),
+                    : const Icon(LucideIcons.sparkles),
                 label: Text(
                   _isExtracting
                       ? 'Menganalisis Notulensi...'
@@ -464,97 +577,93 @@ class _MeetingDetailScreenState extends ConsumerState<MeetingDetailScreen> {
             ],
           ],
         ),
-      ),
-    );
+      );
   }
 
   Widget _buildActionItemsSection(ThemeData theme, Meeting meeting) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Action Item (${meeting.actionItems.where((i) => i.isDone).length}/${meeting.actionItems.length})',
-              style: theme.textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.w700,
-              ),
+    return HubCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Action Item (${meeting.actionItems.where((i) => i.isDone).length}/${meeting.actionItems.length})',
+            style: theme.textTheme.titleMedium?.copyWith(
+              fontWeight: FontWeight.w700,
             ),
-            const SizedBox(height: 10),
-            Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    controller: _newItemController,
-                    textInputAction: TextInputAction.done,
-                    onSubmitted: (_) => _addManualActionItem(meeting),
-                    decoration: const InputDecoration(
-                      hintText: 'Tambah action item...',
-                      isDense: true,
-                    ),
+          ),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: _newItemController,
+                  textInputAction: TextInputAction.done,
+                  onSubmitted: (_) => _addManualActionItem(meeting),
+                  decoration: const InputDecoration(
+                    hintText: 'Tambah action item...',
+                    isDense: true,
                   ),
                 ),
-                const SizedBox(width: 8),
-                IconButton.filledTonal(
-                  tooltip: 'Tambah action item',
-                  onPressed: () => _addManualActionItem(meeting),
-                  icon: const Icon(Icons.add_rounded),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            if (meeting.actionItems.isEmpty)
-              Text(
-                'Belum ada action item. Tambahkan manual atau ekstrak dari catatan menggunakan AI.',
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
-                ),
-              )
-            else
-              for (final item in meeting.actionItems)
-                Row(
-                  children: [
-                    Checkbox(
-                      value: item.isDone,
-                      onChanged: (_) {
+              ),
+              const SizedBox(width: 8),
+              IconButton.filledTonal(
+                tooltip: 'Tambah action item',
+                onPressed: () => _addManualActionItem(meeting),
+                icon: const Icon(LucideIcons.plus),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          if (meeting.actionItems.isEmpty)
+            Text(
+              'Belum ada action item. Tambahkan manual atau ekstrak dari catatan menggunakan AI.',
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            )
+          else
+            for (final item in meeting.actionItems)
+              Row(
+                children: [
+                  Checkbox(
+                    value: item.isDone,
+                    onChanged: (_) {
+                      ref
+                          .read(meetingsListProvider.notifier)
+                          .toggleActionItem(meeting.id, item.id);
+                    },
+                  ),
+                  Expanded(
+                    child: InkWell(
+                      onTap: () {
                         ref
                             .read(meetingsListProvider.notifier)
                             .toggleActionItem(meeting.id, item.id);
                       },
-                    ),
-                    Expanded(
-                      child: InkWell(
-                        onTap: () {
-                          ref
-                              .read(meetingsListProvider.notifier)
-                              .toggleActionItem(meeting.id, item.id);
-                        },
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 8),
-                          child: Text(
-                            item.text,
-                            style: theme.textTheme.bodyMedium?.copyWith(
-                              decoration: item.isDone
-                                  ? TextDecoration.lineThrough
-                                  : null,
-                              color: item.isDone
-                                  ? theme.colorScheme.onSurfaceVariant
-                                  : theme.colorScheme.onSurface,
-                            ),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 8),
+                        child: Text(
+                          item.text,
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            decoration: item.isDone
+                                ? TextDecoration.lineThrough
+                                : null,
+                            color: item.isDone
+                                ? theme.colorScheme.onSurfaceVariant
+                                : theme.colorScheme.onSurface,
                           ),
                         ),
                       ),
                     ),
-                      IconButton(
-                        tooltip: 'Jadikan Tugas',
-                        icon: const Icon(Icons.add_task_rounded, size: 20),
-                        onPressed: () => _promoteActionItem(meeting, item),
-                      ),
-                  ],
-                ),
-          ],
-        ),
+                  ),
+                  IconButton(
+                    tooltip: 'Jadikan Tugas',
+                    icon: const Icon(LucideIcons.listPlus, size: 20),
+                    onPressed: () => _promoteActionItem(meeting, item),
+                  ),
+                ],
+              ),
+        ],
       ),
     );
   }

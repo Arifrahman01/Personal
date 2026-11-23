@@ -45,6 +45,28 @@ void main() {
     );
 
     test(
+      'normalizes accidental Bearer prefix and surrounding quotes on API key read/write',
+      () async {
+        final storage = _InMemorySecureStorage();
+        final store = SecureConfigStore(storage);
+
+        await store.setApiKey('  Bearer "smdr-abc123"  ');
+        expect(await store.getApiKey(), 'smdr-abc123');
+        expect(await storage.read('ai_api_key'), 'smdr-abc123');
+
+        await store.setApiKey("  bearer Bearer 'smdr-xyz789' ");
+        expect(await store.getApiKey(), 'smdr-xyz789');
+
+        await store.setApiKey('Bearer   ');
+        expect(await store.getApiKey(), isNull);
+        expect(await storage.read('ai_api_key'), isNull);
+
+        await storage.write('ai_api_key', 'Bearer smdr-legacy');
+        expect(await store.getApiKey(), 'smdr-legacy');
+      },
+    );
+
+    test(
       'returns default SamudraCorp base URL when unset and trims trailing slash on save',
       () async {
         final storage = _InMemorySecureStorage();

@@ -71,7 +71,7 @@ void main() {
   }
 
   group('HomeScreen - Refleq Minimal Aurora Dashboard Tests', () {
-    testWidgets('renders all Refleq aesthetic elements on standard phone (390x844)', (tester) async {
+    testWidgets('renders all Calm Clarity aesthetic elements on standard phone (390x844)', (tester) async {
       tester.view.physicalSize = const Size(390 * 2, 844 * 2);
       tester.view.devicePixelRatio = 2.0;
       addTearDown(() {
@@ -93,27 +93,30 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      // 1. Reactive Copilot badge
-      expect(find.textContaining('Copilot'), findsWidgets);
+      // 1. Header & App Bar
+      expect(find.text('Personal Hub'), findsOneWidget);
+      expect(find.text('Hari Ini'), findsOneWidget);
 
-      // 2. Horizontal Date/Prayer Strip
-      final now = DateTime.now();
-      expect(find.text('${now.day}'), findsWidgets);
+      // 2. Block 1: Prayer countdown
+      expect(find.textContaining('Jakarta Pusat'), findsOneWidget);
 
-      // 3. 2x2 Modular Action Tiles
-      expect(find.text('Keuangan Harian'), findsOneWidget);
-      expect(find.text('Tugas & Habit'), findsOneWidget);
-      expect(find.text('Jadwal & Kiblat'), findsOneWidget);
-      expect(find.text('Voice Copilot'), findsWidgets);
+      // 3. Block 2: Focus Today
+      expect(find.text('FOKUS HARI INI'), findsOneWidget);
 
-      // 4. Quick Capture Floating Bar
-      expect(
-        find.widgetWithText(TextField, 'Tulis ide, "beli bensin 50rb", tugas...'),
-        findsOneWidget,
-      );
+      // 4. Block 3: KPI cards
+      expect(find.textContaining('Saldo'), findsOneWidget);
+      expect(find.text('Habit Hari Ini'), findsOneWidget);
 
-      // 5. Hero Card
-      expect(find.textContaining('Sholat Berikutnya'), findsOneWidget);
+      // 5. Block 4: AI Daily Briefing
+      expect(find.text('Ringkasan Hari Ini (AI)'), findsOneWidget);
+
+      // 6. Block 5: FAB Catat
+      expect(find.text('Catat'), findsOneWidget);
+
+      // Test tapping FAB opens QuickCaptureSheet
+      await tester.tap(find.text('Catat'));
+      await tester.pumpAndSettle();
+      expect(find.text('Catat Cepat Serbaguna'), findsOneWidget);
     });
 
     testWidgets('verifies layout responsiveness without RenderFlex overflow on small screen (320x600)', (tester) async {
@@ -176,6 +179,42 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('verifies layout with textScaler 1.3 (Large Accessibility Font)', (tester) async {
+      tester.view.physicalSize = const Size(390 * 2, 844 * 2);
+      tester.view.devicePixelRatio = 2.0;
+      addTearDown(() {
+        tester.view.resetPhysicalSize();
+        tester.view.resetDevicePixelRatio();
+      });
+
+      final appDb = await AppDatabase.open(
+        pathOverride: inMemoryDatabasePath,
+        factoryOverride: databaseFactoryFfiNoIsolate,
+      );
+      addTearDown(() async => appDb.close());
+
+      final clipboardGuard = ClipboardGuard(_FakeClipboardAdapter());
+      addTearDown(clipboardGuard.dispose);
+
+      FlutterErrorDetails? capturedDetails;
+      final oldOnError = FlutterError.onError;
+      FlutterError.onError = (details) {
+        capturedDetails = details;
+        oldOnError?.call(details);
+      };
+
+      await tester.pumpWidget(
+        MediaQuery(
+          data: const MediaQueryData(textScaler: TextScaler.linear(1.3)),
+          child: buildTestableHomeScreen(appDb: appDb, clipboardGuard: clipboardGuard),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      FlutterError.onError = oldOnError;
+      expect(capturedDetails, isNull);
     });
   });
 }

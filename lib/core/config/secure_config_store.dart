@@ -56,22 +56,49 @@ class SecureConfigStore {
 
   List<int>? _unlockedMasterKey;
 
+  /// Normalizes a pasted API key by trimming whitespace, matching outer quotes,
+  /// and any accidental `Bearer ` prefix.
+  static String normalizeApiKey(String raw) {
+    var value = raw.trim();
+    final bearerPrefix = RegExp(r'^bearer(\s+|$)', caseSensitive: false);
+    bool changed = true;
+    while (changed && value.isNotEmpty) {
+      changed = false;
+      if (bearerPrefix.hasMatch(value)) {
+        value = value.replaceFirst(bearerPrefix, '').trim();
+        changed = true;
+      }
+      if (value.length >= 2) {
+        final first = value[0];
+        final last = value[value.length - 1];
+        if ((first == '"' && last == '"') || (first == "'" && last == "'")) {
+          value = value.substring(1, value.length - 1).trim();
+          changed = true;
+        }
+      }
+    }
+    return value;
+  }
+
   Future<String?> getApiKey() async {
     final stored = await _storage.read(_apiKeyStorageKey);
-    if (stored != null && stored.trim().isNotEmpty) {
-      return stored.trim();
+    if (stored != null) {
+      final normalized = normalizeApiKey(stored);
+      if (normalized.isNotEmpty) {
+        return normalized;
+      }
     }
-    final fallback = defaultApiKey.trim();
+    final fallback = normalizeApiKey(defaultApiKey);
     return fallback.isEmpty ? null : fallback;
   }
 
   Future<void> setApiKey(String apiKey) async {
-    final trimmed = apiKey.trim();
-    if (trimmed.isEmpty) {
+    final normalized = normalizeApiKey(apiKey);
+    if (normalized.isEmpty) {
       await _storage.delete(_apiKeyStorageKey);
       return;
     }
-    await _storage.write(_apiKeyStorageKey, trimmed);
+    await _storage.write(_apiKeyStorageKey, normalized);
   }
 
   Future<String> getBaseUrl() async {
@@ -377,6 +404,29 @@ class SecureConfigStore {
 
   static const String _goldBenchmarkStorageKey = 'gold_price_benchmark';
   static const String _zakatHaulTrackerStorageKey = 'zakat_haul_tracker';
+  static const String _meetingDraftStorageKey = 'meeting_recording_draft';
+  static const String _homeModuleVisibilityStorageKey = 'home_module_visibility';
+
+  Future<String?> getMeetingDraftJson() =>
+      _storage.read(_meetingDraftStorageKey);
+
+  Future<void> setMeetingDraftJson(String json) async {
+    final trimmed = json.trim();
+    if (trimmed.isEmpty) {
+      await _storage.delete(_meetingDraftStorageKey);
+      return;
+    }
+    await _storage.write(_meetingDraftStorageKey, trimmed);
+  }
+
+  Future<void> clearMeetingDraft() =>
+      _storage.delete(_meetingDraftStorageKey);
+
+  Future<String?> getHomeModuleVisibilityJson() =>
+      _storage.read(_homeModuleVisibilityStorageKey);
+
+  Future<void> setHomeModuleVisibilityJson(String json) =>
+      _storage.write(_homeModuleVisibilityStorageKey, json);
 
   Future<String?> getGoldBenchmarkJson() =>
       _storage.read(_goldBenchmarkStorageKey);

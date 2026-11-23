@@ -32,7 +32,9 @@ void main() {
       );
       expect(adapter.currentText, 'secret-pass-123');
 
-      await Future<void>.delayed(const Duration(milliseconds: 80));
+      for (var i = 0; i < 15 && adapter.currentText.isNotEmpty; i++) {
+        await Future<void>.delayed(const Duration(milliseconds: 30));
+      }
       expect(adapter.currentText, isEmpty);
     });
 

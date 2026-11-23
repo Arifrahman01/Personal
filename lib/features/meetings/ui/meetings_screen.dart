@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
+import 'package:personal_hub/core/theme/app_tokens.dart';
 import 'package:personal_hub/core/theme/glass_widgets.dart';
+import 'package:personal_hub/core/theme/hub_widgets.dart';
 import 'package:personal_hub/features/meetings/models/meeting.dart';
 import 'package:personal_hub/features/meetings/providers/calendar_sync_providers.dart';
 import 'package:personal_hub/features/meetings/providers/meetings_providers.dart';
@@ -22,32 +25,32 @@ enum MeetingCategory {
   healthPersonal(
     label: 'Personal & Sehat',
     stripeColor: Color(0xFFFB7185), // Rose Pink #FB7185
-    icon: Icons.favorite_outline_rounded,
+    icon: LucideIcons.heart,
   ),
   clientWork(
     label: 'Client Call',
     stripeColor: Color(0xFF38BDF8), // Sky Blue #38BDF8
-    icon: Icons.headset_mic_outlined,
+    icon: LucideIcons.headset,
   ),
   teamMeeting(
     label: 'Meeting Tim',
     stripeColor: Color(0xFFA78BFA), // Lavender #A78BFA
-    icon: Icons.groups_outlined,
+    icon: LucideIcons.users,
   ),
   designReview(
     label: 'Review Desain',
     stripeColor: Color(0xFFA78BFA), // Lavender #A78BFA
-    icon: Icons.palette_outlined,
+    icon: LucideIcons.palette,
   ),
   research(
     label: 'Riset & Diskusi',
     stripeColor: Color(0xFFA78BFA), // Lavender #A78BFA
-    icon: Icons.lightbulb_outline,
+    icon: LucideIcons.lightbulb,
   ),
   general(
     label: 'Agenda Rapat',
     stripeColor: Color(0xFF38BDF8), // Sky Blue #38BDF8
-    icon: Icons.calendar_today_outlined,
+    icon: LucideIcons.calendar,
   );
 
   const MeetingCategory({
@@ -138,11 +141,19 @@ enum MeetingCategory {
 /// left timestamp column timeline with vertical guideline,
 /// Refleq Color-Stripe cards, and Amber Peach prayer conflict banner.
 class MeetingsScreen extends ConsumerStatefulWidget {
-  const MeetingsScreen({super.key, this.onPromoteActionItem});
+  const MeetingsScreen({
+    super.key,
+    this.onPromoteActionItem,
+    this.isEmbedded = false,
+  });
 
   /// Optional callback hook invoked when promoting a meeting action item into a task.
   final Future<void> Function(Meeting meeting, MeetingActionItem item)?
   onPromoteActionItem;
+
+  /// Whether this screen is hosted inside a parent hub (e.g. AgendaHubScreen).
+  /// When true, top AppBar and FAB are suppressed to prevent layout collision.
+  final bool isEmbedded;
 
   @override
   ConsumerState<MeetingsScreen> createState() => _MeetingsScreenState();
@@ -375,6 +386,173 @@ class _MeetingsScreenState extends ConsumerState<MeetingsScreen> {
     final conflictsAsync = ref.watch(scheduleGuardianConflictsProvider);
     final conflicts = conflictsAsync.asData?.value ?? const [];
 
+    Widget buildContent() {
+      return meetingsAsync.when(
+        loading: () => const Center(child: CircularProgressIndicator()),
+        error: (error, _) => Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Text(
+              'Gagal memuat daftar meeting: $error',
+              textAlign: TextAlign.center,
+            ),
+          ),
+        ),
+        data: (meetings) {
+          final now = DateTime.now();
+          final upcoming =
+              meetings
+                  .where((m) => !m.scheduledAt.toLocal().isBefore(now))
+                  .toList(growable: false)
+                ..sort((a, b) => a.scheduledAt.compareTo(b.scheduledAt));
+          final completed =
+              meetings
+                  .where((m) => m.scheduledAt.toLocal().isBefore(now))
+                  .toList(growable: false)
+                ..sort((a, b) => b.scheduledAt.compareTo(a.scheduledAt));
+
+          // Filter based on selected date if any
+          final filteredUpcoming = _filterByDate(upcoming, _selectedDate);
+          final filteredCompleted = _filterByDate(completed, _selectedDate);
+
+          return Column(
+            children: [
+              if (widget.isEmbedded)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+                  child: Row(
+                    children: [
+                      const Expanded(
+                        child: TabBar(
+                          tabs: [
+                            Tab(text: 'Mendatang'),
+                            Tab(text: 'Selesai'),
+                          ],
+                        ),
+                      ),
+                      IconButton(
+                        key: const Key('export_ical_button'),
+                        constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
+                        icon: const Icon(LucideIcons.share2),
+                        tooltip: 'Ekspor iCal (.ics)',
+                        onPressed: () {
+                          final allMeetings = meetingsAsync.asData?.value ?? const [];
+                          _showExportSheet(context, allMeetings);
+                        },
+                      ),
+                    ],
+                  ),
+                ),
+
+              // Prominent Action Buttons: Rekam Sekarang & Jadwalkan
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: FilledButton.icon(
+                        key: const Key('record_now_button'),
+                        onPressed: () {
+                          Navigator.of(context).push(
+                            MaterialPageRoute<void>(
+                              builder: (_) => const MeetingFormScreen(),
+                            ),
+                          );
+                        },
+                        icon: const Icon(LucideIcons.mic, size: 18),
+                        label: const Text('🎙️ Rekam Sekarang'),
+                        style: FilledButton.styleFrom(
+                          minimumSize: const Size(0, 48),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    OutlinedButton.icon(
+                      key: const Key('schedule_meeting_button'),
+                      onPressed: () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute<void>(
+                            builder: (_) => const MeetingFormScreen(),
+                          ),
+                        );
+                      },
+                      icon: const Icon(LucideIcons.plus, size: 18),
+                      label: const Text('+ Jadwalkan'),
+                      style: OutlinedButton.styleFrom(
+                        minimumSize: const Size(0, 48),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              // Weekly Date Strip: Horizontal capsule date pills (Refleq Minimal Aurora)
+              _HorizontalWeekPicker(
+                startMonday: _currentWeekMonday,
+                selectedDate: _selectedDate,
+                allMeetings: meetings,
+                onSelectDate: _onSelectDate,
+                onPreviousWeek: () => _shiftWeek(-1),
+                onNextWeek: () => _shiftWeek(1),
+                onResetToThisWeek: _resetToCurrentWeek,
+              ),
+
+              // Prayer Conflict / Break Banner (Amber peach #FBBF24 striped banner)
+              if (conflicts.isNotEmpty)
+                _PrayerConflictBanner(
+                  conflicts: conflicts,
+                  onTapConflict: (conflict) =>
+                      _openDetail(context, conflict.meeting.id),
+                ),
+
+              // Meeting Timeline with left timestamp column & clean vertical guideline
+              Expanded(
+                child: TabBarView(
+                  children: [
+                    _MeetingTabList(
+                      meetings: filteredUpcoming,
+                      emptyTitle: _selectedDate != null
+                          ? 'Tidak ada meeting mendatang di tanggal ini'
+                          : 'Belum ada meeting mendatang',
+                      emptySubtitle: _selectedDate != null
+                          ? 'Ketuk "Semua" atau pilih tanggal lain untuk melihat jadwal agenda.'
+                          : 'Tambahkan jadwal meeting baru untuk mengatur agenda, notulensi, dan pengingat.',
+                      onTapMeeting: (meeting) =>
+                          _openDetail(context, meeting.id),
+                      onClearFilter: _selectedDate != null
+                          ? () => setState(() => _selectedDate = null)
+                          : null,
+                    ),
+                    _MeetingTabList(
+                      meetings: filteredCompleted,
+                      emptyTitle: _selectedDate != null
+                          ? 'Tidak ada meeting selesai di tanggal ini'
+                          : 'Belum ada meeting selesai',
+                      emptySubtitle: _selectedDate != null
+                          ? 'Ketuk "Semua" atau pilih tanggal lain untuk melihat catatan riwayat.'
+                          : 'Meeting yang sudah lewat akan tampil di sini beserta catatan dan tindak lanjutnya.',
+                      onTapMeeting: (meeting) =>
+                          _openDetail(context, meeting.id),
+                      onClearFilter: _selectedDate != null
+                          ? () => setState(() => _selectedDate = null)
+                          : null,
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          );
+        },
+      );
+    }
+
+    if (widget.isEmbedded) {
+      return DefaultTabController(
+        length: 2,
+        child: buildContent(),
+      );
+    }
+
     return DefaultTabController(
       length: 2,
       child: GlassScaffold(
@@ -384,7 +562,7 @@ class _MeetingsScreenState extends ConsumerState<MeetingsScreen> {
             IconButton(
               key: const Key('export_ical_button'),
               constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
-              icon: const Icon(Icons.ios_share_rounded),
+              icon: const Icon(LucideIcons.share2),
               tooltip: 'Ekspor iCal (.ics)',
               onPressed: () {
                 final allMeetings = meetingsAsync.asData?.value ?? const [];
@@ -409,100 +587,13 @@ class _MeetingsScreenState extends ConsumerState<MeetingsScreen> {
                 ),
               );
             },
-            icon: const Icon(Icons.add_rounded),
+            icon: const Icon(LucideIcons.plus),
             label: const Text('Meeting Baru'),
           ),
         ),
         body: SafeArea(
           top: false,
-          child: meetingsAsync.when(
-            loading: () => const Center(child: CircularProgressIndicator()),
-            error: (error, _) => Center(
-              child: Padding(
-                padding: const EdgeInsets.all(24),
-                child: Text(
-                  'Gagal memuat daftar meeting: $error',
-                  textAlign: TextAlign.center,
-                ),
-              ),
-            ),
-            data: (meetings) {
-              final now = DateTime.now();
-              final upcoming =
-                  meetings
-                      .where((m) => !m.scheduledAt.toLocal().isBefore(now))
-                      .toList(growable: false)
-                    ..sort((a, b) => a.scheduledAt.compareTo(b.scheduledAt));
-              final completed =
-                  meetings
-                      .where((m) => m.scheduledAt.toLocal().isBefore(now))
-                      .toList(growable: false)
-                    ..sort((a, b) => b.scheduledAt.compareTo(a.scheduledAt));
-
-              // Filter based on selected date if any
-              final filteredUpcoming = _filterByDate(upcoming, _selectedDate);
-              final filteredCompleted = _filterByDate(completed, _selectedDate);
-
-              return Column(
-                children: [
-                  // Weekly Date Strip: Horizontal capsule date pills (Refleq Minimal Aurora)
-                  _HorizontalWeekPicker(
-                    startMonday: _currentWeekMonday,
-                    selectedDate: _selectedDate,
-                    allMeetings: meetings,
-                    onSelectDate: _onSelectDate,
-                    onPreviousWeek: () => _shiftWeek(-1),
-                    onNextWeek: () => _shiftWeek(1),
-                    onResetToThisWeek: _resetToCurrentWeek,
-                  ),
-
-                  // Prayer Conflict / Break Banner (Amber peach #FBBF24 striped banner)
-                  if (conflicts.isNotEmpty)
-                    _PrayerConflictBanner(
-                      conflicts: conflicts,
-                      onTapConflict: (conflict) =>
-                          _openDetail(context, conflict.meeting.id),
-                    ),
-
-                  // Meeting Timeline with left timestamp column & clean vertical guideline
-                  Expanded(
-                    child: TabBarView(
-                      children: [
-                        _MeetingTabList(
-                          meetings: filteredUpcoming,
-                          emptyTitle: _selectedDate != null
-                              ? 'Tidak ada meeting mendatang di tanggal ini'
-                              : 'Belum ada meeting mendatang',
-                          emptySubtitle: _selectedDate != null
-                              ? 'Ketuk "Semua" atau pilih tanggal lain untuk melihat jadwal agenda.'
-                              : 'Tambahkan jadwal meeting baru untuk mengatur agenda, notulensi, dan pengingat.',
-                          onTapMeeting: (meeting) =>
-                              _openDetail(context, meeting.id),
-                          onClearFilter: _selectedDate != null
-                              ? () => setState(() => _selectedDate = null)
-                              : null,
-                        ),
-                        _MeetingTabList(
-                          meetings: filteredCompleted,
-                          emptyTitle: _selectedDate != null
-                              ? 'Tidak ada meeting selesai di tanggal ini'
-                              : 'Belum ada meeting selesai',
-                          emptySubtitle: _selectedDate != null
-                              ? 'Ketuk "Semua" atau pilih tanggal lain untuk melihat catatan riwayat.'
-                              : 'Meeting yang sudah lewat akan tampil di sini beserta catatan dan tindak lanjutnya.',
-                          onTapMeeting: (meeting) =>
-                              _openDetail(context, meeting.id),
-                          onClearFilter: _selectedDate != null
-                              ? () => setState(() => _selectedDate = null)
-                              : null,
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              );
-            },
-          ),
+          child: buildContent(),
         ),
       ),
     );
@@ -605,11 +696,15 @@ class _HorizontalWeekPicker extends StatelessWidget {
           // Header: Month & Week range + Navigation Arrows (Touch targets >= 48dp)
           Row(
             children: [
-              Text(
-                '${startMonday.day} ${_monthNames[startMonday.month - 1]} - ${endSunday.day} ${_monthNames[endSunday.month - 1]} ${endSunday.year}',
-                style: theme.textTheme.titleSmall?.copyWith(
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: -0.2,
+              Expanded(
+                child: Text(
+                  '${startMonday.day} ${_monthNames[startMonday.month - 1]} - ${endSunday.day} ${_monthNames[endSunday.month - 1]} ${endSunday.year}',
+                  style: theme.textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: -0.2,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
               if (!isCurrentWeek) ...[
@@ -641,7 +736,6 @@ class _HorizontalWeekPicker extends StatelessWidget {
                   ),
                 ),
               ],
-              const Spacer(),
               IconButton(
                 visualDensity: VisualDensity.compact,
                 padding: const EdgeInsets.all(12),
@@ -999,17 +1093,9 @@ class _MeetingTimelineItem extends StatelessWidget {
 
   static String _formatTimelineTime(DateTime dt) {
     final local = dt.toLocal();
-    final hour12 = local.hour == 0
-        ? 12
-        : (local.hour > 12 ? local.hour - 12 : local.hour);
-    final hourStr = hour12.toString().padLeft(2, '0');
+    final hourStr = local.hour.toString().padLeft(2, '0');
     final minuteStr = local.minute.toString().padLeft(2, '0');
     return '$hourStr:$minuteStr';
-  }
-
-  static String _getTimelinePeriod(DateTime dt) {
-    final local = dt.toLocal();
-    return local.hour < 12 ? 'AM' : 'PM';
   }
 
   @override
@@ -1018,15 +1104,14 @@ class _MeetingTimelineItem extends StatelessWidget {
     final isDark = theme.brightness == Brightness.dark;
     final category = MeetingCategory.detect(meeting);
     final timeStr = _formatTimelineTime(meeting.scheduledAt);
-    final periodStr = _getTimelinePeriod(meeting.scheduledAt);
 
     return IntrinsicHeight(
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // Left Timestamp Column (08:30 AM, 11:31 AM)
+          // Left Timestamp Column (24-hour format: 08:30, 14:15)
           SizedBox(
-            width: 58,
+            width: 54,
             child: Padding(
               padding: const EdgeInsets.only(top: 14),
               child: Column(
@@ -1034,18 +1119,20 @@ class _MeetingTimelineItem extends StatelessWidget {
                 children: [
                   Text(
                     timeStr,
-                    style: theme.textTheme.titleSmall?.copyWith(
-                      fontWeight: FontWeight.w700,
-                      fontSize: 13,
-                      letterSpacing: -0.3,
-                      color: isDark
-                          ? const Color(0xFFE2E8F0)
-                          : const Color(0xFF1E293B),
+                    style: HubTypography.tabular(
+                      theme.textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 13,
+                        letterSpacing: -0.3,
+                        color: isDark
+                            ? const Color(0xFFE2E8F0)
+                            : const Color(0xFF1E293B),
+                      ) ?? const TextStyle(fontWeight: FontWeight.w700),
                     ),
                   ),
                   const SizedBox(height: 1),
                   Text(
-                    periodStr,
+                    'WIB',
                     style: theme.textTheme.labelSmall?.copyWith(
                       fontWeight: FontWeight.w700,
                       color: category.stripeColor,
@@ -1210,9 +1297,11 @@ class _MeetingCard extends ConsumerWidget {
         meeting.location.toLowerCase().contains('teams') ||
         meeting.location.toLowerCase().contains('online');
 
-    return GlassCard(
+    return HubCard(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(20),
+      borderRadius: HubRadius.rLg,
+      backgroundColor: isDark ? AppTokens.cardDark : AppTokens.cardLight,
+      borderColor: AppTokens.border(context),
       padding: EdgeInsets.zero,
       child: IntrinsicHeight(
         child: Row(
@@ -1663,13 +1752,13 @@ class _PrayerConflictBanner extends StatelessWidget {
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
-      child: GlassCard(
+      child: HubCard(
         key: const Key('prayer_conflict_banner'),
-        borderRadius: BorderRadius.circular(20),
-        tintColor: isDark
-            ? const Color(0xFF261D0C).withValues(alpha: 0.85)
-            : const Color(0xFFFFFBEB).withValues(alpha: 0.95),
-        borderColor: _amberPeach.withValues(alpha: 0.45),
+        borderRadius: HubRadius.rLg,
+        backgroundColor: isDark
+            ? const Color(0xFF261D0C)
+            : const Color(0xFFFFFBEB),
+        borderColor: _amberPeach.withValues(alpha: 0.5),
         padding: EdgeInsets.zero,
         child: IntrinsicHeight(
           child: Row(
@@ -1819,7 +1908,9 @@ class _PrayerConflictBanner extends StatelessWidget {
                                           final timeStr =
                                               '${newStart.hour.toString().padLeft(2, '0')}:${newStart.minute.toString().padLeft(2, '0')}';
                                           return InkWell(
+                                            key: Key('reschedule_conflict_${conflict.meeting.id}'),
                                             onTap: () async {
+                                              final previousMeeting = conflict.meeting;
                                               final updated = conflict.meeting
                                                   .copyWith(
                                                     scheduledAt: newStart,
@@ -1833,14 +1924,25 @@ class _PrayerConflictBanner extends StatelessWidget {
                                               if (context.mounted) {
                                                 ScaffoldMessenger.of(
                                                   context,
+                                                ).hideCurrentSnackBar();
+                                                ScaffoldMessenger.of(
+                                                  context,
                                                 ).showSnackBar(
                                                   SnackBar(
                                                     content: Text(
-                                                      'Jadwal "${conflict.meetingTitle}" diundur ke $timeStr (Selesai sholat)',
+                                                      'Jadwal "${conflict.meetingTitle}" digeser ke $timeStr (Selesai sholat)',
                                                     ),
                                                     behavior:
                                                         SnackBarBehavior
                                                             .floating,
+                                                    action: SnackBarAction(
+                                                      label: 'Batal',
+                                                      onPressed: () async {
+                                                        await ref
+                                                            .read(meetingsProvider.notifier)
+                                                            .updateMeeting(previousMeeting);
+                                                      },
+                                                    ),
                                                   ),
                                                 );
                                               }
@@ -1873,13 +1975,13 @@ class _PrayerConflictBanner extends StatelessWidget {
                                                     MainAxisSize.min,
                                                 children: [
                                                   const Icon(
-                                                    Icons.bolt_rounded,
+                                                    LucideIcons.clock,
                                                     size: 16,
                                                     color: _amberPeach,
                                                   ),
                                                   const SizedBox(width: 6),
                                                   Text(
-                                                    '⚡ Undur ke $timeStr',
+                                                    '⚡ Geser ke $timeStr',
                                                     style: const TextStyle(
                                                       fontSize: 12,
                                                       fontWeight:

@@ -1,11 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:personal_hub/core/constants/ai_constants.dart';
-import 'package:personal_hub/core/theme/glass_widgets.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
+import 'package:personal_hub/core/theme/app_tokens.dart';
+import 'package:personal_hub/core/theme/hub_widgets.dart';
 import 'package:personal_hub/features/ai/models/ai_models.dart';
 import 'package:personal_hub/features/ai/providers/ai_providers.dart';
+import 'package:personal_hub/features/finance/providers/finance_providers.dart';
+import 'package:personal_hub/features/meetings/providers/meetings_providers.dart';
+import 'package:personal_hub/features/notes/providers/notes_providers.dart';
 
-/// AI Assistant chat screen with free-first fallback badges and optional local context.
+/// AI Assistant chat screen with free-first fallback badges, starter prompts,
+/// privacy-walled context attachment (Notes, Meetings, Finance - strictly NO Vault),
+/// and adaptive Light/Dark tactile interface.
 class AiChatScreen extends ConsumerStatefulWidget {
   const AiChatScreen({super.key});
 
@@ -15,14 +21,18 @@ class AiChatScreen extends ConsumerStatefulWidget {
 
 class _AiChatScreenState extends ConsumerState<AiChatScreen> {
   final TextEditingController _messageController = TextEditingController();
-  final TextEditingController _contextController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
-  bool _showContextEditor = false;
+
+  static const List<(String prompt, IconData icon)> _starterPrompts = [
+    ('Ringkas agenda hari ini', LucideIcons.calendarCheck),
+    ('Cek anomali keuangan', LucideIcons.trendingDown),
+    ('Ide catatan baru', LucideIcons.filePlus),
+    ('Tugas prioritas', LucideIcons.listTodo),
+  ];
 
   @override
   void dispose() {
     _messageController.dispose();
-    _contextController.dispose();
     _scrollController.dispose();
     super.dispose();
   }
@@ -39,8 +49,8 @@ class _AiChatScreenState extends ConsumerState<AiChatScreen> {
     });
   }
 
-  Future<void> _handleSend() async {
-    final text = _messageController.text.trim();
+  Future<void> _handleSend([String? presetText]) async {
+    final text = (presetText ?? _messageController.text).trim();
     if (text.isEmpty) return;
     _messageController.clear();
     await ref.read(aiChatControllerProvider.notifier).sendMessage(text);
@@ -62,6 +72,9 @@ class _AiChatScreenState extends ConsumerState<AiChatScreen> {
               child: const Text('Batal'),
             ),
             FilledButton(
+              style: FilledButton.styleFrom(
+                backgroundColor: AppTokens.error(context),
+              ),
               onPressed: () => Navigator.of(dialogContext).pop(true),
               child: const Text('Hapus'),
             ),
@@ -75,10 +88,274 @@ class _AiChatScreenState extends ConsumerState<AiChatScreen> {
     }
   }
 
+  /// Privacy-walled context attachment sheet.
+  /// PRIVACY WALL: Notes, Meetings, and Finance ONLY.
+  /// Vault entries are STRICTLY FORBIDDEN and completely excluded.
+  Future<void> _openContextAttachmentSheet() async {
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: AppTokens.card(context),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(HubRadius.lg)),
+      ),
+      builder: (sheetContext) {
+        final notesAsync = ref.watch(notesListProvider);
+        final meetingsAsync = ref.watch(meetingsListProvider);
+        final financeAsync = ref.watch(monthlySummaryProvider);
+        final primary = AppTokens.primary(sheetContext);
+
+        return SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+                Center(
+                  child: Container(
+                    width: 38,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: AppTokens.border(context),
+                      borderRadius: HubRadius.rPill,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    Icon(LucideIcons.paperclip, size: 20, color: primary),
+                    const SizedBox(width: 10),
+                    const Text(
+                      'Lampirkan Konteks ke AI',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  'Pilih konteks aktivitas lokal untuk disertakan pada percakapan. Dinding privasi aktif menjamin data sensitif tidak pernah dapat dibagikan.',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: AppTokens.textSecondary(context),
+                    height: 1.35,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                // Privacy Wall Badge
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: AppTokens.success(context).withValues(alpha: 0.12),
+                    borderRadius: HubRadius.rSm,
+                    border: Border.all(
+                      color: AppTokens.success(context).withValues(alpha: 0.35),
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(LucideIcons.shieldCheck, size: 16, color: AppTokens.success(context)),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Dinding Privasi: Data Vault diisolasi 100% dan tidak pernah dapat dilampirkan.',
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                            color: AppTokens.success(context),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 16),
+
+                // Option 1: Ringkasan Keuangan
+                HubCard(
+                  onTap: () {
+                    final summary = financeAsync.asData?.value;
+                    if (summary != null) {
+                      final contextText =
+                          'Konteks Keuangan Bulan Ini: Pemasukan Rp ${summary.totalIncome.toStringAsFixed(0)}, Pengeluaran Rp ${summary.totalExpense.toStringAsFixed(0)}, Saldo Bersih Rp ${summary.netBalance.toStringAsFixed(0)}';
+                      ref
+                          .read(aiChatControllerProvider.notifier)
+                          .setSystemContext(contextText);
+                    } else {
+                      ref
+                          .read(aiChatControllerProvider.notifier)
+                          .setSystemContext('Konteks Keuangan: Ringkasan arus kas bulan ini.');
+                    }
+                    Navigator.of(sheetContext).pop();
+                  },
+                  child: Row(
+                    children: [
+                      CircleAvatar(
+                        radius: 18,
+                        backgroundColor: primary.withValues(alpha: 0.15),
+                        foregroundColor: primary,
+                        child: const Icon(LucideIcons.wallet, size: 18),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'Ringkasan Keuangan Bulan Ini',
+                              style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              financeAsync.when(
+                                data: (s) =>
+                                    'Pemasukan Rp ${s.totalIncome.toStringAsFixed(0)} • Pengeluaran Rp ${s.totalExpense.toStringAsFixed(0)}',
+                                loading: () => 'Memuat data keuangan...',
+                                error: (err, st) => 'Arus kas dan saldo bulanan',
+                              ),
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: AppTokens.textSecondary(context),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const Icon(LucideIcons.chevronRight, size: 16),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 10),
+
+                // Option 2: Agenda & Meeting Hari Ini
+                HubCard(
+                  onTap: () {
+                    final meetings = meetingsAsync.asData?.value ?? [];
+                    if (meetings.isNotEmpty) {
+                      final agendaStr = meetings.take(5).map((m) {
+                        final time =
+                            '${m.scheduledAt.hour.toString().padLeft(2, '0')}:${m.scheduledAt.minute.toString().padLeft(2, '0')}';
+                        return '${m.title} jam $time';
+                      }).join(', ');
+                      ref
+                          .read(aiChatControllerProvider.notifier)
+                          .setSystemContext('Konteks Agenda Pertemuan: $agendaStr');
+                    } else {
+                      ref
+                          .read(aiChatControllerProvider.notifier)
+                          .setSystemContext('Konteks Agenda: Belum ada jadwal rapat terdaftar hari ini.');
+                    }
+                    Navigator.of(sheetContext).pop();
+                  },
+                  child: Row(
+                    children: [
+                      CircleAvatar(
+                        radius: 18,
+                        backgroundColor: AppTokens.info(context).withValues(alpha: 0.15),
+                        foregroundColor: AppTokens.info(context),
+                        child: const Icon(LucideIcons.calendar, size: 18),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'Agenda & Jadwal Pertemuan',
+                              style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              meetingsAsync.when(
+                                data: (m) => '${m.length} jadwal pertemuan aktif',
+                                loading: () => 'Memuat agenda...',
+                                error: (err, st) => 'Jadwal dan pertemuan hari ini',
+                              ),
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: AppTokens.textSecondary(context),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const Icon(LucideIcons.chevronRight, size: 16),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 10),
+
+                // Option 3: Catatan Pribadi
+                HubCard(
+                  onTap: () {
+                    final notes = notesAsync.asData?.value ?? [];
+                    if (notes.isNotEmpty) {
+                      final latest = notes.first;
+                      final snippet = latest.content.length > 100
+                          ? '${latest.content.substring(0, 100)}...'
+                          : latest.content;
+                      ref
+                          .read(aiChatControllerProvider.notifier)
+                          .setSystemContext('Konteks Catatan "${latest.title}": $snippet');
+                    } else {
+                      ref
+                          .read(aiChatControllerProvider.notifier)
+                          .setSystemContext('Konteks Catatan: Catatan pribadi terbaru.');
+                    }
+                    Navigator.of(sheetContext).pop();
+                  },
+                  child: Row(
+                    children: [
+                      CircleAvatar(
+                        radius: 18,
+                        backgroundColor: const Color(0xFF8B5CF6).withValues(alpha: 0.15),
+                        foregroundColor: const Color(0xFF8B5CF6),
+                        child: const Icon(LucideIcons.fileText, size: 18),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'Catatan Pribadi Terbaru',
+                              style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              notesAsync.when(
+                                data: (n) => n.isNotEmpty
+                                    ? '"${n.first.title}" dan ${n.length} catatan lainnya'
+                                    : 'Belum ada catatan',
+                                loading: () => 'Memuat catatan...',
+                                error: (err, st) => 'Catatan pribadi Anda',
+                              ),
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: AppTokens.textSecondary(context),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const Icon(LucideIcons.chevronRight, size: 16),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final chatAsync = ref.watch(aiChatControllerProvider);
-    final theme = Theme.of(context);
+    final primary = AppTokens.primary(context);
 
     ref.listen<AsyncValue<AiChatState>>(aiChatControllerProvider, (prev, next) {
       final prevCount = prev?.asData?.value.messages.length ?? 0;
@@ -88,32 +365,28 @@ class _AiChatScreenState extends ConsumerState<AiChatScreen> {
       }
     });
 
-    return GlassScaffold(
-      appBar: GlassAppBar(
-        title: const Text('Asisten AI'),
+    return Scaffold(
+      backgroundColor: AppTokens.canvas(context),
+      appBar: AppBar(
+        title: Row(
+          children: [
+            Icon(LucideIcons.bot, size: 20, color: primary),
+            const SizedBox(width: 8),
+            const Text('Asisten AI'),
+          ],
+        ),
+        backgroundColor: AppTokens.canvas(context),
+        centerTitle: false,
+        elevation: 0,
         actions: [
           IconButton(
-            tooltip: 'Konteks tambahan',
-            icon: Icon(
-              _showContextEditor ? Icons.tune : Icons.tune_outlined,
-              color: chatAsync.asData?.value.systemContext != null
-                  ? theme.colorScheme.primary
-                  : null,
-            ),
-            onPressed: () {
-              final currentContext =
-                  chatAsync.asData?.value.systemContext ?? '';
-              if (!_showContextEditor && _contextController.text.isEmpty) {
-                _contextController.text = currentContext;
-              }
-              setState(() {
-                _showContextEditor = !_showContextEditor;
-              });
-            },
+            tooltip: 'Lampirkan Konteks',
+            icon: const Icon(LucideIcons.paperclip),
+            onPressed: _openContextAttachmentSheet,
           ),
           IconButton(
             tooltip: 'Hapus riwayat chat',
-            icon: const Icon(Icons.delete_outline_rounded),
+            icon: const Icon(LucideIcons.trash2),
             onPressed: chatAsync.asData?.value.messages.isNotEmpty == true
                 ? _confirmClearChat
                 : null,
@@ -121,7 +394,6 @@ class _AiChatScreenState extends ConsumerState<AiChatScreen> {
         ],
       ),
       body: SafeArea(
-        top: false,
         child: chatAsync.when(
           loading: () => const Center(child: CircularProgressIndicator()),
           error: (error, _) => Center(
@@ -134,30 +406,32 @@ class _AiChatScreenState extends ConsumerState<AiChatScreen> {
             ),
           ),
           data: (chatState) {
+            final hasContext = chatState.systemContext != null &&
+                chatState.systemContext!.isNotEmpty;
+
             return Column(
               children: [
-                if (_showContextEditor) _buildContextEditor(theme, chatState),
-                if (!_showContextEditor && chatState.systemContext != null)
-                  _buildActiveContextBanner(theme, chatState.systemContext!),
+                // Error Banner
                 if (chatState.errorMessage != null)
-                  _buildErrorBanner(theme, chatState.errorMessage!),
+                  _buildErrorBanner(chatState.errorMessage!),
+
+                // Chat Messages or Empty State
                 Expanded(
                   child: chatState.messages.isEmpty
-                      ? _buildEmptyState(theme)
+                      ? _buildEmptyState()
                       : ListView.separated(
                           controller: _scrollController,
                           padding: const EdgeInsets.symmetric(
                             horizontal: 16,
                             vertical: 12,
                           ),
-                          itemCount:
-                              chatState.messages.length +
+                          itemCount: chatState.messages.length +
                               (chatState.isSending ? 1 : 0),
                           separatorBuilder: (_, _) =>
                               const SizedBox(height: 10),
                           itemBuilder: (context, index) {
                             if (index == chatState.messages.length) {
-                              return _buildTypingIndicator(theme);
+                              return _buildTypingIndicator();
                             }
                             return _ChatBubble(
                               message: chatState.messages[index],
@@ -165,7 +439,13 @@ class _AiChatScreenState extends ConsumerState<AiChatScreen> {
                           },
                         ),
                 ),
-                _buildInputBar(theme, chatState.isSending),
+
+                // Active Context Banner above input
+                if (hasContext)
+                  _buildActiveContextBanner(chatState.systemContext!),
+
+                // Input Bar (Adaptive Light/Dark, no old teal)
+                _buildInputBar(chatState.isSending),
               ],
             );
           },
@@ -174,88 +454,114 @@ class _AiChatScreenState extends ConsumerState<AiChatScreen> {
     );
   }
 
-  Widget _buildContextEditor(ThemeData theme, AiChatState chatState) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceContainerLow,
-        border: Border(
-          bottom: BorderSide(
-            color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5),
-          ),
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Konteks Sistem Opsional',
-            style: theme.textTheme.labelLarge?.copyWith(
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            'Gunakan untuk instruksi atau ringkasan catatan/agenda. Data Vault tidak pernah dibagikan ke AI.',
-            style: theme.textTheme.bodySmall?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
-            ),
-          ),
-          const SizedBox(height: 8),
-          TextField(
-            controller: _contextController,
-            maxLines: 2,
-            minLines: 1,
-            decoration: const InputDecoration(
-              hintText: 'Contoh: Fokus ringkas dalam poin-poin singkat...',
-              isDense: true,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.end,
-            children: [
-              if (chatState.systemContext != null)
-                TextButton(
-                  onPressed: () {
-                    _contextController.clear();
-                    ref
-                        .read(aiChatControllerProvider.notifier)
-                        .setSystemContext(null);
-                  },
-                  child: const Text('Hapus Konteks'),
-                ),
-              const SizedBox(width: 8),
-              FilledButton.tonal(
-                onPressed: () {
-                  ref
-                      .read(aiChatControllerProvider.notifier)
-                      .setSystemContext(_contextController.text);
-                  setState(() {
-                    _showContextEditor = false;
-                  });
-                },
-                child: const Text('Terapkan'),
+  Widget _buildEmptyState() {
+    final primary = AppTokens.primary(context);
+
+    return Center(
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 56,
+              height: 56,
+              decoration: BoxDecoration(
+                color: primary.withValues(alpha: 0.12),
+                shape: BoxShape.circle,
               ),
-            ],
-          ),
-        ],
+              child: Icon(LucideIcons.sparkles, size: 28, color: primary),
+            ),
+            const SizedBox(height: 14),
+            const Text(
+              'Asisten AI Samudra',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              'Tanyakan apa saja atau pilih salah satu perintah cepat di bawah ini untuk memulai percakapan.',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 13,
+                color: AppTokens.textSecondary(context),
+                height: 1.35,
+              ),
+            ),
+            const SizedBox(height: 24),
+
+            // 4 Starter Prompts in 2x2 grid
+            Text(
+              'Mulai Percakapan Cepat:',
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+                color: AppTokens.textSecondary(context),
+                letterSpacing: 0.5,
+              ),
+            ),
+            const SizedBox(height: 12),
+            GridView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 2,
+                childAspectRatio: 2.2,
+                crossAxisSpacing: 10,
+                mainAxisSpacing: 10,
+              ),
+              itemCount: _starterPrompts.length,
+              itemBuilder: (context, index) {
+                final item = _starterPrompts[index];
+                return HubCard(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                  onTap: () => _handleSend(item.$1),
+                  child: Row(
+                    children: [
+                      Icon(item.$2, size: 18, color: primary),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          item.$1,
+                          style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                          ),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
+          ],
+        ),
       ),
     );
   }
 
-  Widget _buildActiveContextBanner(ThemeData theme, String contextText) {
+  Widget _buildActiveContextBanner(String contextText) {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      color: theme.colorScheme.primaryContainer.withValues(alpha: 0.45),
+      decoration: BoxDecoration(
+        color: AppTokens.primary(context).withValues(alpha: 0.10),
+        border: Border(
+          top: BorderSide(
+            color: AppTokens.primary(context).withValues(alpha: 0.3),
+          ),
+        ),
+      ),
       child: Row(
         children: [
           Icon(
-            Icons.info_outline_rounded,
-            size: 18,
-            color: theme.colorScheme.primary,
+            LucideIcons.paperclip,
+            size: 16,
+            color: AppTokens.primary(context),
           ),
           const SizedBox(width: 8),
           Expanded(
@@ -263,17 +569,18 @@ class _AiChatScreenState extends ConsumerState<AiChatScreen> {
               'Konteks aktif: $contextText',
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: theme.colorScheme.onSurface,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w500,
+                color: AppTokens.textPrimary(context),
               ),
             ),
           ),
           IconButton(
             visualDensity: VisualDensity.compact,
-            tooltip: 'Bersihkan konteks',
-            icon: const Icon(Icons.close, size: 18),
+            tooltip: 'Hapus konteks',
+            icon: const Icon(LucideIcons.x, size: 16),
             onPressed: () {
-              _contextController.clear();
               ref
                   .read(aiChatControllerProvider.notifier)
                   .setSystemContext(null);
@@ -284,33 +591,35 @@ class _AiChatScreenState extends ConsumerState<AiChatScreen> {
     );
   }
 
-  Widget _buildErrorBanner(ThemeData theme, String message) {
+  Widget _buildErrorBanner(String message) {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-      color: theme.colorScheme.errorContainer,
+      color: AppTokens.error(context).withValues(alpha: 0.15),
       child: Row(
         children: [
           Icon(
-            Icons.error_outline_rounded,
-            size: 20,
-            color: theme.colorScheme.onErrorContainer,
+            LucideIcons.alertCircle,
+            size: 18,
+            color: AppTokens.error(context),
           ),
           const SizedBox(width: 10),
           Expanded(
             child: Text(
               message,
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: theme.colorScheme.onErrorContainer,
+              style: TextStyle(
+                fontSize: 12,
+                color: AppTokens.error(context),
+                fontWeight: FontWeight.w500,
               ),
             ),
           ),
           IconButton(
             visualDensity: VisualDensity.compact,
             icon: Icon(
-              Icons.close,
-              size: 18,
-              color: theme.colorScheme.onErrorContainer,
+              LucideIcons.x,
+              size: 16,
+              color: AppTokens.error(context),
             ),
             onPressed: () =>
                 ref.read(aiChatControllerProvider.notifier).clearError(),
@@ -320,67 +629,33 @@ class _AiChatScreenState extends ConsumerState<AiChatScreen> {
     );
   }
 
-  Widget _buildEmptyState(ThemeData theme) {
-    return Center(
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.all(24),
-        child: Card(
-          child: Padding(
-            padding: const EdgeInsets.all(20),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                CircleAvatar(
-                  radius: 28,
-                  backgroundColor: theme.colorScheme.primaryContainer,
-                  foregroundColor: theme.colorScheme.onPrimaryContainer,
-                  child: const Icon(Icons.auto_awesome_rounded, size: 28),
-                ),
-                const SizedBox(height: 14),
-                Text(
-                  'Asisten AI Samudra',
-                  style: theme.textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  'Prioritas model gratis (${AiConstants.freeModel}) dengan fallback otomatis ke ${AiConstants.fallbackModel} saat kuota terbatas.',
-                  textAlign: TextAlign.center,
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildTypingIndicator(ThemeData theme) {
+  Widget _buildTypingIndicator() {
     return Align(
       alignment: Alignment.centerLeft,
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
         decoration: BoxDecoration(
-          color: theme.colorScheme.surfaceContainerHighest,
+          color: AppTokens.card(context),
           borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: AppTokens.border(context)),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const SizedBox(
+            SizedBox(
               width: 14,
               height: 14,
-              child: CircularProgressIndicator(strokeWidth: 2),
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                color: AppTokens.primary(context),
+              ),
             ),
             const SizedBox(width: 10),
             Text(
               'Menyusun jawaban...',
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
+              style: TextStyle(
+                fontSize: 12,
+                color: AppTokens.textSecondary(context),
               ),
             ),
           ],
@@ -389,23 +664,46 @@ class _AiChatScreenState extends ConsumerState<AiChatScreen> {
     );
   }
 
-  Widget _buildInputBar(ThemeData theme, bool isSending) {
-    final isDark = theme.brightness == Brightness.dark;
+  Widget _buildInputBar(bool isSending) {
+    final primary = AppTokens.primary(context);
+
     return Container(
-      padding: const EdgeInsets.fromLTRB(16, 8, 12, 12),
+      padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
       decoration: BoxDecoration(
-        color: isDark
-            ? const Color(0xFF0E1D1F).withValues(alpha: 0.72)
-            : Colors.white.withValues(alpha: 0.72),
+        color: AppTokens.card(context),
         border: Border(
           top: BorderSide(
-            color: theme.colorScheme.outlineVariant.withValues(alpha: 0.4),
+            color: AppTokens.border(context),
+            width: 1,
           ),
         ),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
+          // Lampirkan Konteks (+ Konteks) Button
+          IconButton(
+            tooltip: 'Lampirkan Konteks',
+            icon: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(LucideIcons.paperclip, size: 16, color: primary),
+                const SizedBox(width: 4),
+                Text(
+                  '+ Konteks',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    color: primary,
+                  ),
+                ),
+              ],
+            ),
+            onPressed: isSending ? null : _openContextAttachmentSheet,
+          ),
+          const SizedBox(width: 4),
+
+          // Message Input Field
           Expanded(
             child: TextField(
               controller: _messageController,
@@ -414,17 +712,37 @@ class _AiChatScreenState extends ConsumerState<AiChatScreen> {
               maxLines: 4,
               textInputAction: TextInputAction.send,
               onSubmitted: (_) => _handleSend(),
-              decoration: const InputDecoration(
+              decoration: InputDecoration(
                 hintText: 'Tulis pesan untuk AI...',
                 isDense: true,
+                filled: true,
+                fillColor: AppTokens.canvas(context),
+                border: OutlineInputBorder(
+                  borderRadius: HubRadius.rSm,
+                  borderSide: BorderSide(color: AppTokens.border(context)),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: HubRadius.rSm,
+                  borderSide: BorderSide(color: AppTokens.border(context)),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: HubRadius.rSm,
+                  borderSide: BorderSide(color: primary, width: 1.5),
+                ),
               ),
             ),
           ),
           const SizedBox(width: 8),
+
+          // Send Button
           IconButton.filled(
+            style: IconButton.styleFrom(
+              backgroundColor: primary,
+              foregroundColor: Colors.white,
+            ),
             tooltip: 'Kirim',
-            onPressed: isSending ? null : _handleSend,
-            icon: const Icon(Icons.send_rounded),
+            onPressed: isSending ? null : () => _handleSend(),
+            icon: const Icon(LucideIcons.send, size: 18),
           ),
         ],
       ),
@@ -439,15 +757,16 @@ class _ChatBubble extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     final isUser = message.role == 'user';
+    final primary = AppTokens.primary(context);
 
-    final bubbleColor = isUser
-        ? theme.colorScheme.primaryContainer
-        : theme.colorScheme.surfaceContainerHighest;
-    final textColor = isUser
-        ? theme.colorScheme.onPrimaryContainer
-        : theme.colorScheme.onSurface;
+    final bubbleBg = isUser
+        ? primary.withValues(alpha: 0.15)
+        : AppTokens.card(context);
+    final borderColor = isUser
+        ? primary.withValues(alpha: 0.40)
+        : AppTokens.border(context);
+    final textColor = AppTokens.textPrimary(context);
 
     return Align(
       alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
@@ -458,13 +777,14 @@ class _ChatBubble extends StatelessWidget {
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
           decoration: BoxDecoration(
-            color: bubbleColor,
+            color: bubbleBg,
             borderRadius: BorderRadius.only(
               topLeft: const Radius.circular(16),
               topRight: const Radius.circular(16),
               bottomLeft: Radius.circular(isUser ? 16 : 4),
               bottomRight: Radius.circular(isUser ? 4 : 16),
             ),
+            border: Border.all(color: borderColor, width: 1),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -478,7 +798,11 @@ class _ChatBubble extends StatelessWidget {
               ],
               SelectableText(
                 message.content,
-                style: theme.textTheme.bodyMedium?.copyWith(color: textColor),
+                style: TextStyle(
+                  fontSize: 14,
+                  height: 1.4,
+                  color: textColor,
+                ),
               ),
             ],
           ),
@@ -496,13 +820,13 @@ class _ModelBadgeChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final primary = AppTokens.primary(context);
+    final warning = AppTokens.warning(context);
+
     final bgColor = didFallback
-        ? theme.colorScheme.tertiaryContainer
-        : theme.colorScheme.secondaryContainer;
-    final fgColor = didFallback
-        ? theme.colorScheme.onTertiaryContainer
-        : theme.colorScheme.onSecondaryContainer;
+        ? warning.withValues(alpha: 0.15)
+        : primary.withValues(alpha: 0.15);
+    final fgColor = didFallback ? warning : primary;
     final label = didFallback ? 'Fallback' : 'Free';
 
     return Tooltip(
@@ -511,12 +835,14 @@ class _ModelBadgeChip extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
         decoration: BoxDecoration(
           color: bgColor,
-          borderRadius: BorderRadius.circular(999),
+          borderRadius: HubRadius.rPill,
+          border: Border.all(color: fgColor.withValues(alpha: 0.4)),
         ),
         child: Text(
           label,
-          style: theme.textTheme.labelSmall?.copyWith(
+          style: TextStyle(
             color: fgColor,
+            fontSize: 11,
             fontWeight: FontWeight.w700,
           ),
         ),

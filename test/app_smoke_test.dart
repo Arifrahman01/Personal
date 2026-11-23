@@ -105,35 +105,37 @@ void main() {
 
       // Home dashboard assertions
       expect(find.text('Personal Hub'), findsOneWidget);
+      expect(find.text('Hari Ini'), findsWidgets);
       expect(find.text('Ringkasan Hari Ini (AI)'), findsOneWidget);
-      expect(find.text('Jadwal & Kiblat'), findsOneWidget);
-      expect(find.text('Tugas & Habit'), findsOneWidget);
-      expect(find.text('Keuangan Harian'), findsOneWidget);
+      expect(find.text('FOKUS HARI INI'), findsOneWidget);
+      expect(find.text('Habit Hari Ini'), findsOneWidget);
+      expect(find.textContaining('Saldo'), findsOneWidget);
+      expect(find.text('Catat'), findsOneWidget);
 
       // Verify all 5 tabs in bottom nav
-      for (final label in ['Beranda', 'Catatan', 'Meeting', 'Vault', 'AI']) {
+      for (final label in ['Hari Ini', 'Agenda', 'Catatan', 'Keuangan', 'Vault']) {
         expect(find.text(label), findsWidgets);
       }
 
       // Navigate across tabs
+      await tester.tap(find.text('Agenda').last);
+      await tester.pumpAndSettle();
+      expect(find.text('Agenda'), findsWidgets);
+
       await tester.tap(find.text('Catatan').last);
       await tester.pumpAndSettle();
       expect(find.text('Belum ada catatan'), findsOneWidget);
 
-      await tester.tap(find.text('Meeting').last);
+      await tester.tap(find.text('Keuangan').last);
       await tester.pumpAndSettle();
-      expect(find.text('Mendatang'), findsOneWidget);
+      expect(find.text('Keuangan'), findsWidgets);
 
       await tester.tap(find.text('Vault').last);
       await tester.pumpAndSettle();
       expect(find.text('Buat PIN Brankas'), findsOneWidget);
 
-      await tester.tap(find.text('AI').last);
-      await tester.pumpAndSettle();
-      expect(find.text('Asisten AI Samudra'), findsOneWidget);
-
-      // Return to Beranda and open Settings
-      await tester.tap(find.text('Beranda').last);
+      // Return to Hari Ini and open Settings
+      await tester.tap(find.text('Hari Ini').last);
       await tester.pumpAndSettle();
 
       await tester.tap(find.byTooltip('Pengaturan'));
@@ -142,6 +144,23 @@ void main() {
       expect(find.text('Pengaturan'), findsOneWidget);
       expect(find.textContaining(AiConstants.freeModel), findsWidgets);
       expect(find.textContaining(AiConstants.fallbackModel), findsWidgets);
+
+      // Back to Hari Ini
+      await tester.pageBack();
+      await tester.pumpAndSettle();
+
+      // Test AI Copilot 1-tap from AppBar
+      await tester.tap(find.byTooltip('AI Copilot'));
+      await tester.pumpAndSettle();
+      expect(find.text('Asisten AI Samudra'), findsOneWidget);
+
+      await tester.pageBack();
+      await tester.pumpAndSettle();
+
+      // Test Global Search 1-tap from AppBar
+      await tester.tap(find.byTooltip('Cari'));
+      await tester.pumpAndSettle();
+      expect(find.text('Cari catatan, meeting, tugas, transaksi...'), findsOneWidget);
     },
   );
 }

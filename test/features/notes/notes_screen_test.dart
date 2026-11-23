@@ -5,6 +5,7 @@ import 'package:http/http.dart' as http;
 import 'package:personal_hub/core/config/secure_config_store.dart';
 import 'package:personal_hub/core/constants/ai_constants.dart';
 import 'package:personal_hub/core/errors/app_exceptions.dart';
+import 'package:personal_hub/core/theme/hub_widgets.dart';
 import 'package:personal_hub/features/ai/models/ai_models.dart';
 import 'package:personal_hub/features/ai/providers/ai_providers.dart';
 import 'package:personal_hub/features/ai/services/samudra_ai_client.dart';
@@ -215,7 +216,7 @@ void main() {
         expect(find.text('Catatan Rumah'), findsOneWidget);
 
         // Select #kerja filter chip
-        await tester.tap(find.widgetWithText(ChoiceChip, '#kerja'));
+        await tester.tap(find.widgetWithText(HubPill, '#kerja'));
         await tester.pumpAndSettle();
 
         expect(find.text('Catatan Kerja'), findsOneWidget);
@@ -230,10 +231,10 @@ void main() {
         await tester.pumpAndSettle();
 
         // Filter falls back cleanly to Semua and displays remaining notes
-        final semuaChip = tester.widget<ChoiceChip>(
-          find.widgetWithText(ChoiceChip, 'Semua'),
+        final semuaPill = tester.widget<HubPill>(
+          find.widgetWithText(HubPill, 'Semua'),
         );
-        expect(semuaChip.selected, isTrue);
+        expect(semuaPill.isSelected, isTrue);
         expect(find.text('Catatan Kerja'), findsNothing);
         expect(find.text('Catatan Rumah'), findsOneWidget);
       },
@@ -284,13 +285,11 @@ void main() {
           'Bahas progres rilis dan kirim notulensi ke tim.',
         );
 
-        // Open AI Bantu sheet
-        await tester.tap(find.text('AI Bantu'));
+        // Open unified AI Assistant sheet
+        await tester.tap(find.text('✨ Asisten AI'));
         await tester.pumpAndSettle();
 
         expect(find.text('Ringkas catatan'), findsOneWidget);
-        expect(find.text('Rapikan bahasa'), findsOneWidget);
-        expect(find.text('Ubah jadi checklist'), findsOneWidget);
 
         // First action -> Free badge + Sisipkan di bawah
         await tester.tap(find.text('Ringkas catatan'));
@@ -310,9 +309,15 @@ void main() {
           'Bahas progres rilis dan kirim notulensi ke tim.\n\nRingkasan padat catatan rapat.',
         );
 
-        // Second action -> Fallback badge + Terapkan
-        await tester.tap(find.text('AI Bantu'));
+        // Second action -> Gaya Bahasa tab -> Ubah jadi checklist -> Fallback badge + Terapkan
+        await tester.tap(find.text('✨ Asisten AI'));
         await tester.pumpAndSettle();
+
+        await tester.tap(find.text('Gaya Bahasa'));
+        await tester.pumpAndSettle();
+
+        expect(find.text('Rapikan bahasa'), findsOneWidget);
+        expect(find.text('Ubah jadi checklist'), findsOneWidget);
 
         await tester.tap(find.text('Ubah jadi checklist'));
         await tester.pumpAndSettle();
@@ -323,6 +328,7 @@ void main() {
           findsOneWidget,
         );
 
+        await tester.ensureVisible(find.text('Terapkan'));
         await tester.tap(find.text('Terapkan'));
         await tester.pumpAndSettle();
 
@@ -333,6 +339,49 @@ void main() {
           contentFieldAfterReplace.controller?.text,
           '- [ ] Kirim notulensi\n- [ ] Jadwalkan evaluasi',
         );
+      },
+    );
+
+    testWidgets(
+      'filters by Notulensi Meeting quick filter chip when meeting notes are present',
+      (tester) async {
+        final repo = _InMemoryNotesRepository();
+        await repo.createNote(
+          title: 'Notulensi Sinkronisasi Tim',
+          content: 'Poin rapat koordinasi mingguan.',
+          tags: ['meeting', 'notulensi'],
+        );
+        await repo.createNote(
+          title: 'Daftar Belanja',
+          content: 'Kopi, teh, gula.',
+          tags: ['pribadi'],
+        );
+
+        await tester.pumpWidget(
+          ProviderScope(
+            overrides: [notesRepositoryProvider.overrideWithValue(repo)],
+            child: const MaterialApp(home: NotesScreen()),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        expect(find.text('Notulensi Sinkronisasi Tim'), findsOneWidget);
+        expect(find.text('Daftar Belanja'), findsOneWidget);
+
+        // Tap Notulensi Meeting chip
+        expect(find.text('Notulensi Meeting'), findsOneWidget);
+        await tester.tap(find.text('Notulensi Meeting'));
+        await tester.pumpAndSettle();
+
+        expect(find.text('Notulensi Sinkronisasi Tim'), findsOneWidget);
+        expect(find.text('Daftar Belanja'), findsNothing);
+
+        // Tap Semua chip to reset
+        await tester.tap(find.text('Semua'));
+        await tester.pumpAndSettle();
+
+        expect(find.text('Notulensi Sinkronisasi Tim'), findsOneWidget);
+        expect(find.text('Daftar Belanja'), findsOneWidget);
       },
     );
   });

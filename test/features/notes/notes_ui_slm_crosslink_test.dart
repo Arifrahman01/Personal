@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:personal_hub/core/theme/glass_widgets.dart';
+import 'package:personal_hub/core/theme/hub_widgets.dart';
 import 'package:personal_hub/features/ai/providers/local_slm_providers.dart';
 import 'package:personal_hub/features/ai/providers/semantic_memory_providers.dart';
 import 'package:personal_hub/features/ai/services/local_slm_engine_service.dart';
@@ -68,7 +68,7 @@ class _FakeNotesRepository implements NotesRepository {
 void main() {
   group('Notes Screen & 1-tap Export', () {
     testWidgets(
-      'renders dark glassmorphism card with 18px border radius, pin indicator, and 1-tap export button',
+      'renders tactile HubCard with border, pin indicator, and export via action menu',
       (tester) async {
         final repo = _FakeNotesRepository();
         final now = DateTime.now().toUtc();
@@ -106,15 +106,14 @@ void main() {
         expect(find.text('#ide'), findsWidgets);
         expect(find.text('#kerja'), findsWidgets);
 
-        // Verify GlassCard has 18px border radius
-        final glassCards = tester.widgetList<GlassCard>(find.byType(GlassCard));
-        expect(glassCards.any((gc) => gc.borderRadius == BorderRadius.circular(18)), isTrue);
+        // Verify HubCard is rendered
+        final hubCards = tester.widgetList<HubCard>(find.byType(HubCard));
+        expect(hubCards.isNotEmpty, isTrue);
 
-        // 1-tap export button
-        final exportButton = find.byTooltip('Ekspor Markdown (.md)');
-        expect(exportButton, findsOneWidget);
-
-        await tester.tap(exportButton);
+        // Export via 3-dot popup menu
+        await tester.tap(find.byTooltip('Aksi catatan').first);
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Ekspor .md'));
         await tester.pumpAndSettle();
 
         expect(exportedNote, isNotNull);
@@ -139,12 +138,12 @@ void main() {
         await tester.pumpAndSettle();
 
         expect(find.text('Saran tag:'), findsOneWidget);
-        expect(find.widgetWithText(ActionChip, '#ide'), findsOneWidget);
-        expect(find.widgetWithText(ActionChip, '#kerja'), findsOneWidget);
-        expect(find.widgetWithText(ActionChip, '#pribadi'), findsOneWidget);
+        expect(find.widgetWithText(HubPill, '#ide'), findsOneWidget);
+        expect(find.widgetWithText(HubPill, '#kerja'), findsOneWidget);
+        expect(find.widgetWithText(HubPill, '#pribadi'), findsOneWidget);
 
         // Tap #ide
-        await tester.tap(find.widgetWithText(ActionChip, '#ide'));
+        await tester.tap(find.widgetWithText(HubPill, '#ide'));
         await tester.pumpAndSettle();
 
         final tagsField = tester.widget<TextField>(
@@ -181,7 +180,11 @@ void main() {
         );
         await tester.pumpAndSettle();
 
-        // Tap "Ringkas via AI Lokal (Offline)" on the AI Toolbar
+        // Tap "✨ Asisten AI" on the bottom toolbar
+        await tester.tap(find.text('✨ Asisten AI'));
+        await tester.pumpAndSettle();
+
+        // Tap "Ringkas via AI Lokal (Offline)" on the Ringkas tab
         final ringkasButton = find.text('Ringkas via AI Lokal (Offline)');
         expect(ringkasButton, findsOneWidget);
         await tester.tap(ringkasButton);
@@ -193,6 +196,7 @@ void main() {
         expect(find.text('Hasil Ringkasan'), findsOneWidget);
 
         // Tap "Sisipkan di bawah"
+        await tester.ensureVisible(find.text('Sisipkan di bawah'));
         await tester.tap(find.text('Sisipkan di bawah'));
         await tester.pumpAndSettle();
 
@@ -230,18 +234,19 @@ void main() {
         );
         await tester.pumpAndSettle();
 
-        // Tap "Ekstrak Tugas" on the AI Toolbar
-        final ekstrakButton = find.text('Ekstrak Tugas');
-        await tester.ensureVisible(ekstrakButton);
+        // Tap "✨ Asisten AI" on the bottom toolbar
+        await tester.tap(find.text('✨ Asisten AI'));
         await tester.pumpAndSettle();
-        expect(ekstrakButton, findsOneWidget);
-        await tester.tap(ekstrakButton);
+
+        // Switch to "Ekstrak Tugas" tab
+        await tester.tap(find.text('Ekstrak Tugas'));
         await tester.pumpAndSettle();
 
         expect(find.text('Ekstrak Tugas via SLM'), findsOneWidget);
         expect(find.text('SLM On-Device'), findsOneWidget);
         expect(find.text('Tambahkan Checklist ke Catatan'), findsOneWidget);
 
+        await tester.ensureVisible(find.text('Tambahkan Checklist ke Catatan'));
         await tester.tap(find.text('Tambahkan Checklist ke Catatan'));
         await tester.pumpAndSettle();
 
@@ -278,7 +283,8 @@ void main() {
         );
         await tester.pumpAndSettle();
 
-        expect(find.text('Rekomendasi Tautan Semantik'), findsOneWidget);
+        // Panel is initially hidden when there are no relevant links
+        expect(find.text('Rekomendasi Tautan Semantik'), findsNothing);
 
         // Enter text with high semantic overlap
         await tester.enterText(
@@ -291,7 +297,8 @@ void main() {
         );
         await tester.pumpAndSettle();
 
-        // The smart chip for "Rapat Peluncuran Apollo" should be discovered
+        // The smart chip for "Rapat Peluncuran Apollo" should now be discovered
+        expect(find.text('Rekomendasi Tautan Semantik'), findsOneWidget);
         final smartChip = find.textContaining('Rapat Peluncuran Apollo');
         await tester.ensureVisible(smartChip);
         await tester.pumpAndSettle();

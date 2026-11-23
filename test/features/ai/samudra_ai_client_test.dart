@@ -299,5 +299,86 @@ void main() {
         }
       },
     );
+
+    test(
+      'normalizes accidental Bearer prefix in stored key and includes server reason on 401/403',
+      () async {
+        final requests = <http.Request>[];
+        final mockClient = MockClient((request) async {
+          requests.add(request);
+          return http.Response(
+            jsonEncode({
+              'error': {
+                'code': 'invalid_api_key',
+                'message': 'invalid API key',
+              },
+            }),
+            401,
+          );
+        });
+
+        final client = SamudraAiClient(
+          mockClient,
+          _makeStore(apiKey: 'Bearer smdr-key-123'),
+        );
+
+        await expectLater(
+          client.chat(messages: const [AiMessage(role: 'user', content: 'Tes')]),
+          throwsA(
+            isA<AiException>()
+                .having((e) => e.type, 'type', AiErrorType.unauthorized)
+                .having(
+                  (e) => e.message,
+                  'message',
+                  allOf(contains('HTTP 401'), contains('invalid API key')),
+                ),
+          ),
+        );
+        expect(requests, hasLength(1));
+        expect(requests.single.headers['Authorization'], 'Bearer smdr-key-123');
+      },
+    );
+
+    test(
+      'falls back from deepseek-v4.1-flash:free to deepseek-v4.1-flash on 404 or 400 model_not_found',
+      () async {
+        for (final failureResponse in [
+          http.Response(
+            jsonEncode({
+              'error': {
+                'code': 'model_not_found',
+                'message': 'The model `deepseek-v4.1-flash:free` does not exist',
+              },
+            }),
+            400,
+          ),
+          http.Response(
+            jsonEncode({'error': {'message': 'Model not found'}}),
+            404,
+          ),
+        ]) {
+          final models = <String>[];
+          final mockClient = MockClient((request) async {
+            final body = jsonDecode(request.body) as Map<String, dynamic>;
+            models.add(body['model'] as String);
+
+            if (models.length == 1) {
+              return failureResponse;
+            }
+            return http.Response(_chatCompletionJson('Sukses lewat flash biasa'), 200);
+          });
+
+          final client = SamudraAiClient(mockClient, _makeStore());
+          final response = await client.chat(
+            messages: const [AiMessage(role: 'user', content: 'Halo')],
+          );
+
+          expect(models, [AiConstants.freeModel, AiConstants.fallbackModel]);
+          expect(response.usedModel, AiConstants.fallbackModel);
+          expect(response.didFallback, isTrue);
+          expect(response.content, 'Sukses lewat flash biasa');
+        }
+      },
+    );
   });
 }
