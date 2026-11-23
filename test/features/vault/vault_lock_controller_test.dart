@@ -44,8 +44,30 @@ class _FakeBiometricAdapter implements BiometricAuthAdapter {
   }
 }
 
+class _SpyVaultLockController extends VaultLockController {
+  _SpyVaultLockController(
+    super.configStore,
+    super.crypto,
+    super.biometrics,
+  );
+
+  int listenerCount = 0;
+
+  @override
+  void addListener(VoidCallback listener) {
+    listenerCount++;
+    super.addListener(listener);
+  }
+
+  @override
+  void removeListener(VoidCallback listener) {
+    listenerCount--;
+    super.removeListener(listener);
+  }
+}
+
 void main() {
-  group('VaultLockController', () {
+  group('VaultLockController PIN and Duress PIN', () {
     test(
       'sets up PIN, rejects invalid PIN length, unlocks with correct PIN, and rejects wrong PIN',
       () async {
@@ -73,9 +95,11 @@ void main() {
 
         expect(await controller.unlockWithPin('4321'), isTrue);
         expect(controller.isUnlocked, isTrue);
+        expect(controller.isDecoyMode, isFalse);
 
         controller.lock();
         expect(controller.isUnlocked, isFalse);
+        expect(controller.isDecoyMode, isFalse);
       },
     );
 
@@ -94,6 +118,7 @@ void main() {
 
       expect(await controller.unlockWithBiometrics(), isTrue);
       expect(controller.isUnlocked, isTrue);
+      expect(controller.isDecoyMode, isFalse);
       expect(biometrics.lastReason, isNotNull);
 
       controller.lock();
@@ -108,13 +133,78 @@ void main() {
     });
 
     test(
-      'locks immediately on paused, inactive, hidden, and detached lifecycle states',
+      'handles Duress PIN setup, collision protection, and activates decoy mode',
       () async {
         final configStore = SecureConfigStore(_InMemorySecureStorage());
         final controller = VaultLockController(
           configStore,
           VaultCryptoService(),
           _FakeBiometricAdapter(),
+        );
+        addTearDown(controller.dispose);
+
+        await controller.setupPin('1111');
+        expect(await controller.hasDuressPin(), isFalse);
+
+        // Rejects invalid duress pin length
+        await expectLater(
+          controller.setupDuressPin('99'),
+          throwsA(isA<ValidationException>()),
+        );
+
+        // Rejects duress pin identical to primary PIN
+        await expectLater(
+          controller.setupDuressPin('1111'),
+          throwsA(isA<ValidationException>()),
+        );
+
+        // Successfully configure duress pin
+        await controller.setupDuressPin('9999');
+        expect(await controller.hasDuressPin(), isTrue);
+
+        // Rejects primary pin re-setup matching existing duress pin
+        await expectLater(
+          controller.setupPin('9999'),
+          throwsA(isA<ValidationException>()),
+        );
+
+        // Unlock with real PIN -> real mode
+        expect(await controller.unlockWithPin('1111'), isTrue);
+        expect(controller.isUnlocked, isTrue);
+        expect(controller.isDecoyMode, isFalse);
+
+        controller.lock();
+        expect(controller.isUnlocked, isFalse);
+        expect(controller.isDecoyMode, isFalse);
+
+        // Unlock with Duress PIN -> decoy mode
+        expect(await controller.unlockWithPin('9999'), isTrue);
+        expect(controller.isUnlocked, isTrue);
+        expect(controller.isDecoyMode, isTrue);
+
+        // Locking resets decoy mode
+        controller.lock();
+        expect(controller.isUnlocked, isFalse);
+        expect(controller.isDecoyMode, isFalse);
+
+        // Wrong PIN unlocks neither
+        expect(await controller.unlockWithPin('5555'), isFalse);
+        expect(controller.isUnlocked, isFalse);
+        expect(controller.isDecoyMode, isFalse);
+      },
+    );
+  });
+
+  group('VaultLockController Auto-Lock Timeout', () {
+    test(
+      'locks immediately on pause/inactive/hidden/detached when timeout is immediate',
+      () async {
+        final configStore = SecureConfigStore(_InMemorySecureStorage());
+        final controller = VaultLockController(
+          configStore,
+          VaultCryptoService(),
+          _FakeBiometricAdapter(),
+          defaultTimeout: AutoLockTimeout.immediate,
         );
         addTearDown(controller.dispose);
 
@@ -136,9 +226,96 @@ void main() {
         expect(controller.isUnlocked, isTrue);
       },
     );
+
+    test(
+      'delays locking according to configured timeout and locks only after duration elapsed',
+      () async {
+        final configStore = SecureConfigStore(_InMemorySecureStorage());
+        var simulatedNow = DateTime.utc(2026, 1, 1, 12, 0, 0);
+
+        final controller = VaultLockController(
+          configStore,
+          VaultCryptoService(),
+          _FakeBiometricAdapter(),
+          clock: () => simulatedNow,
+          defaultTimeout: AutoLockTimeout.seconds30,
+        );
+        addTearDown(controller.dispose);
+
+        expect(controller.autoLockTimeout, AutoLockTimeout.seconds30);
+
+        // Unlock vault
+        await controller.unlockWithBiometrics();
+        expect(controller.isUnlocked, isTrue);
+
+        // Pause app at T=0s
+        controller.handleAppLifecycle(AppLifecycleState.paused);
+        // Does NOT lock immediately because timeout is 30s
+        expect(controller.isUnlocked, isTrue);
+        expect(controller.pausedAt, simulatedNow);
+
+        // Resume after 10 seconds (elapsed < 30s) -> should remain unlocked
+        simulatedNow = simulatedNow.add(const Duration(seconds: 10));
+        controller.handleAppLifecycle(AppLifecycleState.resumed);
+        expect(controller.isUnlocked, isTrue);
+        expect(controller.pausedAt, isNull);
+
+        // Pause app again at T=10s
+        controller.handleAppLifecycle(AppLifecycleState.paused);
+        expect(controller.isUnlocked, isTrue);
+        expect(controller.pausedAt, simulatedNow);
+
+        // Resume after 30 seconds (elapsed >= 30s) -> should lock!
+        simulatedNow = simulatedNow.add(const Duration(seconds: 30));
+        controller.handleAppLifecycle(AppLifecycleState.resumed);
+        expect(controller.isUnlocked, isFalse);
+        expect(controller.pausedAt, isNull);
+
+        // Unlock again
+        await controller.unlockWithBiometrics();
+        expect(controller.isUnlocked, isTrue);
+
+        // Pause app, advance 60 seconds (elapsed > 30s) -> should lock
+        controller.handleAppLifecycle(AppLifecycleState.paused);
+        simulatedNow = simulatedNow.add(const Duration(seconds: 60));
+        controller.handleAppLifecycle(AppLifecycleState.resumed);
+        expect(controller.isUnlocked, isFalse);
+      },
+    );
+
+    test('persists and loads auto-lock timeout preferences', () async {
+      final configStore = SecureConfigStore(_InMemorySecureStorage());
+      final controller = VaultLockController(
+        configStore,
+        VaultCryptoService(),
+        _FakeBiometricAdapter(),
+      );
+      addTearDown(controller.dispose);
+
+      expect(controller.autoLockTimeout, AutoLockTimeout.immediate);
+
+      await controller.setAutoLockTimeout(AutoLockTimeout.minute1);
+      expect(controller.autoLockTimeout, AutoLockTimeout.minute1);
+      expect(await configStore.getAutoLockTimeoutSeconds(), 60);
+
+      await controller.setAutoLockTimeout(AutoLockTimeout.minutes5);
+      expect(controller.autoLockTimeout, AutoLockTimeout.minutes5);
+      expect(await configStore.getAutoLockTimeoutSeconds(), 300);
+
+      // Create a second controller sharing the same storage to verify reload
+      final secondController = VaultLockController(
+        configStore,
+        VaultCryptoService(),
+        _FakeBiometricAdapter(),
+      );
+      addTearDown(secondController.dispose);
+
+      await secondController.loadAutoLockTimeout();
+      expect(secondController.autoLockTimeout, AutoLockTimeout.minutes5);
+    });
   });
 
-  group('vaultEntriesProvider lock/unlock clearing', () {
+  group('vaultEntriesProvider lock/unlock and Decoy Mode isolation', () {
     setUpAll(() {
       sqfliteFfiInit();
     });
@@ -198,10 +375,167 @@ void main() {
         );
         expect(reloadedEntries, hasLength(1));
 
-        // App lifecycle paused -> immediately clears in-memory AsyncData to [].
+        // App lifecycle paused (with immediate timeout) -> immediately clears in-memory AsyncData to [].
         lockController.handleAppLifecycle(AppLifecycleState.paused);
         expect(lockController.isUnlocked, isFalse);
         expect(container.read(vaultEntriesProvider).asData?.value, isEmpty);
+      },
+    );
+
+    test(
+      'completely isolates decoy entries from real SQLite entries in decoy mode',
+      () async {
+        final db = await AppDatabase.open(
+          pathOverride: inMemoryDatabasePath,
+          factoryOverride: databaseFactoryFfi,
+        );
+        addTearDown(() async => db.close());
+
+        final configStore = SecureConfigStore(_InMemorySecureStorage());
+        final container = ProviderContainer(
+          overrides: [
+            appDatabaseProvider.overrideWithValue(db),
+            secureConfigStoreProvider.overrideWithValue(configStore),
+            biometricAuthAdapterProvider.overrideWithValue(
+              _FakeBiometricAdapter(available: true, shouldSucceed: true),
+            ),
+          ],
+        );
+        addTearDown(container.dispose);
+
+        final sub = container.listen(vaultEntriesProvider, (_, _) {});
+        addTearDown(sub.close);
+
+        final lockController = container.read(vaultLockControllerProvider);
+        await lockController.setupPin('1234');
+        await lockController.setupDuressPin('9999');
+
+        // Insert real sensitive entry into repository
+        final repo = container.read(vaultRepositoryProvider);
+        await repo.createEntry(
+          title: 'Private Crypto Wallet',
+          username: 'crypto_owner',
+          password: 'UltraSecretSeedPhrase12345!',
+        );
+
+        // 1. Decoy unlock via Duress PIN (9999)
+        final unlockedDecoy = await lockController.unlockWithPin('9999');
+        expect(unlockedDecoy, isTrue);
+        expect(lockController.isDecoyMode, isTrue);
+
+        final decoyList = await container.read(vaultEntriesProvider.future);
+        expect(decoyList, isNotEmpty);
+        // Real entry MUST NOT appear in decoy list!
+        expect(
+          decoyList.any((e) => e.title.contains('Private Crypto Wallet')),
+          isFalse,
+        );
+        // Decoy entries ARE present
+        expect(
+          decoyList.any((e) => e.title == 'Wi-Fi Tamu'),
+          isTrue,
+        );
+        expect(
+          decoyList.any((e) => e.title == 'Akun Media Sosial Baca'),
+          isTrue,
+        );
+
+        // Query filtering works on decoy entries
+        container
+            .read(vaultSearchQueryProvider.notifier)
+            .setQuery('Media Sosial');
+        final filteredDecoy = await container.read(vaultEntriesProvider.future);
+        expect(filteredDecoy, hasLength(1));
+        expect(filteredDecoy.single.title, 'Akun Media Sosial Baca');
+
+        // Clear query
+        container.read(vaultSearchQueryProvider.notifier).setQuery('');
+
+        // Attempting create/update/delete in decoy mode does not modify real DB
+        await container.read(vaultEntriesProvider.notifier).createEntry(
+              title: 'Decoy Attempt',
+              username: 'hacker',
+              password: 'fake',
+            );
+        final realDbEntries = await repo.getEntries();
+        expect(realDbEntries, hasLength(1));
+        expect(realDbEntries.single.title, 'Private Crypto Wallet');
+
+        // 2. Lock vault
+        lockController.lock();
+        expect(lockController.isUnlocked, isFalse);
+        expect(lockController.isDecoyMode, isFalse);
+        expect(container.read(vaultEntriesProvider).asData?.value, isEmpty);
+
+        // 3. Normal unlock via Real PIN (1234)
+        final unlockedReal = await lockController.unlockWithPin('1234');
+        expect(unlockedReal, isTrue);
+        expect(lockController.isDecoyMode, isFalse);
+
+        final realList = await container.read(vaultEntriesProvider.future);
+        expect(realList, hasLength(1));
+        expect(realList.single.title, 'Private Crypto Wallet');
+        expect(realList.single.password, 'UltraSecretSeedPhrase12345!');
+        // Decoy entries MUST NOT appear in real list!
+        expect(realList.any((e) => e.title == 'Wi-Fi Tamu'), isFalse);
+      },
+    );
+
+    test(
+      'does not accumulate listeners on search query updates and cleans up on dispose',
+      () async {
+        final db = await AppDatabase.open(
+          pathOverride: inMemoryDatabasePath,
+          factoryOverride: databaseFactoryFfi,
+        );
+        addTearDown(() async => db.close());
+
+        final configStore = SecureConfigStore(_InMemorySecureStorage());
+        final spyLockController = _SpyVaultLockController(
+          configStore,
+          VaultCryptoService(),
+          _FakeBiometricAdapter(available: true, shouldSucceed: true),
+        );
+
+        final container = ProviderContainer(
+          overrides: [
+            appDatabaseProvider.overrideWithValue(db),
+            secureConfigStoreProvider.overrideWithValue(configStore),
+            vaultLockControllerProvider.overrideWithValue(spyLockController),
+          ],
+        );
+
+        // Listen to vaultEntriesProvider to keep it active
+        final sub = container.listen(vaultEntriesProvider, (_, _) {});
+
+        // Initially unlocked or locked
+        await spyLockController.unlockWithBiometrics();
+        await container.read(vaultEntriesProvider.future);
+
+        // Exactly one lock listener registered
+        expect(spyLockController.listenerCount, 1);
+
+        // Simulate 10 keystrokes in search bar
+        for (var i = 0; i < 10; i++) {
+          container
+              .read(vaultSearchQueryProvider.notifier)
+              .setQuery('query-$i');
+          await container.read(vaultEntriesProvider.future);
+        }
+
+        // Listener count must still be exactly 1!
+        expect(spyLockController.listenerCount, 1);
+
+        // Lock should work as expected
+        spyLockController.lock();
+        expect(container.read(vaultEntriesProvider).asData?.value, isEmpty);
+
+        // Close subscription and dispose container
+        sub.close();
+        container.dispose();
+
+        // Listeners cleanly removed on dispose
+        expect(spyLockController.listenerCount, 0);
       },
     );
   });

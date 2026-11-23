@@ -3,6 +3,9 @@ import 'dart:ui';
 
 import 'package:flutter/material.dart';
 
+import 'app_theme.dart';
+export 'app_theme.dart' show RefleqPalette;
+
 /// Wraps a tab [FloatingActionButton] so it clears an ancestor [GlassBottomNavBar]
 /// without adding extra bottom inset when the screen is rendered standalone.
 class GlassFabAnchor extends StatelessWidget {
@@ -37,7 +40,7 @@ class _GlassCanvasScope extends InheritedWidget {
   bool updateShouldNotify(_GlassCanvasScope oldWidget) => false;
 }
 
-/// Ambient emerald/teal/indigo mesh gradient backdrop paired with a transparent [Scaffold].
+/// Ambient obsidian/indigo mesh gradient backdrop paired with a transparent [Scaffold].
 class GlassScaffold extends StatelessWidget {
   const GlassScaffold({
     super.key,
@@ -100,9 +103,9 @@ class _AmbientGlassCanvas extends StatelessWidget {
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
             colors: [
-              Color(0xFF061114),
-              Color(0xFF0A1B1D),
-              Color(0xFF0D1422),
+              Color(0xFF0C101D), // Refleq Obsidian Canvas
+              Color(0xFF13192B), // Refleq Elevated Slate
+              Color(0xFF0C101D), // Refleq Obsidian Canvas
             ],
           )
         : const LinearGradient(
@@ -124,33 +127,33 @@ class _AmbientGlassCanvas extends StatelessWidget {
             top: -110,
             left: -70,
             child: _GlowOrb(
-              size: 320,
+              size: 340,
               color: (isDark
-                      ? const Color(0xFF14B8A6)
-                      : const Color(0xFF2DD4BF))
-                  .withValues(alpha: isDark ? 0.22 : 0.20),
+                      ? RefleqPalette.royalViolet
+                      : const Color(0xFF818CF8))
+                  .withValues(alpha: isDark ? 0.18 : 0.18),
             ),
           ),
           Positioned(
             top: 150,
             right: -95,
             child: _GlowOrb(
-              size: 290,
+              size: 300,
               color: (isDark
-                      ? const Color(0xFF0EA5E9)
-                      : const Color(0xFF38BDF8))
-                  .withValues(alpha: isDark ? 0.16 : 0.16),
+                      ? RefleqPalette.skyCyan
+                      : const Color(0xFF2DD4BF))
+                  .withValues(alpha: isDark ? 0.12 : 0.16),
             ),
           ),
           Positioned(
             bottom: -120,
             left: 20,
             child: _GlowOrb(
-              size: 340,
+              size: 320,
               color: (isDark
-                      ? const Color(0xFF6366F1)
-                      : const Color(0xFF818CF8))
-                  .withValues(alpha: isDark ? 0.18 : 0.14),
+                      ? RefleqPalette.rosePink
+                      : const Color(0xFF84CC16))
+                  .withValues(alpha: isDark ? 0.08 : 0.12),
             ),
           ),
         ],
@@ -186,7 +189,16 @@ class _GlowOrb extends StatelessWidget {
   }
 }
 
-/// Frosted glassmorphic card with [BackdropFilter] blur, translucent fill, and crisp 1px border.
+/// Standard 5-Step Harmonic Radius tokens according to Google Material 3 Design
+abstract final class GlassRadius {
+  static const BorderRadius micro = BorderRadius.all(Radius.circular(8));
+  static const BorderRadius small = BorderRadius.all(Radius.circular(14));
+  static const BorderRadius medium = BorderRadius.all(Radius.circular(18));
+  static const BorderRadius large = BorderRadius.all(Radius.circular(24));
+  static const BorderRadius pill = BorderRadius.all(Radius.circular(999));
+}
+
+/// Frosted glassmorphic card with [BackdropFilter] blur, translucent fill, and directional specular top rim border.
 class GlassCard extends StatelessWidget {
   const GlassCard({
     super.key,
@@ -213,18 +225,48 @@ class GlassCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
-    final radius = borderRadius ?? BorderRadius.circular(20);
+    final radius = borderRadius ?? GlassRadius.large;
 
     final effectiveTint =
         tintColor ??
         (isDark
-            ? const Color(0xFF132224).withValues(alpha: 0.62)
+            ? const Color(0xFF182035).withValues(alpha: 0.72)
             : Colors.white.withValues(alpha: 0.68));
-    final effectiveBorder =
-        borderColor ??
-        (isDark
-            ? Colors.white.withValues(alpha: 0.14)
-            : Colors.white.withValues(alpha: 0.82));
+
+    final BoxBorder borderDecoration;
+    final BorderRadius? boxRadius;
+
+    if (borderColor != null) {
+      borderDecoration = Border.all(color: borderColor!, width: 1);
+      boxRadius = radius;
+    } else if (isDark) {
+      // Directional specular top rim border lighting
+      borderDecoration = Border(
+        top: BorderSide(
+          color: Colors.white.withValues(alpha: 0.15),
+          width: 1.2,
+        ),
+        left: BorderSide(
+          color: Colors.white.withValues(alpha: 0.10),
+          width: 1.0,
+        ),
+        right: BorderSide(
+          color: Colors.white.withValues(alpha: 0.05),
+          width: 1.0,
+        ),
+        bottom: BorderSide(
+          color: Colors.white.withValues(alpha: 0.03),
+          width: 1.0,
+        ),
+      );
+      boxRadius = null; // Let parent ClipRRect clip corners cleanly
+    } else {
+      borderDecoration = Border.all(
+        color: Colors.white.withValues(alpha: 0.82),
+        width: 1,
+      );
+      boxRadius = radius;
+    }
 
     Widget content = padding != null
         ? Padding(padding: padding!, child: child)
@@ -246,8 +288,8 @@ class GlassCard extends StatelessWidget {
           child: DecoratedBox(
             decoration: BoxDecoration(
               color: effectiveTint,
-              borderRadius: radius,
-              border: Border.all(color: effectiveBorder, width: 1),
+              borderRadius: boxRadius,
+              border: borderDecoration,
               gradient: LinearGradient(
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
@@ -260,7 +302,7 @@ class GlassCard extends StatelessWidget {
               ),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withValues(alpha: isDark ? 0.24 : 0.05),
+                  color: Colors.black.withValues(alpha: isDark ? 0.28 : 0.05),
                   blurRadius: 18,
                   offset: const Offset(0, 8),
                 ),
@@ -269,6 +311,112 @@ class GlassCard extends StatelessWidget {
             child: content,
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// Refleq-style frosted card with a colored accent stripe on its left edge.
+///
+/// Features a vertical stripe (width 4dp, radius 2dp) matching [stripeColor],
+/// frosted glass background, specular border, and padding.
+class RefleqColorStripeCard extends StatelessWidget {
+  const RefleqColorStripeCard({
+    super.key,
+    required this.child,
+    required this.stripeColor,
+    this.padding,
+    this.margin,
+    this.borderRadius,
+    this.tintColor,
+    this.blurSigma = 16,
+    this.onTap,
+    this.borderColor,
+    this.stripeWidth = 4.0,
+    this.stripeRadius = 2.0,
+    this.stripeLeft = 14.0,
+    this.stripeVerticalInset = 12.0,
+  });
+
+  /// The primary content inside the card.
+  final Widget child;
+
+  /// The accent color of the vertical left stripe.
+  final Color stripeColor;
+
+  /// Padding around the child content.
+  ///
+  /// Defaults to `EdgeInsets.fromLTRB(stripeLeft + stripeWidth + 12.0, stripeVerticalInset, 16.0, stripeVerticalInset)`.
+  /// If provided, caller should ensure left padding provides sufficient clearance for the stripe.
+  final EdgeInsetsGeometry? padding;
+
+  /// Outer margin around the card.
+  final EdgeInsetsGeometry? margin;
+
+  /// Rounded corner radius of the card (defaults to 20dp).
+  final BorderRadius? borderRadius;
+
+  /// Optional frosted glass tint color.
+  final Color? tintColor;
+
+  /// Blur intensity for frosted glass effect (default 16).
+  final double blurSigma;
+
+  /// Optional click/tap handler for the whole card.
+  final VoidCallback? onTap;
+
+  /// Optional explicit border color override.
+  final Color? borderColor;
+
+  /// Width of the vertical stripe (defaults to 4dp).
+  final double stripeWidth;
+
+  /// Corner radius of the stripe ends (defaults to 2dp).
+  final double stripeRadius;
+
+  /// Inset from the left edge of the card to the stripe (defaults to 14dp).
+  final double stripeLeft;
+
+  /// Inset from the top and bottom edge of the card to the stripe ends (defaults to 12dp).
+  final double stripeVerticalInset;
+
+  @override
+  Widget build(BuildContext context) {
+    final effectivePadding = padding ??
+        EdgeInsets.fromLTRB(
+          stripeLeft + stripeWidth + 12.0,
+          stripeVerticalInset,
+          16.0,
+          stripeVerticalInset,
+        );
+
+    return GlassCard(
+      margin: margin,
+      borderRadius: borderRadius ?? BorderRadius.circular(20),
+      tintColor: tintColor,
+      blurSigma: blurSigma,
+      onTap: onTap,
+      borderColor: borderColor,
+      padding: EdgeInsets.zero,
+      child: Stack(
+        children: [
+          Padding(
+            padding: effectivePadding,
+            child: child,
+          ),
+          Positioned(
+            left: stripeLeft,
+            top: stripeVerticalInset,
+            bottom: stripeVerticalInset,
+            child: Container(
+              width: stripeWidth,
+              decoration: BoxDecoration(
+                color: stripeColor,
+                borderRadius: BorderRadius.circular(stripeRadius),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -309,7 +457,7 @@ class GlassAppBar extends StatelessWidget implements PreferredSizeWidget {
         child: DecoratedBox(
           decoration: BoxDecoration(
             color: isDark
-                ? const Color(0xFF0A1618).withValues(alpha: 0.65)
+                ? const Color(0xFF0C101D).withValues(alpha: 0.70)
                 : Colors.white.withValues(alpha: 0.60),
             border: Border(
               bottom: BorderSide(
@@ -350,7 +498,7 @@ class GlassNavDestination {
   final IconData selectedIcon;
 }
 
-/// Floating frosted-glass bottom navigation bar.
+/// Floating frosted-glass bottom navigation bar styled as a Refleq capsule dock.
 class GlassBottomNavBar extends StatelessWidget {
   const GlassBottomNavBar({
     super.key,
@@ -367,37 +515,38 @@ class GlassBottomNavBar extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
-    final radius = BorderRadius.circular(26);
+    final radius = BorderRadius.circular(36);
 
     return SafeArea(
       top: false,
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(14, 4, 14, 12),
+        padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
         child: ClipRRect(
           borderRadius: radius,
           child: BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+            filter: ImageFilter.blur(sigmaX: 24, sigmaY: 24),
             child: DecoratedBox(
               decoration: BoxDecoration(
                 color: isDark
-                    ? const Color(0xFF0E1D1F).withValues(alpha: 0.78)
-                    : Colors.white.withValues(alpha: 0.78),
+                    ? const Color(0xFF0C101D).withValues(alpha: 0.94)
+                    : Colors.white.withValues(alpha: 0.88),
                 borderRadius: radius,
                 border: Border.all(
                   color: isDark
-                      ? Colors.white.withValues(alpha: 0.15)
+                      ? Colors.white.withValues(alpha: 0.10)
                       : Colors.white.withValues(alpha: 0.90),
+                  width: 1.0,
                 ),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withValues(alpha: isDark ? 0.35 : 0.08),
-                    blurRadius: 22,
+                    color: Colors.black.withValues(alpha: isDark ? 0.50 : 0.08),
+                    blurRadius: 26,
                     offset: const Offset(0, 10),
                   ),
                 ],
               ),
               child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
                 child: Row(
                   children: [
                     for (var i = 0; i < destinations.length; i++)
@@ -434,29 +583,35 @@ class _GlassNavItem extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
-    final activeBg = theme.colorScheme.primary.withValues(
-      alpha: isDark ? 0.24 : 0.14,
-    );
     final fgColor = isSelected
-        ? theme.colorScheme.primary
-        : theme.colorScheme.onSurfaceVariant;
+        ? Colors.white
+        : (isDark ? const Color(0xFF94A3B8) : theme.colorScheme.onSurfaceVariant);
 
     return Material(
       type: MaterialType.transparency,
       child: InkWell(
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(24),
         onTap: onTap,
         child: AnimatedContainer(
-          duration: const Duration(milliseconds: 180),
+          duration: const Duration(milliseconds: 200),
           curve: Curves.easeOutCubic,
           padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
           decoration: BoxDecoration(
-            color: isSelected ? activeBg : Colors.transparent,
-            borderRadius: BorderRadius.circular(18),
-            border: isSelected
-                ? Border.all(
-                    color: theme.colorScheme.primary.withValues(alpha: 0.35),
-                  )
+            gradient: isSelected ? RefleqPalette.sunsetAurora : null,
+            borderRadius: BorderRadius.circular(24),
+            boxShadow: isSelected
+                ? [
+                    BoxShadow(
+                      color: const Color(0xFF8B5CF6).withValues(alpha: 0.35),
+                      blurRadius: 12,
+                      offset: const Offset(0, 4),
+                    ),
+                    BoxShadow(
+                      color: const Color(0xFFF43F5E).withValues(alpha: 0.25),
+                      blurRadius: 12,
+                      offset: const Offset(0, 4),
+                    ),
+                  ]
                 : null,
           ),
           child: Column(
@@ -474,7 +629,8 @@ class _GlassNavItem extends StatelessWidget {
                 overflow: TextOverflow.ellipsis,
                 style: theme.textTheme.labelSmall?.copyWith(
                   color: fgColor,
-                  fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                  fontWeight: isSelected ? FontWeight.w800 : FontWeight.w500,
+                  fontSize: 11,
                 ),
               ),
             ],
@@ -525,13 +681,15 @@ class GlassBadge extends StatelessWidget {
             Icon(icon, size: 13, color: fg),
             const SizedBox(width: 4),
           ],
-          Text(
-            label,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: theme.textTheme.labelSmall?.copyWith(
-              color: fg,
-              fontWeight: FontWeight.w700,
+          Flexible(
+            child: Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: theme.textTheme.labelSmall?.copyWith(
+                color: fg,
+                fontWeight: FontWeight.w700,
+              ),
             ),
           ),
         ],

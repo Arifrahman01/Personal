@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -104,6 +105,64 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('Asisten AI'), findsOneWidget);
       expect(find.text('Asisten AI Samudra'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'MainNavigationShell displays privacy overlay when app is inactive or hidden and clears on resume',
+    (WidgetTester tester) async {
+      final appDb = await AppDatabase.open(
+        pathOverride: inMemoryDatabasePath,
+        factoryOverride: databaseFactoryFfiNoIsolate,
+      );
+      addTearDown(() async => appDb.close());
+
+      final clipboardGuard = ClipboardGuard(_FakeClipboardAdapter());
+      addTearDown(clipboardGuard.dispose);
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            appDatabaseProvider.overrideWithValue(appDb),
+            secureConfigStoreProvider.overrideWithValue(
+              SecureConfigStore(_InMemorySecureStorage()),
+            ),
+            biometricAuthAdapterProvider.overrideWithValue(
+              _FakeBiometricAdapter(),
+            ),
+            clipboardGuardProvider.overrideWithValue(clipboardGuard),
+          ],
+          child: const PersonalHubApp(),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // Initially no privacy shield overlay
+      expect(find.text('Personal Hub - Layar Terlindungi'), findsNothing);
+
+      // Transition to inactive (e.g. multitasking card / app switcher)
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+      await tester.pumpAndSettle();
+      expect(find.text('Personal Hub - Layar Terlindungi'), findsOneWidget);
+
+      // Return to foreground (resumed)
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+      await tester.pumpAndSettle();
+      expect(find.text('Personal Hub - Layar Terlindungi'), findsNothing);
+
+      // Full background sequence: resumed -> inactive -> hidden -> paused
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.hidden);
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+      await tester.pumpAndSettle();
+      expect(find.text('Personal Hub - Layar Terlindungi'), findsOneWidget);
+
+      // Return sequence: paused -> hidden -> inactive -> resumed
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.hidden);
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+      await tester.pumpAndSettle();
+      expect(find.text('Personal Hub - Layar Terlindungi'), findsNothing);
     },
   );
 }

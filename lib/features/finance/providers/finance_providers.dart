@@ -6,6 +6,7 @@ import 'package:personal_hub/features/ai/providers/ai_providers.dart';
 import 'package:personal_hub/features/finance/data/finance_repository.dart';
 import 'package:personal_hub/features/finance/models/finance_models.dart';
 import 'package:personal_hub/features/finance/services/finance_ai_parser.dart';
+import 'package:personal_hub/features/finance/services/finance_export_service.dart';
 
 /// Provides [FinanceRepository] backed by [appDatabaseProvider].
 final financeRepositoryProvider = Provider<FinanceRepository>((ref) {
@@ -262,3 +263,8 @@ final financeAiControllerProvider =
     NotifierProvider<FinanceAiController, FinanceAiState>(
       FinanceAiController.new,
     );
+
+/// Provides [FinanceExportService] for exporting transactions to CSV.
+final financeExportServiceProvider = Provider<FinanceExportService>((ref) {
+  return FinanceExportService(ref.watch(financeRepositoryProvider));
+});

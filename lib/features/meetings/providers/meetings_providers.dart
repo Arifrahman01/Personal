@@ -180,3 +180,7 @@ final meetingsListProvider =
     AsyncNotifierProvider<MeetingsNotifier, List<Meeting>>(
       MeetingsNotifier.new,
     );
+
+/// Alias for [meetingsListProvider] as referenced by schedule guardian and external modules.
+final meetingsProvider = meetingsListProvider;
+

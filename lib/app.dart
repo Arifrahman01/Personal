@@ -1,3 +1,5 @@
+import 'dart:ui';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
@@ -43,6 +45,7 @@ class MainNavigationShell extends ConsumerStatefulWidget {
 class _MainNavigationShellState extends ConsumerState<MainNavigationShell>
     with WidgetsBindingObserver {
   int _selectedIndex = 0;
+  bool _isObscured = false;
 
   static const List<GlassNavDestination> _destinations = [
     GlassNavDestination(
@@ -87,6 +90,25 @@ class _MainNavigationShellState extends ConsumerState<MainNavigationShell>
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     ref.read(vaultLockControllerProvider).handleAppLifecycle(state);
+    switch (state) {
+      case AppLifecycleState.inactive:
+      case AppLifecycleState.paused:
+      case AppLifecycleState.hidden:
+        if (!_isObscured) {
+          setState(() {
+            _isObscured = true;
+          });
+        }
+        break;
+      case AppLifecycleState.resumed:
+      case AppLifecycleState.detached:
+        if (_isObscured) {
+          setState(() {
+            _isObscured = false;
+          });
+        }
+        break;
+    }
   }
 
   void _selectTab(int index) {
@@ -114,25 +136,100 @@ class _MainNavigationShellState extends ConsumerState<MainNavigationShell>
 
   @override
   Widget build(BuildContext context) {
-    return GlassScaffold(
-      extendBody: true,
-      body: IndexedStack(
-        index: _selectedIndex,
-        children: [
-          HomeScreen(
-            onSwitchTab: _selectTab,
-            onPromoteActionItem: _promoteActionItem,
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        GlassScaffold(
+          extendBody: true,
+          body: IndexedStack(
+            index: _selectedIndex,
+            children: [
+              HomeScreen(
+                onSwitchTab: _selectTab,
+                onPromoteActionItem: _promoteActionItem,
+              ),
+              const NotesScreen(),
+              MeetingsScreen(onPromoteActionItem: _promoteActionItem),
+              const VaultTabView(),
+              const AiChatScreen(),
+            ],
           ),
-          const NotesScreen(),
-          MeetingsScreen(onPromoteActionItem: _promoteActionItem),
-          const VaultTabView(),
-          const AiChatScreen(),
-        ],
-      ),
-      bottomNavigationBar: GlassBottomNavBar(
-        selectedIndex: _selectedIndex,
-        onDestinationSelected: _selectTab,
-        destinations: _destinations,
+          bottomNavigationBar: GlassBottomNavBar(
+            selectedIndex: _selectedIndex,
+            onDestinationSelected: _selectTab,
+            destinations: _destinations,
+          ),
+        ),
+        if (_isObscured)
+          const _PrivacyShieldOverlay(),
+      ],
+    );
+  }
+}
+
+/// Full-screen frosted glass overlay that obscures sensitive screen content during OS multitasking.
+class _PrivacyShieldOverlay extends StatelessWidget {
+  const _PrivacyShieldOverlay();
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
+    return Positioned.fill(
+      child: AbsorbPointer(
+        child: ClipRect(
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 24, sigmaY: 24),
+            child: Container(
+              color: (isDark ? const Color(0xFF061114) : const Color(0xFFEAF6F4))
+                  .withValues(alpha: 0.88),
+              alignment: Alignment.center,
+              padding: const EdgeInsets.symmetric(horizontal: 32),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 76,
+                    height: 76,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: (isDark ? const Color(0xFF14B8A6) : const Color(0xFF0F766E))
+                          .withValues(alpha: 0.15),
+                      border: Border.all(
+                        color: (isDark ? const Color(0xFF2DD4BF) : const Color(0xFF14B8A6))
+                            .withValues(alpha: 0.4),
+                        width: 1.5,
+                      ),
+                    ),
+                    child: Icon(
+                      LucideIcons.shieldCheck,
+                      size: 38,
+                      color: isDark ? const Color(0xFF2DD4BF) : const Color(0xFF0F766E),
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  Text(
+                    'Personal Hub - Layar Terlindungi',
+                    textAlign: TextAlign.center,
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 0.3,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Data sensitif disembunyikan saat aplikasi tidak aktif',
+                    textAlign: TextAlign.center,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.textTheme.bodySmall?.color?.withValues(alpha: 0.7),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
       ),
     );
   }

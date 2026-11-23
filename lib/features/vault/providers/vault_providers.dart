@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:personal_hub/core/config/secure_config_store.dart';
 import 'package:personal_hub/core/database/app_database.dart';
@@ -6,6 +7,55 @@ import 'package:personal_hub/features/vault/models/vault_entry.dart';
 import 'package:personal_hub/features/vault/providers/vault_lock_controller.dart';
 import 'package:personal_hub/features/vault/services/clipboard_guard.dart';
 import 'package:personal_hub/features/vault/services/vault_crypto_service.dart';
+
+/// Static realistic decoy entries shown when the vault is unlocked in decoy mode (via Duress PIN).
+final List<VaultEntry> decoyVaultEntries = [
+  VaultEntry(
+    id: 'decoy-1',
+    title: 'Wi-Fi Tamu',
+    username: 'Tamu-Rumah-5G',
+    password: 'KopiHangatPagi123!',
+    url: '',
+    notes: 'Koneksi Wi-Fi ruang tamu',
+    createdAt: DateTime.utc(2025, 1, 1),
+    updatedAt: DateTime.utc(2025, 1, 1),
+  ),
+  VaultEntry(
+    id: 'decoy-2',
+    title: 'Akun Media Sosial Baca',
+    username: 'bacaan_harian',
+    password: 'AmanSandi@2025',
+    url: 'https://instagram.com',
+    notes: 'Akun publik untuk browsing artikel dan buku',
+    createdAt: DateTime.utc(2025, 2, 1),
+    updatedAt: DateTime.utc(2025, 2, 1),
+  ),
+  VaultEntry(
+    id: 'decoy-3',
+    title: 'Wi-Fi Kafe Langganan',
+    username: 'KopiSantai_Guest',
+    password: 'ManualBrew2025!',
+    url: '',
+    notes: 'Password Wi-Fi kafe sudut jalan',
+    createdAt: DateTime.utc(2025, 2, 15),
+    updatedAt: DateTime.utc(2025, 2, 15),
+  ),
+];
+
+List<VaultEntry> filterDecoyEntries(String query) {
+  final q = query.trim().toLowerCase();
+  if (q.isEmpty) {
+    return List.unmodifiable(decoyVaultEntries);
+  }
+  return decoyVaultEntries
+      .where(
+        (e) =>
+            e.title.toLowerCase().contains(q) ||
+            e.username.toLowerCase().contains(q) ||
+            e.url.toLowerCase().contains(q),
+      )
+      .toList();
+}
 
 /// Provides [VaultCryptoService] for AES-256-GCM encryption and PIN hashing.
 final vaultCryptoServiceProvider = Provider<VaultCryptoService>((ref) {
@@ -45,6 +95,7 @@ final vaultLockControllerProvider = Provider<VaultLockController>((ref) {
     ref.watch(vaultCryptoServiceProvider),
     ref.watch(biometricAuthAdapterProvider),
   );
+  controller.loadAutoLockTimeout();
   ref.onDispose(controller.dispose);
   return controller;
 });
@@ -67,38 +118,80 @@ final vaultSearchQueryProvider =
 
 /// Manages decrypted [VaultEntry] items while the vault is unlocked.
 class VaultEntriesNotifier extends AsyncNotifier<List<VaultEntry>> {
+  VaultLockController? _subscribedLockController;
+  VoidCallback? _lockListener;
+  bool _disposeRegistered = false;
+
+  void _onLockChanged() {
+    final lockController = _subscribedLockController;
+    if (lockController == null) return;
+    if (!lockController.isUnlocked) {
+      state = const AsyncData([]);
+    } else {
+      ref.invalidateSelf();
+    }
+  }
+
+  void _ensureLockListener(VaultLockController controller) {
+    if (!_disposeRegistered) {
+      _disposeRegistered = true;
+      ref.onDispose(_cleanupLockListener);
+    }
+    if (_subscribedLockController == controller) return;
+
+    _removeLockListener();
+    _subscribedLockController = controller;
+    _lockListener = _onLockChanged;
+    controller.addListener(_onLockChanged);
+  }
+
+  void _removeLockListener() {
+    if (_subscribedLockController != null && _lockListener != null) {
+      _subscribedLockController!.removeListener(_lockListener!);
+      _subscribedLockController = null;
+      _lockListener = null;
+    }
+  }
+
+  void _cleanupLockListener() {
+    _removeLockListener();
+    _disposeRegistered = false;
+  }
+
   @override
   Future<List<VaultEntry>> build() async {
     final lockController = ref.watch(vaultLockControllerProvider);
-    void onLockChanged() {
-      if (!lockController.isUnlocked) {
-        state = const AsyncData([]);
-      } else {
-        ref.invalidateSelf();
-      }
-    }
-
-    lockController.addListener(onLockChanged);
-    ref.onDispose(() => lockController.removeListener(onLockChanged));
+    _ensureLockListener(lockController);
 
     if (!lockController.isUnlocked) {
       return const [];
     }
+
+    if (lockController.isDecoyMode) {
+      final query = ref.watch(vaultSearchQueryProvider);
+      return filterDecoyEntries(query);
+    }
+
     final query = ref.watch(vaultSearchQueryProvider);
     final entries = await ref
         .watch(vaultRepositoryProvider)
         .getEntries(query: query);
-    if (!lockController.isUnlocked) {
+    if (!lockController.isUnlocked || lockController.isDecoyMode) {
       return const [];
     }
     return entries;
   }
 
-  /// Reloads entries from encrypted SQLite storage.
+  /// Reloads entries from encrypted SQLite storage or decoy list.
   Future<void> refresh() async {
     final lockController = ref.read(vaultLockControllerProvider);
     if (!lockController.isUnlocked) {
       state = const AsyncData([]);
+      return;
+    }
+    if (lockController.isDecoyMode) {
+      final query = ref.read(vaultSearchQueryProvider);
+      state = AsyncData(filterDecoyEntries(query));
       return;
     }
     state = const AsyncLoading();
@@ -109,6 +202,7 @@ class VaultEntriesNotifier extends AsyncNotifier<List<VaultEntry>> {
   }
 
   /// Encrypts and inserts a new vault entry, then refreshes the list.
+  /// In decoy mode, database write is prevented to maintain vault isolation.
   Future<void> createEntry({
     required String title,
     required String username,
@@ -116,6 +210,10 @@ class VaultEntriesNotifier extends AsyncNotifier<List<VaultEntry>> {
     String url = '',
     String notes = '',
   }) async {
+    final lockController = ref.read(vaultLockControllerProvider);
+    if (lockController.isDecoyMode) {
+      return;
+    }
     await ref
         .read(vaultRepositoryProvider)
         .createEntry(
@@ -129,13 +227,23 @@ class VaultEntriesNotifier extends AsyncNotifier<List<VaultEntry>> {
   }
 
   /// Encrypts and updates an existing vault entry, then refreshes the list.
+  /// In decoy mode, database write is prevented to maintain vault isolation.
   Future<void> updateEntry(VaultEntry entry) async {
+    final lockController = ref.read(vaultLockControllerProvider);
+    if (lockController.isDecoyMode) {
+      return;
+    }
     await ref.read(vaultRepositoryProvider).updateEntry(entry);
     await refresh();
   }
 
   /// Deletes a vault entry by [id], then refreshes the list.
+  /// In decoy mode, database write is prevented to maintain vault isolation.
   Future<void> deleteEntry(String id) async {
+    final lockController = ref.read(vaultLockControllerProvider);
+    if (lockController.isDecoyMode) {
+      return;
+    }
     await ref.read(vaultRepositoryProvider).deleteEntry(id);
     await refresh();
   }

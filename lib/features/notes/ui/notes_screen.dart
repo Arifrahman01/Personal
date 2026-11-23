@@ -136,19 +136,112 @@ class _NotesScreenState extends ConsumerState<NotesScreen> {
     }
   }
 
+  Future<void> _exportNote(Note note) async {
+    try {
+      await ref.read(notesExportServiceProvider).shareNote(note);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Catatan "${note.title}" berhasil diekspor.')),
+        );
+      }
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Gagal mengekspor catatan.')),
+        );
+      }
+    }
+  }
+
+  Future<void> _exportAllNotes() async {
+    final notes = ref.read(notesListProvider).asData?.value ?? [];
+    if (notes.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Tidak ada catatan untuk diekspor.')),
+      );
+      return;
+    }
+    try {
+      await ref.read(notesExportServiceProvider).shareAllNotes(notes);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('${notes.length} catatan berhasil diekspor.')),
+        );
+      }
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Gagal mengekspor catatan.')),
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final notesAsync = ref.watch(notesListProvider);
     final theme = Theme.of(context);
 
     return GlassScaffold(
-      appBar: const GlassAppBar(title: Text('Catatan')),
+      appBar: GlassAppBar(
+        title: const Text('Catatan'),
+        actions: [
+          PopupMenuButton<String>(
+            tooltip: 'Opsi lainnya',
+            icon: const Icon(Icons.more_vert_rounded),
+            onSelected: (value) {
+              if (value == 'export_all') {
+                _exportAllNotes();
+              }
+            },
+            itemBuilder: (_) => const [
+              PopupMenuItem<String>(
+                value: 'export_all',
+                child: Text('Ekspor Semua (.md)'),
+              ),
+            ],
+          ),
+        ],
+      ),
       floatingActionButton: GlassFabAnchor(
-        child: FloatingActionButton.extended(
-          heroTag: 'notes_fab',
-          onPressed: () => _openEditor(),
-          icon: const Icon(Icons.add_rounded),
-          label: const Text('Catatan Baru'),
+        child: Container(
+          decoration: BoxDecoration(
+            gradient: RefleqPalette.lavenderCloud,
+            borderRadius: BorderRadius.circular(20),
+            boxShadow: [
+              BoxShadow(
+                color: const Color(0xFF8B5CF6).withValues(alpha: 0.42),
+                blurRadius: 18,
+                offset: const Offset(0, 6),
+              ),
+            ],
+          ),
+          child: Material(
+            color: Colors.transparent,
+            child: InkWell(
+              borderRadius: BorderRadius.circular(20),
+              onTap: () => _openEditor(),
+              child: const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.add_rounded, color: Colors.white, size: 22),
+                    SizedBox(width: 8),
+                    Text(
+                      'Catatan Baru',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 15,
+                        letterSpacing: -0.2,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
         ),
       ),
       body: SafeArea(
@@ -235,6 +328,9 @@ class _NotesScreenState extends ConsumerState<NotesScreen> {
                         Padding(
                           padding: const EdgeInsets.only(right: 8),
                           child: ChoiceChip(
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(100),
+                            ),
                             label: const Text('Semua'),
                             selected: activeTag == null,
                             onSelected: (_) {
@@ -248,6 +344,9 @@ class _NotesScreenState extends ConsumerState<NotesScreen> {
                           Padding(
                             padding: const EdgeInsets.only(right: 8),
                             child: ChoiceChip(
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(100),
+                              ),
                               label: Text('#$tag'),
                               selected:
                                   activeTag?.toLowerCase() == tag.toLowerCase(),
@@ -315,7 +414,7 @@ class _NotesScreenState extends ConsumerState<NotesScreen> {
         padding: const EdgeInsets.symmetric(horizontal: 20),
         decoration: BoxDecoration(
           color: theme.colorScheme.errorContainer,
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(18),
         ),
         child: Icon(
           Icons.delete_outline_rounded,
@@ -326,6 +425,7 @@ class _NotesScreenState extends ConsumerState<NotesScreen> {
         note: note,
         onTap: () => _openEditor(note),
         onTogglePin: () => _togglePin(note),
+        onExport: () => _exportNote(note),
         onDelete: () async {
           if (await _confirmDelete(note)) {
             await _deleteNote(note);
@@ -422,13 +522,13 @@ class _SectionHeader extends StatelessWidget {
     final theme = Theme.of(context);
     return Row(
       children: [
-        Icon(icon, size: 16, color: theme.colorScheme.primary),
+        Icon(icon, size: 16, color: RefleqPalette.lavender),
         const SizedBox(width: 6),
         Text(
           label,
           style: theme.textTheme.labelLarge?.copyWith(
             fontWeight: FontWeight.w700,
-            color: theme.colorScheme.primary,
+            color: RefleqPalette.lavender,
           ),
         ),
       ],
@@ -441,12 +541,14 @@ class _NoteCard extends StatelessWidget {
     required this.note,
     required this.onTap,
     required this.onTogglePin,
+    required this.onExport,
     required this.onDelete,
   });
 
   final Note note;
   final VoidCallback onTap;
   final VoidCallback onTogglePin;
+  final VoidCallback onExport;
   final VoidCallback onDelete;
 
   static const List<String> _shortMonths = [
@@ -464,6 +566,66 @@ class _NoteCard extends StatelessWidget {
     'Des',
   ];
 
+  static Color resolveCategoryColor(Note note) {
+    final tagsLower = note.tags.map((t) => t.toLowerCase()).toList();
+    if (tagsLower.any((t) =>
+        t.contains('ide') ||
+        t.contains('kreatif') ||
+        t.contains('ai') ||
+        t.contains('desain') ||
+        t.contains('design'))) {
+      return RefleqPalette.lavender;
+    }
+    if (tagsLower.any((t) =>
+        t.contains('kerja') ||
+        t.contains('meeting') ||
+        t.contains('rapat') ||
+        t.contains('proyek') ||
+        t.contains('klien'))) {
+      return RefleqPalette.skyCyan;
+    }
+    if (tagsLower.any((t) =>
+        t.contains('pribadi') ||
+        t.contains('kesehatan') ||
+        t.contains('olahraga') ||
+        t.contains('penting') ||
+        t.contains('jadwal'))) {
+      return RefleqPalette.rosePink;
+    }
+    if (tagsLower.any((t) =>
+        t.contains('uang') ||
+        t.contains('keuangan') ||
+        t.contains('finansial') ||
+        t.contains('zakat'))) {
+      return RefleqPalette.emeraldMint;
+    }
+    final hash = (note.id.hashCode ^ note.title.hashCode).abs();
+    const cycle = [
+      RefleqPalette.lavender,
+      RefleqPalette.skyCyan,
+      RefleqPalette.rosePink,
+      RefleqPalette.amberPeach,
+    ];
+    return cycle[hash % cycle.length];
+  }
+
+  static Color resolveTagColor(String tag, Color fallback) {
+    final t = tag.toLowerCase();
+    if (t.contains('ide') || t.contains('kreatif') || t.contains('ai')) {
+      return RefleqPalette.lavender;
+    }
+    if (t.contains('kerja') || t.contains('rapat') || t.contains('proyek')) {
+      return RefleqPalette.skyCyan;
+    }
+    if (t.contains('pribadi') || t.contains('kesehatan') || t.contains('jadwal')) {
+      return RefleqPalette.rosePink;
+    }
+    if (t.contains('uang') || t.contains('zakat')) {
+      return RefleqPalette.emeraldMint;
+    }
+    return fallback;
+  }
+
   String _formatUpdatedAt(DateTime dt) {
     final local = dt.toLocal();
     final day = local.day.toString().padLeft(2, '0');
@@ -476,126 +638,201 @@ class _NoteCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
     final snippet = note.content.trim();
+    final categoryColor = resolveCategoryColor(note);
 
     return GlassCard(
       onTap: onTap,
-      padding: const EdgeInsets.fromLTRB(16, 12, 8, 12),
-      child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(
-                    child: Padding(
-                      padding: const EdgeInsets.only(top: 4),
+      borderRadius: BorderRadius.circular(18),
+      borderColor: note.isPinned
+          ? RefleqPalette.lavender.withValues(alpha: 0.55)
+          : (isDark
+              ? Colors.white.withValues(alpha: 0.10)
+              : Colors.black.withValues(alpha: 0.08)),
+      tintColor: isDark
+          ? RefleqPalette.surfaceCard.withValues(alpha: 0.72)
+          : Colors.white.withValues(alpha: 0.72),
+      padding: EdgeInsets.zero,
+      child: IntrinsicHeight(
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // Refleq Category Pastel Stripe
+            Container(
+              width: 4,
+              margin: const EdgeInsets.symmetric(vertical: 12),
+              decoration: BoxDecoration(
+                color: categoryColor,
+                borderRadius: const BorderRadius.horizontal(
+                  right: Radius.circular(3),
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: categoryColor.withValues(alpha: 0.55),
+                    blurRadius: 8,
+                    offset: const Offset(1, 0),
+                  ),
+                ],
+              ),
+            ),
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(14, 12, 8, 12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          child: Padding(
+                            padding: const EdgeInsets.only(top: 4),
+                            child: Row(
+                              children: [
+                                if (note.isPinned) ...[
+                                  const Icon(
+                                    Icons.push_pin_rounded,
+                                    size: 16,
+                                    color: RefleqPalette.lavender,
+                                  ),
+                                  const SizedBox(width: 6),
+                                ],
+                                Expanded(
+                                  child: Text(
+                                    note.title,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: theme.textTheme.titleMedium?.copyWith(
+                                      fontWeight: FontWeight.w700,
+                                      letterSpacing: -0.2,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                        IconButton(
+                          tooltip: 'Ekspor Markdown (.md)',
+                          icon: const Icon(Icons.file_download_outlined, size: 20),
+                          visualDensity: VisualDensity.compact,
+                          onPressed: onExport,
+                        ),
+                        PopupMenuButton<String>(
+                          tooltip: 'Aksi catatan',
+                          onSelected: (value) {
+                            if (value == 'pin') {
+                              onTogglePin();
+                            } else if (value == 'export') {
+                              onExport();
+                            } else if (value == 'delete') {
+                              onDelete();
+                            }
+                          },
+                          itemBuilder: (_) => [
+                            PopupMenuItem<String>(
+                              value: 'pin',
+                              child: Text(
+                                note.isPinned ? 'Lepas Sematan' : 'Sematkan',
+                              ),
+                            ),
+                            const PopupMenuItem<String>(
+                              value: 'export',
+                              child: Text('Ekspor ke Markdown'),
+                            ),
+                            const PopupMenuItem<String>(
+                              value: 'delete',
+                              child: Text('Hapus'),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                    if (snippet.isNotEmpty) ...[
+                      const SizedBox(height: 4),
+                      Padding(
+                        padding: const EdgeInsets.only(right: 8),
+                        child: Text(
+                          snippet,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            color: theme.colorScheme.onSurfaceVariant,
+                            height: 1.35,
+                          ),
+                        ),
+                      ),
+                    ],
+                    const SizedBox(height: 10),
+                    Padding(
+                      padding: const EdgeInsets.only(right: 8),
                       child: Row(
                         children: [
-                          if (note.isPinned) ...[
-                            Icon(
-                              Icons.push_pin_rounded,
-                              size: 16,
-                              color: theme.colorScheme.primary,
-                            ),
-                            const SizedBox(width: 6),
-                          ],
-                          Expanded(
-                            child: Text(
-                              note.title,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: theme.textTheme.titleMedium?.copyWith(
-                                fontWeight: FontWeight.w700,
+                          if (note.tags.isNotEmpty)
+                            Expanded(
+                              child: Wrap(
+                                spacing: 6,
+                                runSpacing: 4,
+                                children: [
+                                  for (final tag in note.tags.take(3)) ...[
+                                    Builder(
+                                      builder: (context) {
+                                        final tagColor =
+                                            resolveTagColor(tag, categoryColor);
+                                        return Container(
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 10,
+                                            vertical: 3,
+                                          ),
+                                          decoration: BoxDecoration(
+                                            color: tagColor.withValues(
+                                              alpha: isDark ? 0.16 : 0.12,
+                                            ),
+                                            borderRadius:
+                                                BorderRadius.circular(100),
+                                            border: Border.all(
+                                              color: tagColor.withValues(
+                                                alpha: isDark ? 0.38 : 0.25,
+                                              ),
+                                            ),
+                                          ),
+                                          child: Text(
+                                            '#$tag',
+                                            style: theme.textTheme.labelSmall
+                                                ?.copyWith(
+                                              color: isDark
+                                                  ? tagColor
+                                                  : tagColor.withValues(
+                                                      alpha: 0.95,
+                                                    ),
+                                              fontWeight: FontWeight.w600,
+                                            ),
+                                          ),
+                                        );
+                                      },
+                                    ),
+                                  ],
+                                ],
                               ),
+                            )
+                          else
+                            const Spacer(),
+                          Text(
+                            _formatUpdatedAt(note.updatedAt),
+                            style: theme.textTheme.labelSmall?.copyWith(
+                              color: theme.colorScheme.onSurfaceVariant,
                             ),
                           ),
                         ],
                       ),
                     ),
-                  ),
-                  PopupMenuButton<String>(
-                    tooltip: 'Aksi catatan',
-                    onSelected: (value) {
-                      if (value == 'pin') {
-                        onTogglePin();
-                      } else if (value == 'delete') {
-                        onDelete();
-                      }
-                    },
-                    itemBuilder: (_) => [
-                      PopupMenuItem<String>(
-                        value: 'pin',
-                        child: Text(
-                          note.isPinned ? 'Lepas Sematan' : 'Sematkan',
-                        ),
-                      ),
-                      const PopupMenuItem<String>(
-                        value: 'delete',
-                        child: Text('Hapus'),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-              if (snippet.isNotEmpty) ...[
-                const SizedBox(height: 4),
-                Padding(
-                  padding: const EdgeInsets.only(right: 8),
-                  child: Text(
-                    snippet,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      color: theme.colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                ),
-              ],
-              const SizedBox(height: 10),
-              Padding(
-                padding: const EdgeInsets.only(right: 8),
-                child: Row(
-                  children: [
-                    if (note.tags.isNotEmpty)
-                      Expanded(
-                        child: Wrap(
-                          spacing: 6,
-                          runSpacing: 4,
-                          children: [
-                            for (final tag in note.tags.take(3))
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 8,
-                                  vertical: 2,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: theme.colorScheme.secondaryContainer,
-                                  borderRadius: BorderRadius.circular(999),
-                                ),
-                                child: Text(
-                                  '#$tag',
-                                  style: theme.textTheme.labelSmall?.copyWith(
-                                    color:
-                                        theme.colorScheme.onSecondaryContainer,
-                                  ),
-                                ),
-                              ),
-                          ],
-                        ),
-                      )
-                    else
-                      const Spacer(),
-                    Text(
-                      _formatUpdatedAt(note.updatedAt),
-                      style: theme.textTheme.labelSmall?.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant,
-                      ),
-                    ),
                   ],
                 ),
               ),
-            ],
+            ),
+          ],
+        ),
       ),
     );
   }

@@ -88,6 +88,10 @@ void main() {
         );
         expect(vaultColumnNames, isNot(contains('password')));
 
+        // Verify foreign keys are enabled by default
+        final fkResult = await appDb.db.rawQuery('PRAGMA foreign_keys');
+        expect(fkResult.first.values.first, 1);
+
         // Verify UNIQUE(habit_id, log_date) on habit_logs.
         await appDb.db.insert('habit_logs', {
           'id': 'log-1',
@@ -146,6 +150,16 @@ void main() {
           );
           addTearDown(() async => secondOpen.close());
 
+          final journalResult =
+              await secondOpen.db.rawQuery('PRAGMA journal_mode');
+          expect(
+            journalResult.first.values.first.toString().toLowerCase(),
+            'wal',
+          );
+
+          final fkResult = await secondOpen.db.rawQuery('PRAGMA foreign_keys');
+          expect(fkResult.first.values.first, 1);
+
           final rows = await secondOpen.db.query(
             'notes',
             where: 'id = ?',
@@ -154,6 +168,44 @@ void main() {
           expect(rows, hasLength(1));
           expect(rows.first['title'], 'Catatan Rapat');
           expect(rows.first['is_pinned'], 1);
+        },
+      );
+
+      test(
+        'onUpgrade handles version increments gracefully without crashing',
+        () async {
+          final dbPath = p.join(tempDir.path, 'upgrade_test.db');
+          final v1 = await AppDatabase.open(
+            pathOverride: dbPath,
+            factoryOverride: databaseFactoryFfi,
+            versionOverride: 1,
+          );
+          await v1.db.insert('notes', {
+            'id': 'note-v1',
+            'title': 'Catatan Versi 1',
+            'content': 'Isi data lama',
+            'tags': '[]',
+            'is_pinned': 0,
+            'created_at': '2026-11-23T08:00:00Z',
+            'updated_at': '2026-11-23T08:00:00Z',
+          });
+          await v1.close();
+
+          final v2 = await AppDatabase.open(
+            pathOverride: dbPath,
+            factoryOverride: databaseFactoryFfi,
+            versionOverride: 2,
+          );
+          addTearDown(() async => v2.close());
+
+          final rows = await v2.db.query(
+            'notes',
+            where: 'id = ?',
+            whereArgs: ['note-v1'],
+          );
+          expect(rows, hasLength(1));
+          expect(rows.first['title'], 'Catatan Versi 1');
+          expect(await v2.db.getVersion(), 2);
         },
       );
     });

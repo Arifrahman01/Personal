@@ -74,5 +74,22 @@ void main() {
         expect(adapter.currentText, 'secret-pass-123');
       },
     );
+
+    test('clearNow wipes clipboard immediately and cancels pending timer', () async {
+      final adapter = _FakeClipboardAdapter();
+      final guard = ClipboardGuard(adapter);
+      addTearDown(guard.dispose);
+
+      await guard.copySensitive(
+        'secret-pass-immediate',
+        clearAfter: const Duration(seconds: 30),
+      );
+      expect(adapter.currentText, 'secret-pass-immediate');
+      expect(guard.isPendingClear, isTrue);
+
+      await guard.clearNow();
+      expect(adapter.currentText, isEmpty);
+      expect(guard.isPendingClear, isFalse);
+    });
   });
 }

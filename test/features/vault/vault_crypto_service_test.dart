@@ -99,5 +99,130 @@ void main() {
       expect(await service.verifyPin('9999', storedHash), isFalse);
       expect(await service.verifyPin('2580', 'invalid-format'), isFalse);
     });
+
+    test('uses 100,000 default PBKDF2 iterations', () {
+      expect(VaultCryptoService.defaultPbkdf2Iterations, 100000);
+    });
+
+    test('derives 256-bit Key Encryption Key (KEK) from PIN and salt', () async {
+      const pin = '4321';
+      final salt = service.generateSalt();
+
+      final kek1 = await service.deriveKeyEncryptionKey(pin, salt: salt);
+      final kek2 = await service.deriveKek(pin, salt: salt);
+
+      expect(kek1, hasLength(32));
+      expect(kek2, equals(kek1));
+
+      final differentPinKek = await service.deriveKek('9999', salt: salt);
+      expect(differentPinKek, isNot(equals(kek1)));
+
+      final differentSaltKek = await service.deriveKek(
+        pin,
+        salt: service.generateSalt(),
+      );
+      expect(differentSaltKek, isNot(equals(kek1)));
+    });
+
+    test('deriveKeyEncryptionKey rejects invalid salt', () async {
+      await expectLater(
+        service.deriveKeyEncryptionKey('1234', salt: ''),
+        throwsA(isA<ValidationException>()),
+      );
+      await expectLater(
+        service.deriveKeyEncryptionKey('1234', salt: 'invalid:salt'),
+        throwsA(isA<ValidationException>()),
+      );
+    });
+
+    test(
+      'encrypts and decrypts 32-byte Vault Master Key using KEK and AES-256-GCM',
+      () async {
+        final kek = await service.deriveKek('5678', salt: service.generateSalt());
+
+        final payload = await service.encryptMasterKey(masterKey, kek);
+        expect(base64Decode(payload.nonceBase64), hasLength(12));
+        expect(base64Decode(payload.cipherTextBase64), hasLength(32));
+
+        final decrypted = await service.decryptMasterKey(payload, kek);
+        expect(decrypted, equals(masterKey));
+
+        // Alias check
+        final decryptedAlias = await service.decryptVaultMasterKey(payload, kek);
+        expect(decryptedAlias, equals(masterKey));
+      },
+    );
+
+    test('encryptMasterKeyWithPin and decryptMasterKeyWithPin round-trip', () async {
+      final salt = service.generateSalt();
+      const pin = '7890';
+
+      final payload = await service.encryptMasterKeyWithPin(
+        masterKey,
+        pin: pin,
+        salt: salt,
+      );
+
+      final decrypted = await service.decryptMasterKeyWithPin(
+        payload,
+        pin: pin,
+        salt: salt,
+      );
+      expect(decrypted, equals(masterKey));
+
+      await expectLater(
+        service.decryptMasterKeyWithPin(payload, pin: '0000', salt: salt),
+        throwsA(isA<VaultDecryptionException>()),
+      );
+    });
+
+    test('decryptMasterKey throws VaultDecryptionException on wrong KEK or tampered payload', () async {
+      final kek = await service.deriveKek('1234', salt: 'test-salt-1');
+      final wrongKek = await service.deriveKek('9999', salt: 'test-salt-1');
+
+      final payload = await service.encryptMasterKey(masterKey, kek);
+
+      await expectLater(
+        service.decryptMasterKey(payload, wrongKek),
+        throwsA(isA<VaultDecryptionException>()),
+      );
+
+      final tamperedCipher = base64Decode(payload.cipherTextBase64);
+      tamperedCipher[0] = tamperedCipher[0] ^ 0xFF;
+      final tamperedPayload = EncryptedPayload(
+        cipherTextBase64: base64Encode(tamperedCipher),
+        nonceBase64: payload.nonceBase64,
+        macBase64: payload.macBase64,
+      );
+
+      await expectLater(
+        service.decryptMasterKey(tamperedPayload, kek),
+        throwsA(isA<VaultDecryptionException>()),
+      );
+    });
+
+    test('encryptMasterKey and decryptMasterKey enforce 32-byte key requirements', () async {
+      final validKek = List<int>.generate(32, (i) => i);
+      final invalidShortKey = List<int>.generate(16, (i) => i);
+
+      await expectLater(
+        service.encryptMasterKey(invalidShortKey, validKek),
+        throwsA(isA<VaultDecryptionException>()),
+      );
+      await expectLater(
+        service.encryptMasterKey(masterKey, invalidShortKey),
+        throwsA(isA<VaultDecryptionException>()),
+      );
+
+      const dummyPayload = EncryptedPayload(
+        cipherTextBase64: 'AAAA',
+        nonceBase64: 'AAAA',
+        macBase64: 'AAAA',
+      );
+      await expectLater(
+        service.decryptMasterKey(dummyPayload, invalidShortKey),
+        throwsA(isA<VaultDecryptionException>()),
+      );
+    });
   });
 }

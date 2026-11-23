@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="utf-8"?>
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+    <shortcut
+        android:shortcutId="quick_capture"
+        android:enabled="true"
+        android:icon="@mipmap/ic_launcher"
+        android:shortcutShortLabel="@string/shortcut_quick_capture_short"
+        android:shortcutLongLabel="@string/shortcut_quick_capture_long">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:targetPackage="id.personal.hub.personal_hub"
+            android:targetClass="id.personal.hub.personal_hub.MainActivity">
+            <extra
+                android:name="shortcut_id"
+                android:value="quick_capture" />
+        </intent>
+        <categories android:name="android.shortcut.conversation" />
+    </shortcut>
+    <shortcut
+        android:shortcutId="prayer_schedule"
+        android:enabled="true"
+        android:icon="@mipmap/ic_launcher"
+        android:shortcutShortLabel="@string/shortcut_prayer_schedule_short"
+        android:shortcutLongLabel="@string/shortcut_prayer_schedule_long">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:targetPackage="id.personal.hub.personal_hub"
+            android:targetClass="id.personal.hub.personal_hub.MainActivity">
+            <extra
+                android:name="shortcut_id"
+                android:value="prayer_schedule" />
+        </intent>
+    </shortcut>
+    <shortcut
+        android:shortcutId="new_note"
+        android:enabled="true"
+        android:icon="@mipmap/ic_launcher"
+        android:shortcutShortLabel="@string/shortcut_new_note_short"
+        android:shortcutLongLabel="@string/shortcut_new_note_long">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:targetPackage="id.personal.hub.personal_hub"
+            android:targetClass="id.personal.hub.personal_hub.MainActivity">
+            <extra
+                android:name="shortcut_id"
+                android:value="new_note" />
+        </intent>
+    </shortcut>
+</shortcuts>

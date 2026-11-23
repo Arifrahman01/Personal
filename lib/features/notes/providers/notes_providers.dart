@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:personal_hub/core/database/app_database.dart';
 import 'package:personal_hub/features/notes/data/notes_repository.dart';
 import 'package:personal_hub/features/notes/models/note.dart';
+import 'package:personal_hub/features/notes/services/notes_export_service.dart';
 
 /// Provides [NotesRepository] backed by [appDatabaseProvider].
 final notesRepositoryProvider = Provider<NotesRepository>((ref) {
@@ -58,3 +59,8 @@ class NotesNotifier extends AsyncNotifier<List<Note>> {
 final notesListProvider = AsyncNotifierProvider<NotesNotifier, List<Note>>(
   NotesNotifier.new,
 );
+
+/// Provides [NotesExportService] for exporting notes to Markdown.
+final notesExportServiceProvider = Provider<NotesExportService>((ref) {
+  return const NotesExportService();
+});

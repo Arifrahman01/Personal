@@ -13,6 +13,20 @@ class EncryptedPayload {
   final String nonceBase64;
   final String macBase64;
 
+  Map<String, dynamic> toJson() => {
+    'cipherTextBase64': cipherTextBase64,
+    'nonceBase64': nonceBase64,
+    'macBase64': macBase64,
+  };
+
+  factory EncryptedPayload.fromJson(Map<String, dynamic> json) =>
+      EncryptedPayload(
+        cipherTextBase64:
+            (json['cipherTextBase64'] ?? json['cipherText']) as String,
+        nonceBase64: (json['nonceBase64'] ?? json['nonce']) as String,
+        macBase64: (json['macBase64'] ?? json['mac']) as String,
+      );
+
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||

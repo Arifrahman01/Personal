@@ -75,6 +75,16 @@ class FinanceRepository {
     return rows.map(FinanceTransaction.fromMap).toList(growable: false);
   }
 
+  /// Returns all transactions across all time, newest first.
+  Future<List<FinanceTransaction>> getAllTransactions() async {
+    final rows = await _database.db.query(
+      _tableName,
+      orderBy: 'occurred_at DESC, created_at DESC, rowid DESC',
+    );
+
+    return rows.map(FinanceTransaction.fromMap).toList(growable: false);
+  }
+
   /// Computes income, expense, net balance, and expense-by-category totals for [year]/[month].
   Future<MonthlySummary> getMonthlySummary(int year, int month) async {
     final transactions = await getTransactionsForMonth(year, month);

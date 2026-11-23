@@ -22,7 +22,9 @@ class AppDatabase {
   static Future<AppDatabase> open({
     String? pathOverride,
     DatabaseFactory? factoryOverride,
+    int? versionOverride,
   }) async {
+    final version = versionOverride ?? schemaVersion;
     if (factoryOverride != null) {
       final dbPath =
           pathOverride ??
@@ -32,12 +34,12 @@ class AppDatabase {
                   await factoryOverride.getDatabasesPath(),
                   _databaseFileName,
                 ));
-      return _openWithFactory(factoryOverride, dbPath);
+      return _openWithFactory(factoryOverride, dbPath, version: version);
     }
 
     if (kIsWeb) {
       final dbPath = pathOverride ?? _databaseFileName;
-      return _openOnWeb(dbPath);
+      return _openOnWeb(dbPath, version: version);
     }
 
     if (defaultTargetPlatform == TargetPlatform.windows ||
@@ -45,23 +47,34 @@ class AppDatabase {
       sqfliteFfiInit();
       final factory = databaseFactoryFfi;
       final dbPath = pathOverride ?? await _resolveDesktopDbPath(factory);
-      return _openWithFactory(factory, dbPath);
+      return _openWithFactory(factory, dbPath, version: version);
     }
 
     final factory = databaseFactory;
     final dbPath =
         pathOverride ??
         p.join(await factory.getDatabasesPath(), _databaseFileName);
-    return _openWithFactory(factory, dbPath);
+    return _openWithFactory(factory, dbPath, version: version);
   }
 
-  static Future<AppDatabase> _openOnWeb(String dbPath) async {
+  static Future<AppDatabase> _openOnWeb(
+    String dbPath, {
+    int version = schemaVersion,
+  }) async {
     try {
       databaseFactory = databaseFactoryFfiWeb;
-      return await _openWithFactory(databaseFactoryFfiWeb, dbPath);
+      return await _openWithFactory(
+        databaseFactoryFfiWeb,
+        dbPath,
+        version: version,
+      );
     } catch (_) {
       databaseFactory = databaseFactoryFfiWebNoWebWorker;
-      return _openWithFactory(databaseFactoryFfiWebNoWebWorker, dbPath);
+      return _openWithFactory(
+        databaseFactoryFfiWebNoWebWorker,
+        dbPath,
+        version: version,
+      );
     }
   }
 
@@ -76,18 +89,46 @@ class AppDatabase {
 
   static Future<AppDatabase> _openWithFactory(
     DatabaseFactory factory,
-    String dbPath,
-  ) async {
+    String dbPath, {
+    int version = schemaVersion,
+  }) async {
     final database = await factory.openDatabase(
       dbPath,
       options: OpenDatabaseOptions(
-        version: schemaVersion,
-        onCreate: (db, version) async {
+        version: version,
+        onConfigure: (db) async {
+          await db.execute('PRAGMA foreign_keys = ON');
+          if (!kIsWeb) {
+            await db.execute('PRAGMA journal_mode = WAL');
+          }
+        },
+        onCreate: (db, v) async {
           await _createSchemaV1(db);
         },
+        onUpgrade: onUpgrade,
       ),
     );
     return AppDatabase._(database);
+  }
+
+  /// Handles incremental schema migrations from [oldVersion] to [newVersion].
+  @visibleForTesting
+  static Future<void> onUpgrade(
+    Database db,
+    int oldVersion,
+    int newVersion,
+  ) async {
+    for (var version = oldVersion + 1; version <= newVersion; version++) {
+      await _applyMigration(db, version);
+    }
+  }
+
+  static Future<void> _applyMigration(Database db, int targetVersion) async {
+    switch (targetVersion) {
+      // Future incremental schema migrations will be added here.
+      default:
+        break;
+    }
   }
 
   static Future<void> _createSchemaV1(Database db) async {

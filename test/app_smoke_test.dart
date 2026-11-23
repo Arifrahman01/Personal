@@ -106,7 +106,7 @@ void main() {
       // Home dashboard assertions
       expect(find.text('Personal Hub'), findsOneWidget);
       expect(find.text('Ringkasan Hari Ini (AI)'), findsOneWidget);
-      expect(find.text('Jadwal Sholat & Kiblat'), findsOneWidget);
+      expect(find.text('Jadwal & Kiblat'), findsOneWidget);
       expect(find.text('Tugas & Habit'), findsOneWidget);
       expect(find.text('Keuangan Harian'), findsOneWidget);
 

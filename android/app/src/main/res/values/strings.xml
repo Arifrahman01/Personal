@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">personal_hub</string>
+    <string name="shortcut_quick_capture_short">Catat Cepat</string>
+    <string name="shortcut_quick_capture_long">Catat Cepat (Voice/Teks)</string>
+    <string name="shortcut_prayer_schedule_short">Jadwal Sholat</string>
+    <string name="shortcut_prayer_schedule_long">Jadwal Sholat &amp; Kiblat</string>
+    <string name="shortcut_new_note_short">Catatan Baru</string>
+    <string name="shortcut_new_note_long">Catatan Baru</string>
+    <string name="shortcut_new_transaction_short">Catat Pengeluaran</string>
+    <string name="shortcut_new_transaction_long">Catat Pengeluaran</string>
+</resources>
