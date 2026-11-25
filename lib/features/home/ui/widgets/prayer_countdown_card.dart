@@ -73,45 +73,66 @@ class PrayerCountdownCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // Location and Hijri Date row
-          Row(
-            children: [
-              Icon(
-                LucideIcons.mapPin,
-                size: 14,
-                color: AppTokens.textSecondary(context),
-              ),
-              const SizedBox(width: 6),
-              Expanded(
-                child: Text(
-                  '$cityName • $hijriDate',
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w500,
-                    color: AppTokens.textSecondary(context),
-                  ),
-                  overflow: TextOverflow.ellipsis,
+          // Location and Hijri Date row (wraps cleanly on narrow 320dp + 1.3x screens)
+          SizedBox(
+            width: double.infinity,
+            child: Wrap(
+              spacing: 8,
+              runSpacing: 6,
+              alignment: WrapAlignment.spaceBetween,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: [
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      LucideIcons.mapPin,
+                      size: 14,
+                      color: AppTokens.textSecondary(context),
+                    ),
+                    const SizedBox(width: 6),
+                    Flexible(
+                      child: Text(
+                        '$cityName • $hijriDate',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w500,
+                          color: AppTokens.textSecondary(context),
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
                 ),
-              ),
-              if (nextPrayer != null)
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                  decoration: BoxDecoration(
-                    color: AppTokens.primary(context).withValues(alpha: 0.12),
-                    borderRadius: HubRadius.rPill,
-                  ),
-                  child: Text(
-                    _formatRemaining(nextPrayer!.remaining),
-                    style: HubTypography.tabular(
-                      TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        color: AppTokens.primary(context),
+                if (nextPrayer != null)
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 3,
+                    ),
+                    decoration: BoxDecoration(
+                      color: AppTokens.primary(context).withValues(alpha: 0.12),
+                      borderRadius: HubRadius.rPill,
+                    ),
+                    child: Text(
+                      _formatRemaining(nextPrayer!.remaining),
+                      maxLines: 1,
+                      softWrap: false,
+                      style: HubTypography.tabular(
+                        TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: AppTokens.tonalForeground(
+                            context,
+                            AppTokens.primary(context),
+                          ),
+                        ),
                       ),
                     ),
                   ),
-                ),
-            ],
+              ],
+            ),
           ),
           const SizedBox(height: 12),
 
@@ -147,13 +168,21 @@ class PrayerCountdownCard extends StatelessWidget {
               ),
               const SizedBox(width: 12),
               if (nextPrayer != null)
-                Text(
-                  timeFmt.format(nextPrayer!.time),
-                  style: HubTypography.tabular(
-                    TextStyle(
-                      fontSize: 26,
-                      fontWeight: FontWeight.w800,
-                      color: AppTokens.primary(context),
+                Flexible(
+                  fit: FlexFit.loose,
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: Text(
+                      timeFmt.format(nextPrayer!.time),
+                      maxLines: 1,
+                      softWrap: false,
+                      style: HubTypography.tabular(
+                        TextStyle(
+                          fontSize: 26,
+                          fontWeight: FontWeight.w800,
+                          color: AppTokens.primary(context),
+                        ),
+                      ),
                     ),
                   ),
                 ),
@@ -207,32 +236,45 @@ class _PrayerMiniPill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      children: [
-        Text(
-          name,
-          style: TextStyle(
-            fontSize: 11,
-            fontWeight: isNext ? FontWeight.w700 : FontWeight.w500,
-            color: isNext
-                ? AppTokens.primary(context)
-                : AppTokens.textSecondary(context),
-          ),
-        ),
-        const SizedBox(height: 2),
-        Text(
-          time,
-          style: HubTypography.tabular(
-            TextStyle(
-              fontSize: 11,
-              fontWeight: isNext ? FontWeight.w700 : FontWeight.w400,
-              color: isNext
-                  ? AppTokens.primary(context)
-                  : AppTokens.textPrimary(context),
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 2),
+      child: Column(
+        children: [
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Text(
+              name,
+              maxLines: 1,
+              softWrap: false,
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: isNext ? FontWeight.w700 : FontWeight.w500,
+                color: isNext
+                    ? AppTokens.primary(context)
+                    : AppTokens.textSecondary(context),
+              ),
             ),
           ),
-        ),
-      ],
+          const SizedBox(height: 2),
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Text(
+              time,
+              maxLines: 1,
+              softWrap: false,
+              style: HubTypography.tabular(
+                TextStyle(
+                  fontSize: 11,
+                  fontWeight: isNext ? FontWeight.w700 : FontWeight.w400,
+                  color: isNext
+                      ? AppTokens.primary(context)
+                      : AppTokens.textPrimary(context),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

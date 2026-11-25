@@ -46,12 +46,11 @@ class TodayFocusCard extends StatelessWidget {
             children: [
               Expanded(
                 child: Text(
-                  'FOKUS HARI INI',
+                  'Fokus Hari Ini',
                   style: TextStyle(
-                    fontSize: 12,
+                    fontSize: 13,
                     fontWeight: FontWeight.w700,
-                    letterSpacing: 0.8,
-                    color: AppTokens.textSecondary(context),
+                    color: AppTokens.textPrimary(context),
                   ),
                   overflow: TextOverflow.ellipsis,
                 ),
@@ -60,32 +59,35 @@ class TodayFocusCard extends StatelessWidget {
               InkWell(
                 onTap: onSeeAllAgenda,
                 borderRadius: HubRadius.rXs,
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        'Lihat Agenda',
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(minHeight: 48),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 6),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          'Lihat Agenda',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: AppTokens.primary(context),
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                        Icon(
+                          LucideIcons.arrowRight,
+                          size: 14,
                           color: AppTokens.primary(context),
                         ),
-                      ),
-                      const SizedBox(width: 4),
-                      Icon(
-                        LucideIcons.arrowRight,
-                        size: 14,
-                        color: AppTokens.primary(context),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 8),
 
           if (isEmpty) ...[
             Padding(
@@ -97,7 +99,7 @@ class TodayFocusCard extends StatelessWidget {
                     Icon(
                       LucideIcons.checkCircle2,
                       size: 28,
-                      color: AppTokens.textSecondary(context).withValues(alpha: 0.5),
+                      color: AppTokens.textSecondary(context),
                     ),
                     const SizedBox(height: 6),
                     Text(
@@ -121,9 +123,8 @@ class TodayFocusCard extends StatelessWidget {
               child: Container(
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
-                  color: AppTokens.canvas(context),
+                  color: AppTokens.surfaceSubtle(context),
                   borderRadius: HubRadius.rSm,
-                  border: Border.all(color: AppTokens.border(context)),
                 ),
                 child: Row(
                   children: [
@@ -141,7 +142,7 @@ class TodayFocusCard extends StatelessWidget {
                     ),
                     const SizedBox(width: 10),
                     Text(
-                      timeFmt.format(closestMeeting.scheduledAt),
+                      timeFmt.format(closestMeeting.scheduledAt.toLocal()),
                       style: HubTypography.tabular(
                         TextStyle(
                           fontSize: 13,
@@ -179,58 +180,65 @@ class TodayFocusCard extends StatelessWidget {
 
           // Active to-dos (max 3 priority active tasks)
           for (final task in displayTasks) ...[
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 3),
-              child: Row(
-                children: [
-                  SizedBox(
-                    width: 28,
-                    height: 28,
-                    child: Checkbox(
+            InkWell(
+              onTap: () => onToggleTask(task.id),
+              borderRadius: HubRadius.rXs,
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(minHeight: 48),
+                child: Row(
+                  children: [
+                    Checkbox(
                       value: task.isDone,
                       onChanged: (_) => onToggleTask(task.id),
+                      materialTapTargetSize: MaterialTapTargetSize.padded,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(4),
                       ),
                     ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      task.title,
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w500,
-                        color: task.isDone
-                            ? AppTokens.textSecondary(context)
-                            : AppTokens.textPrimary(context),
-                        decoration: task.isDone
-                            ? TextDecoration.lineThrough
-                            : TextDecoration.none,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                  if (task.priority == TaskPriority.high) ...[
-                    const SizedBox(width: 6),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: AppTokens.error(context).withValues(alpha: 0.12),
-                        borderRadius: HubRadius.rXs,
-                      ),
+                    const SizedBox(width: 4),
+                    Expanded(
                       child: Text(
-                        'Tinggi',
+                        task.title,
                         style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w600,
-                          color: AppTokens.error(context),
+                          fontSize: 13,
+                          fontWeight: FontWeight.w500,
+                          color: task.isDone
+                              ? AppTokens.textSecondary(context)
+                              : AppTokens.textPrimary(context),
+                          decoration: task.isDone
+                              ? TextDecoration.lineThrough
+                              : TextDecoration.none,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    if (task.priority == TaskPriority.high) ...[
+                      const SizedBox(width: 6),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 6,
+                          vertical: 2,
+                        ),
+                        decoration: BoxDecoration(
+                          color: AppTokens.error(context).withValues(alpha: 0.12),
+                          borderRadius: HubRadius.rXs,
+                        ),
+                        child: Text(
+                          'Tinggi',
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                            color: AppTokens.tonalForeground(
+                              context,
+                              AppTokens.error(context),
+                            ),
+                          ),
                         ),
                       ),
-                    ),
+                    ],
                   ],
-                ],
+                ),
               ),
             ),
           ],

@@ -22,6 +22,7 @@ class QuickCaptureSheet extends ConsumerStatefulWidget {
     return showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
+      useSafeArea: true,
       backgroundColor: Colors.transparent,
       builder: (_) => const QuickCaptureSheet(),
     );
@@ -150,7 +151,6 @@ class _QuickCaptureSheetState extends ConsumerState<QuickCaptureSheet> {
   Widget build(BuildContext context) {
     final captureState = ref.watch(quickCaptureControllerProvider);
     final batch = captureState.batch;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     final bottomInset = MediaQuery.of(context).viewInsets.bottom;
     final currencyFmt = NumberFormat.currency(
       locale: 'id_ID',
@@ -184,7 +184,7 @@ class _QuickCaptureSheetState extends ConsumerState<QuickCaptureSheet> {
                   width: 36,
                   height: 4,
                   decoration: BoxDecoration(
-                    color: isDark ? Colors.white24 : Colors.black12,
+                    color: AppTokens.border(context),
                     borderRadius: HubRadius.rPill,
                   ),
                 ),
@@ -273,7 +273,7 @@ class _QuickCaptureSheetState extends ConsumerState<QuickCaptureSheet> {
                       'Misal: "Beli kopi 25rb besok meeting sprint lalu kerjakan slide"',
                   hintStyle: TextStyle(
                     fontSize: 13,
-                    color: AppTokens.textSecondary(context).withValues(alpha: 0.8),
+                    color: AppTokens.textSecondary(context),
                   ),
                   contentPadding: const EdgeInsets.all(12),
                   filled: true,
@@ -390,9 +390,8 @@ class _QuickCaptureSheetState extends ConsumerState<QuickCaptureSheet> {
                     margin: const EdgeInsets.only(bottom: 6),
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
                     decoration: BoxDecoration(
-                      color: AppTokens.canvas(context),
+                      color: AppTokens.surfaceSubtle(context),
                       borderRadius: HubRadius.rSm,
-                      border: Border.all(color: AppTokens.border(context)),
                     ),
                     child: Row(
                       children: [
@@ -437,9 +436,8 @@ class _QuickCaptureSheetState extends ConsumerState<QuickCaptureSheet> {
                     margin: const EdgeInsets.only(bottom: 6),
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
                     decoration: BoxDecoration(
-                      color: AppTokens.canvas(context),
+                      color: AppTokens.surfaceSubtle(context),
                       borderRadius: HubRadius.rSm,
-                      border: Border.all(color: AppTokens.border(context)),
                     ),
                     child: Row(
                       children: [
@@ -467,15 +465,19 @@ class _QuickCaptureSheetState extends ConsumerState<QuickCaptureSheet> {
                             decoration: BoxDecoration(
                               color: item.priority == TaskPriority.high
                                   ? AppTokens.error(context).withValues(alpha: 0.12)
-                                  : AppTokens.canvas(context),
+                                  : AppTokens.card(context),
                               borderRadius: HubRadius.rXs,
                             ),
                             child: Text(
                               item.priority == TaskPriority.high ? 'Tinggi' : 'Rendah',
                               style: TextStyle(
                                 fontSize: 11,
+                                fontWeight: FontWeight.w600,
                                 color: item.priority == TaskPriority.high
-                                    ? AppTokens.error(context)
+                                    ? AppTokens.tonalForeground(
+                                        context,
+                                        AppTokens.error(context),
+                                      )
                                     : AppTokens.textSecondary(context),
                               ),
                             ),
@@ -490,9 +492,8 @@ class _QuickCaptureSheetState extends ConsumerState<QuickCaptureSheet> {
                     margin: const EdgeInsets.only(bottom: 6),
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
                     decoration: BoxDecoration(
-                      color: AppTokens.canvas(context),
+                      color: AppTokens.surfaceSubtle(context),
                       borderRadius: HubRadius.rSm,
-                      border: Border.all(color: AppTokens.border(context)),
                     ),
                     child: Row(
                       children: [
@@ -532,12 +533,12 @@ class _QuickCaptureSheetState extends ConsumerState<QuickCaptureSheet> {
               FilledButton.icon(
                 onPressed: captureState.isSaving || batch.isEmpty ? null : _saveAll,
                 icon: captureState.isSaving
-                    ? const SizedBox(
+                    ? SizedBox(
                         width: 16,
                         height: 16,
                         child: CircularProgressIndicator(
                           strokeWidth: 2,
-                          color: Colors.white,
+                          color: AppTokens.onPrimary(context),
                         ),
                       )
                     : const Icon(LucideIcons.check, size: 18),
@@ -550,8 +551,9 @@ class _QuickCaptureSheetState extends ConsumerState<QuickCaptureSheet> {
                   style: const TextStyle(fontWeight: FontWeight.w600),
                 ),
                 style: FilledButton.styleFrom(
+                  minimumSize: const Size.fromHeight(48),
                   backgroundColor: AppTokens.primary(context),
-                  foregroundColor: Colors.white,
+                  foregroundColor: AppTokens.onPrimary(context),
                   padding: const EdgeInsets.symmetric(vertical: 12),
                   shape: RoundedRectangleBorder(borderRadius: HubRadius.rSm),
                 ),
@@ -580,27 +582,34 @@ class _ShortcutChip extends StatelessWidget {
     return InkWell(
       onTap: onTap,
       borderRadius: HubRadius.rPill,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-        decoration: BoxDecoration(
-          color: AppTokens.canvas(context),
-          borderRadius: HubRadius.rPill,
-          border: Border.all(color: AppTokens.border(context)),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, size: 12, color: AppTokens.primary(context)),
-            const SizedBox(width: 4),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 11,
-                fontWeight: FontWeight.w500,
-                color: AppTokens.textPrimary(context),
-              ),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
+        child: Center(
+          widthFactor: 1.0,
+          heightFactor: 1.0,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: BoxDecoration(
+              color: AppTokens.canvas(context),
+              borderRadius: HubRadius.rPill,
+              border: Border.all(color: AppTokens.border(context)),
             ),
-          ],
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(icon, size: 14, color: AppTokens.primary(context)),
+                const SizedBox(width: 6),
+                Text(
+                  label,
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                    color: AppTokens.textPrimary(context),
+                  ),
+                ),
+              ],
+            ),
+          ),
         ),
       ),
     );

@@ -70,7 +70,7 @@ class _BackupSectionState extends ConsumerState<BackupSection> {
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      'Enkripsi AES-256-GCM dengan passphrase pribadi Anda.',
+                      'Berkas cadangan terenkripsi aman dengan passphrase pribadi Anda.',
                       style: theme.textTheme.bodySmall?.copyWith(
                         color: AppTokens.textSecondary(context),
                       ),
@@ -88,32 +88,6 @@ class _BackupSectionState extends ConsumerState<BackupSection> {
               fontSize: 13,
             ),
           ),
-          const SizedBox(height: 12),
-          // Human-readable GFS rotation explanation
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            decoration: BoxDecoration(
-              color: primary.withValues(alpha: 0.08),
-              borderRadius: HubRadius.rSm,
-              border: Border.all(color: primary.withValues(alpha: 0.25)),
-            ),
-            child: Row(
-              children: [
-                Icon(LucideIcons.history, size: 16, color: primary),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    'Rotasi Otomatis: 7 Harian • 4 Mingguan • 3 Bulanan',
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      color: primary,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
           if (_isBusy) ...[
             const SizedBox(height: 12),
             const LinearProgressIndicator(),
@@ -126,7 +100,7 @@ class _BackupSectionState extends ConsumerState<BackupSection> {
               FilledButton.icon(
                 style: FilledButton.styleFrom(
                   backgroundColor: primary,
-                  foregroundColor: Colors.white,
+                  foregroundColor: AppTokens.onPrimary(context),
                   shape: RoundedRectangleBorder(borderRadius: HubRadius.rSm),
                 ),
                 onPressed: _isBusy ? null : _handleExport,

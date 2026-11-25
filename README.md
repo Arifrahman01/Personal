@@ -1,17 +1,10 @@
-# personal_hub
+# Personal Hub
 
-A new Flutter project.
+Aplikasi produktivitas pribadi *local-first* berbasis Flutter dengan antarmuka **Calm Clarity v3.0**:
+- **Beranda & Asisten AI:** Ringkasan fokus harian, tombol rekam rapat cepat, dan obrolan AI dengan dukungan konteks catatan/jadwal.
+- **Agenda Hub:** Rekam & susun notulensi rapat otomatis oleh AI, daftar tugas & kebiasaan harian, serta jadwal sholat + penunjuk arah kiblat.
+- **Catatan & Pengetahuan:** Editor catatan cepat, tag pintar, dan tautan lintas catatan.
+- **Keuangan & Zakat:** Arus kas bulanan, anggaran kategori, kalkulator nisab emas, dan zakat fitrah.
+- **Brankas Kata Sandi:** Penyimpanan akun terenkripsi lokal dengan kunci PIN / biometrik, mode penyamaran (*Duress PIN*), dan cadangan `.phub` terenkripsi.
 
-## Getting Started
-
-This project is a starting point for a Flutter application.
-
-A few resources to get you started if this is your first Flutter project:
-
-- [Learn Flutter](https://docs.flutter.dev/get-started/learn-flutter)
-- [Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Flutter learning resources](https://docs.flutter.dev/reference/learning-resources)
-
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+Panduan desain tersedia di [DESIGN.md](DESIGN.md).

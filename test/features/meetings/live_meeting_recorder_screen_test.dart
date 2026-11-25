@@ -10,10 +10,13 @@ import 'package:personal_hub/features/meetings/models/meeting.dart';
 import 'package:personal_hub/features/meetings/providers/meetings_providers.dart';
 import 'package:personal_hub/features/meetings/services/meeting_note_composer_service.dart';
 import 'package:personal_hub/features/meetings/services/meeting_voice_recorder.dart';
+import 'package:personal_hub/features/meetings/services/whisper_model_manager.dart';
 import 'package:personal_hub/features/meetings/ui/live_meeting_recorder_screen.dart';
+import 'package:personal_hub/features/meetings/ui/widgets/offline_whisper_model_sheet.dart';
 import 'package:personal_hub/features/notes/data/notes_repository.dart';
 import 'package:personal_hub/features/notes/models/note.dart';
 import 'package:personal_hub/features/notes/providers/notes_providers.dart';
+import 'package:personal_hub/features/notes/ui/note_editor_screen.dart';
 import 'package:personal_hub/features/tasks/data/tasks_repository.dart';
 import 'package:personal_hub/features/tasks/models/task_models.dart';
 import 'package:personal_hub/features/tasks/providers/tasks_providers.dart';
@@ -33,6 +36,7 @@ class _FakeSpeechRecognizerGateway implements SpeechRecognizerGateway {
     required String localeId,
     required void Function(String text, bool isFinal) onResult,
     void Function(String status)? onStatus,
+    void Function(double level)? onSoundLevelChange,
   }) async {
     isListening = true;
     _onResult = onResult;
@@ -175,6 +179,10 @@ class _InMemoryNotesRepository implements NotesRepository {
   }
 
   @override
+  Future<List<Note>> getNotes({String? query, String? tag}) async =>
+      List.from(notes);
+
+  @override
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
 
@@ -237,6 +245,9 @@ void main() {
       return ProviderScope(
         overrides: [
           speechRecognizerGatewayProvider.overrideWithValue(fakeGateway),
+          backgroundRecordingGatewayProvider.overrideWithValue(
+            NoOpBackgroundRecordingGateway(),
+          ),
           aiClientProvider.overrideWithValue(fakeAi),
           meetingsRepositoryProvider.overrideWithValue(meetingsRepo),
           notesRepositoryProvider.overrideWithValue(notesRepo),
@@ -412,5 +423,580 @@ void main() {
         expect(tasksRepo.tasks.length, 2);
       },
     );
+
+    testWidgets(
+      'paused transcript inline editor updates recorder finalizedTranscript',
+      (tester) async {
+        tester.view.physicalSize = const Size(800, 1200);
+        tester.view.devicePixelRatio = 1.0;
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+
+        await tester.pumpWidget(buildTestApp());
+        await tester.pumpAndSettle();
+
+        fakeGateway.emitResult('Kalimat awal rapat', isFinal: true);
+        await tester.pump();
+
+        // Pause recording
+        await tester.tap(find.text('Jeda'));
+        await tester.pumpAndSettle();
+
+        final editor = find.byKey(const Key('paused_transcript_editor'));
+        expect(editor, findsOneWidget);
+
+        await tester.enterText(editor, 'Transkrip diedit saat jeda');
+        await tester.pumpAndSettle();
+
+        final container = ProviderScope.containerOf(
+          tester.element(find.byType(LiveMeetingRecorderScreen)),
+        );
+        final recorder = container.read(meetingVoiceRecorderProvider);
+        expect(
+          recorder.state.finalizedTranscript,
+          'Transkrip diedit saat jeda',
+        );
+      },
+    );
+
+    testWidgets(
+      'draft recovery prevents auto-starting over unsaved draft and restores style on resume',
+      (tester) async {
+        tester.view.physicalSize = const Size(800, 1200);
+        tester.view.devicePixelRatio = 1.0;
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+
+        await inMemoryDraftStore.saveDraft(
+          MeetingDraft(
+            title: 'Draft Klien Q4',
+            style: 'clientMeeting',
+            transcript: 'Pembahasan roadmap Q4 bersama klien.',
+            updatedAt: DateTime.now(),
+          ),
+        );
+
+        await tester.pumpWidget(buildTestApp());
+        await tester.pumpAndSettle();
+
+        // Auto-start must NOT overwrite or start listening while draft banner is pending
+        expect(fakeGateway.isListening, isFalse);
+        expect(
+          find.text('Ada rekaman meeting yang belum dirapikan:'),
+          findsOneWidget,
+        );
+
+        await tester.tap(find.text('Lanjutkan Rekaman'));
+        await tester.pumpAndSettle();
+
+        expect(fakeGateway.isListening, isTrue);
+        expect(find.text('Draft Klien Q4'), findsOneWidget);
+        final clientChip = tester.widget<ChoiceChip>(
+          find.ancestor(
+            of: find.text('Rapat Klien'),
+            matching: find.byType(ChoiceChip),
+          ),
+        );
+        expect(clientChip.selected, isTrue);
+      },
+    );
+
+    testWidgets(
+      'MeetingNoteResultSheet offline mode displays retry button and composes with AI on tap',
+      (tester) async {
+        tester.view.physicalSize = const Size(800, 1400);
+        tester.view.devicePixelRatio = 1.0;
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+
+        fakeAi.shouldThrow = true;
+
+        await tester.pumpWidget(buildTestApp());
+        await tester.pumpAndSettle();
+
+        fakeGateway.emitResult(
+          'Diskusi arsitektur database saat offline',
+          isFinal: true,
+        );
+        await tester.pump();
+
+        await tester.tap(find.text('Selesai & Susun Catatan'));
+        await tester.pumpAndSettle();
+
+        expect(
+          find.text('Tersimpan ke Catatan & Meeting (Offline)'),
+          findsOneWidget,
+        );
+        final retryBtn = find.byKey(const Key('retry_compose_ai_button'));
+        expect(retryBtn, findsOneWidget);
+        expect(find.text('Susun Ulang dengan AI'), findsOneWidget);
+
+        // Restore AI connectivity and retry
+        fakeAi.shouldThrow = false;
+        await tester.tap(retryBtn);
+        await tester.pumpAndSettle();
+
+        expect(find.text('Tersimpan ke Catatan & Meeting'), findsOneWidget);
+        expect(find.text('Ringkasan Eksekutif'), findsOneWidget);
+        expect(
+          find.byKey(const Key('retry_compose_ai_button')),
+          findsNothing,
+        );
+      },
+    );
+
+    testWidgets(
+      'displays microphone error alert card and allows manual typing fallback',
+      (tester) async {
+        tester.view.physicalSize = const Size(320 * 2, 600 * 2);
+        tester.view.devicePixelRatio = 2.0;
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+
+        fakeGateway.available = false;
+
+        await tester.pumpWidget(buildTestApp());
+        await tester.pumpAndSettle();
+
+        expect(find.text('Mikrofon tidak aktif'), findsOneWidget);
+        expect(find.byKey(const Key('retry_mic_button')), findsOneWidget);
+        expect(
+          find.byKey(const Key('manual_edit_fallback_button')),
+          findsOneWidget,
+        );
+
+        await tester.tap(find.byKey(const Key('manual_edit_fallback_button')));
+        await tester.pumpAndSettle();
+
+        final editor = find.byKey(const Key('paused_transcript_editor'));
+        expect(editor, findsOneWidget);
+
+        await tester.enterText(editor, 'Catatan rapat manual saat mic off');
+        await tester.pumpAndSettle();
+
+        final container = ProviderScope.containerOf(
+          tester.element(find.byType(LiveMeetingRecorderScreen)),
+        );
+        expect(
+          container.read(meetingVoiceRecorderProvider).state.finalizedTranscript,
+          'Catatan rapat manual saat mic off',
+        );
+      },
+    );
+
+    testWidgets(
+      'Buka di Editor Catatan replaces LiveMeetingRecorderScreen with NoteEditorScreen',
+      (tester) async {
+        tester.view.physicalSize = const Size(800, 1400);
+        tester.view.devicePixelRatio = 1.0;
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+
+        await tester.pumpWidget(
+          ProviderScope(
+            overrides: [
+              speechRecognizerGatewayProvider.overrideWithValue(fakeGateway),
+              backgroundRecordingGatewayProvider.overrideWithValue(
+                NoOpBackgroundRecordingGateway(),
+              ),
+              aiClientProvider.overrideWithValue(fakeAi),
+              meetingsRepositoryProvider.overrideWithValue(meetingsRepo),
+              notesRepositoryProvider.overrideWithValue(notesRepo),
+              tasksRepositoryProvider.overrideWithValue(tasksRepo),
+              meetingDraftStoreProvider.overrideWithValue(inMemoryDraftStore),
+              recordingWakelockGatewayProvider.overrideWithValue(noOpWakelock),
+              meetingNoteComposerServiceProvider.overrideWithValue(
+                MeetingNoteComposerService(
+                  aiClient: fakeAi,
+                  meetingsRepository: meetingsRepo,
+                  notesRepository: notesRepo,
+                ),
+              ),
+            ],
+            child: MaterialApp(
+              home: Builder(
+                builder: (context) => Scaffold(
+                  body: ElevatedButton(
+                    onPressed: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute<void>(
+                          builder: (_) => const LiveMeetingRecorderScreen(),
+                        ),
+                      );
+                    },
+                    child: const Text('Buka Studio'),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+
+        await tester.tap(find.text('Buka Studio'));
+        await tester.pumpAndSettle();
+        expect(find.byType(LiveMeetingRecorderScreen), findsOneWidget);
+
+        fakeGateway.emitResult('Pembahasan rilis minggu ini', isFinal: true);
+        await tester.pump();
+
+        await tester.tap(find.text('Selesai & Susun Catatan'));
+        await tester.pumpAndSettle();
+
+        await tester.tap(find.text('Buka di Editor Catatan'));
+        await tester.pumpAndSettle();
+
+        expect(find.byType(NoteEditorScreen), findsOneWidget);
+        expect(find.byType(LiveMeetingRecorderScreen), findsNothing);
+      },
+    );
+
+    testWidgets(
+      'Rekam di Latar pops LiveMeetingRecorderScreen while keeping recording active',
+      (tester) async {
+        tester.view.physicalSize = const Size(800, 1400);
+        tester.view.devicePixelRatio = 1.0;
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+
+        final bg = NoOpBackgroundRecordingGateway();
+
+        await tester.pumpWidget(
+          ProviderScope(
+            overrides: [
+              speechRecognizerGatewayProvider.overrideWithValue(fakeGateway),
+              backgroundRecordingGatewayProvider.overrideWithValue(bg),
+              aiClientProvider.overrideWithValue(fakeAi),
+              meetingsRepositoryProvider.overrideWithValue(meetingsRepo),
+              notesRepositoryProvider.overrideWithValue(notesRepo),
+              tasksRepositoryProvider.overrideWithValue(tasksRepo),
+              meetingDraftStoreProvider.overrideWithValue(inMemoryDraftStore),
+              recordingWakelockGatewayProvider.overrideWithValue(noOpWakelock),
+            ],
+            child: MaterialApp(
+              home: Builder(
+                builder: (context) => Scaffold(
+                  body: ElevatedButton(
+                    onPressed: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute<void>(
+                          builder: (_) => const LiveMeetingRecorderScreen(),
+                        ),
+                      );
+                    },
+                    child: const Text('Buka Studio'),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+
+        await tester.tap(find.text('Buka Studio'));
+        await tester.pumpAndSettle();
+        expect(find.byType(LiveMeetingRecorderScreen), findsOneWidget);
+
+        final container = ProviderScope.containerOf(
+          tester.element(find.byType(LiveMeetingRecorderScreen)),
+        );
+        expect(bg.isActive, isTrue);
+
+        await tester.tap(find.byIcon(LucideIcons.arrowLeft));
+        await tester.pumpAndSettle();
+        expect(find.text('Rekam di Latar'), findsOneWidget);
+
+        await tester.tap(find.text('Rekam di Latar'));
+        await tester.pumpAndSettle();
+
+        expect(find.byType(LiveMeetingRecorderScreen), findsNothing);
+        final recorder = container.read(meetingVoiceRecorderProvider);
+        expect(recorder.state.isRecording, isTrue);
+        expect(bg.isActive, isTrue);
+      },
+    );
+
+    testWidgets(
+      'hybrid Audio Senyap mode: records silently, transcribes offline with Whisper, and composes note',
+      (tester) async {
+        tester.view.physicalSize = const Size(800, 1400);
+        tester.view.devicePixelRatio = 1.0;
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+
+        final audioGateway = NoOpAudioRecorderGateway(supported: true);
+        final offlineTranscriber = NoOpOfflineAudioTranscriberGateway(
+          supported: true,
+          readyModel: true,
+          scriptedChunks: ['Presentasi produk selesai dan disetujui tim.'],
+        );
+        final modelMgr = _FakeWhisperModelManager(hasBaseModel: true);
+
+        await tester.pumpWidget(
+          ProviderScope(
+            overrides: [
+              speechRecognizerGatewayProvider.overrideWithValue(fakeGateway),
+              audioRecorderGatewayProvider.overrideWithValue(audioGateway),
+              offlineAudioTranscriberGatewayProvider.overrideWithValue(
+                offlineTranscriber,
+              ),
+              whisperModelManagerProvider.overrideWithValue(modelMgr),
+              backgroundRecordingGatewayProvider.overrideWithValue(
+                NoOpBackgroundRecordingGateway(),
+              ),
+              aiClientProvider.overrideWithValue(fakeAi),
+              meetingsRepositoryProvider.overrideWithValue(meetingsRepo),
+              notesRepositoryProvider.overrideWithValue(notesRepo),
+              tasksRepositoryProvider.overrideWithValue(tasksRepo),
+              meetingDraftStoreProvider.overrideWithValue(inMemoryDraftStore),
+              recordingWakelockGatewayProvider.overrideWithValue(noOpWakelock),
+              meetingVoiceRecorderProvider.overrideWith((ref) {
+                final r = MeetingVoiceRecorder(
+                  fakeGateway,
+                  audioRecorder: audioGateway,
+                  offlineTranscriber: offlineTranscriber,
+                  wakelock: noOpWakelock,
+                  backgroundService: NoOpBackgroundRecordingGateway(),
+                  draftStore: inMemoryDraftStore,
+                  audioDirectoryProvider: () async => '/mock/audio',
+                );
+                ref.onDispose(r.dispose);
+                return r;
+              }),
+            ],
+            child: const MaterialApp(home: LiveMeetingRecorderScreen()),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        expect(find.byKey(const Key('mode_silent_audio_chip')), findsOneWidget);
+        expect(find.byKey(const Key('mode_live_speech_chip')), findsOneWidget);
+        expect(find.byKey(const Key('keep_screen_on_toggle')), findsOneWidget);
+        expect(
+          find.byKey(const Key('minimize_to_background_button')),
+          findsOneWidget,
+        );
+        expect(audioGateway.isCapturing, isTrue);
+
+        // Toggle opt-in keep screen on
+        await tester.tap(find.byKey(const Key('keep_screen_on_toggle')));
+        await tester.pumpAndSettle();
+        expect(noOpWakelock.isEnabled, isTrue);
+
+        // Finish & compose triggers offline transcription + AI compose + cleanup
+        await tester.tap(find.text('Selesai & Susun Catatan'));
+        await tester.pumpAndSettle();
+
+        expect(offlineTranscriber.transcribeCallCount, 1);
+        expect(notesRepo.notes.length, 1);
+        expect(
+          notesRepo.notes.first.content,
+          contains('Presentasi produk selesai dan disetujui tim.'),
+        );
+        expect(audioGateway.deletedPaths, isNotEmpty);
+      },
+    );
+
+    testWidgets(
+      'missing Whisper model opens OfflineWhisperModelSheet without losing recorded audio',
+      (tester) async {
+        tester.view.physicalSize = const Size(800, 1400);
+        tester.view.devicePixelRatio = 1.0;
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+
+        final audioGateway = NoOpAudioRecorderGateway(supported: true);
+        final offlineTranscriber = NoOpOfflineAudioTranscriberGateway(
+          supported: true,
+          readyModel: false,
+        );
+        final modelMgr = _FakeWhisperModelManager(hasBaseModel: false);
+
+        await tester.pumpWidget(
+          ProviderScope(
+            overrides: [
+              speechRecognizerGatewayProvider.overrideWithValue(fakeGateway),
+              audioRecorderGatewayProvider.overrideWithValue(audioGateway),
+              offlineAudioTranscriberGatewayProvider.overrideWithValue(
+                offlineTranscriber,
+              ),
+              whisperModelManagerProvider.overrideWithValue(modelMgr),
+              backgroundRecordingGatewayProvider.overrideWithValue(
+                NoOpBackgroundRecordingGateway(),
+              ),
+              aiClientProvider.overrideWithValue(fakeAi),
+              meetingsRepositoryProvider.overrideWithValue(meetingsRepo),
+              notesRepositoryProvider.overrideWithValue(notesRepo),
+              tasksRepositoryProvider.overrideWithValue(tasksRepo),
+              meetingDraftStoreProvider.overrideWithValue(inMemoryDraftStore),
+              recordingWakelockGatewayProvider.overrideWithValue(noOpWakelock),
+              meetingVoiceRecorderProvider.overrideWith((ref) {
+                final r = MeetingVoiceRecorder(
+                  fakeGateway,
+                  audioRecorder: audioGateway,
+                  offlineTranscriber: offlineTranscriber,
+                  wakelock: noOpWakelock,
+                  backgroundService: NoOpBackgroundRecordingGateway(),
+                  draftStore: inMemoryDraftStore,
+                  audioDirectoryProvider: () async => '/mock/audio',
+                );
+                ref.onDispose(r.dispose);
+                return r;
+              }),
+            ],
+            child: const MaterialApp(home: LiveMeetingRecorderScreen()),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        await tester.tap(find.text('Selesai & Susun Catatan'));
+        await tester.pumpAndSettle();
+
+        expect(find.byType(OfflineWhisperModelSheet), findsOneWidget);
+        expect(
+          find.text('Model Transkripsi Offline (Whisper)'),
+          findsOneWidget,
+        );
+        expect(audioGateway.deletedPaths, isEmpty);
+      },
+    );
+
+    testWidgets(
+      '1-tap minimize button pops studio while keeping Audio Senyap recording active',
+      (tester) async {
+        tester.view.physicalSize = const Size(800, 1400);
+        tester.view.devicePixelRatio = 1.0;
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+
+        final audioGateway = NoOpAudioRecorderGateway(supported: true);
+        final offlineTranscriber = NoOpOfflineAudioTranscriberGateway(
+          supported: true,
+          readyModel: true,
+        );
+        final modelMgr = _FakeWhisperModelManager(hasBaseModel: true);
+
+        await tester.pumpWidget(
+          ProviderScope(
+            overrides: [
+              speechRecognizerGatewayProvider.overrideWithValue(fakeGateway),
+              audioRecorderGatewayProvider.overrideWithValue(audioGateway),
+              offlineAudioTranscriberGatewayProvider.overrideWithValue(
+                offlineTranscriber,
+              ),
+              whisperModelManagerProvider.overrideWithValue(modelMgr),
+              backgroundRecordingGatewayProvider.overrideWithValue(
+                NoOpBackgroundRecordingGateway(),
+              ),
+              meetingDraftStoreProvider.overrideWithValue(inMemoryDraftStore),
+              recordingWakelockGatewayProvider.overrideWithValue(noOpWakelock),
+              meetingVoiceRecorderProvider.overrideWith((ref) {
+                final r = MeetingVoiceRecorder(
+                  fakeGateway,
+                  audioRecorder: audioGateway,
+                  offlineTranscriber: offlineTranscriber,
+                  wakelock: noOpWakelock,
+                  backgroundService: NoOpBackgroundRecordingGateway(),
+                  draftStore: inMemoryDraftStore,
+                  audioDirectoryProvider: () async => '/mock/audio',
+                );
+                ref.onDispose(r.dispose);
+                return r;
+              }),
+            ],
+            child: MaterialApp(
+              home: Builder(
+                builder: (context) => Scaffold(
+                  body: ElevatedButton(
+                    onPressed: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute<void>(
+                          builder: (_) => const LiveMeetingRecorderScreen(),
+                        ),
+                      );
+                    },
+                    child: const Text('Buka Studio'),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+
+        await tester.tap(find.text('Buka Studio'));
+        await tester.pumpAndSettle();
+        expect(find.byType(LiveMeetingRecorderScreen), findsOneWidget);
+
+        final container = ProviderScope.containerOf(
+          tester.element(find.byType(LiveMeetingRecorderScreen)),
+        );
+        await tester.tap(find.byKey(const Key('minimize_to_background_button')));
+        await tester.pumpAndSettle();
+
+        expect(find.byType(LiveMeetingRecorderScreen), findsNothing);
+        expect(
+          container.read(meetingVoiceRecorderProvider).state.isRecording,
+          isTrue,
+        );
+        expect(audioGateway.isCapturing, isTrue);
+      },
+    );
+
+    testWidgets(
+      'displays audio-only draft recovery banner when pending WAV draft exists',
+      (tester) async {
+        tester.view.physicalSize = const Size(800, 1200);
+        tester.view.devicePixelRatio = 1.0;
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+
+        await inMemoryDraftStore.saveDraft(
+          MeetingDraft(
+            title: 'Rapat Lapangan',
+            style: 'standard',
+            transcript: '',
+            audioFilePath: '/mock/audio/pending.wav',
+            recordingMode: 'silentAudioOffline',
+            elapsedSeconds: 125,
+            updatedAt: DateTime.now(),
+          ),
+        );
+
+        await tester.pumpWidget(buildTestApp());
+        await tester.pumpAndSettle();
+
+        expect(
+          find.text('Ada rekaman audio yang belum ditranskrip:'),
+          findsOneWidget,
+        );
+        expect(find.text('Transkrip & Susun'), findsOneWidget);
+      },
+    );
   });
+}
+
+class _FakeWhisperModelManager extends WhisperModelManager {
+  _FakeWhisperModelManager({required this.hasBaseModel});
+
+  final bool hasBaseModel;
+
+  @override
+  Future<bool> isModelInstalled(OfflineWhisperModelOption option) async {
+    return hasBaseModel && option == OfflineWhisperModelOption.baseQ5;
+  }
+
+  @override
+  Future<int?> getModelSizeBytes(OfflineWhisperModelOption option) async {
+    return (hasBaseModel && option == OfflineWhisperModelOption.baseQ5)
+        ? 57 * 1024 * 1024
+        : null;
+  }
+
+  @override
+  Future<OfflineWhisperModelOption?> getInstalledPreferredModel() async {
+    return hasBaseModel ? OfflineWhisperModelOption.baseQ5 : null;
+  }
+
+  @override
+  Future<String?> getReadyModelPath() async {
+    return hasBaseModel ? '/mock/ggml-base-q5_1.bin' : null;
+  }
 }

@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:personal_hub/core/config/secure_config_store.dart';
 import 'package:personal_hub/core/database/app_database.dart';
+import 'package:personal_hub/features/home/providers/home_module_preferences.dart';
 import 'package:personal_hub/features/home/ui/home_screen.dart';
 import 'package:personal_hub/features/vault/providers/vault_lock_controller.dart';
 import 'package:personal_hub/features/vault/providers/vault_providers.dart';
@@ -100,8 +101,10 @@ void main() {
       // 2. Block 1: Prayer countdown
       expect(find.textContaining('Jakarta Pusat'), findsOneWidget);
 
-      // 3. Block 2: Focus Today
-      expect(find.text('FOKUS HARI INI'), findsOneWidget);
+      // 3. Block 2: Focus Today & single Hero button
+      expect(find.text('Fokus Hari Ini'), findsOneWidget);
+      expect(find.byKey(const Key('home_record_meeting_button')), findsOneWidget);
+      expect(find.byKey(const Key('home_quick_capture_button')), findsNothing);
 
       // 4. Block 3: KPI cards
       expect(find.textContaining('Saldo'), findsOneWidget);
@@ -216,5 +219,50 @@ void main() {
       FlutterError.onError = oldOnError;
       expect(capturedDetails, isNull);
     });
+
+    testWidgets(
+      'toggling homeModulePreferences hides individual KPI and prayer cards',
+      (tester) async {
+        tester.view.physicalSize = const Size(390 * 2, 844 * 2);
+        tester.view.devicePixelRatio = 2.0;
+        addTearDown(() {
+          tester.view.resetPhysicalSize();
+          tester.view.resetDevicePixelRatio();
+        });
+
+        final appDb = await AppDatabase.open(
+          pathOverride: inMemoryDatabasePath,
+          factoryOverride: databaseFactoryFfiNoIsolate,
+        );
+        addTearDown(() async => appDb.close());
+
+        final clipboardGuard = ClipboardGuard(_FakeClipboardAdapter());
+        addTearDown(clipboardGuard.dispose);
+
+        await tester.pumpWidget(
+          buildTestableHomeScreen(appDb: appDb, clipboardGuard: clipboardGuard),
+        );
+        await tester.pumpAndSettle();
+
+        expect(find.textContaining('Saldo'), findsOneWidget);
+        expect(find.text('Habit Hari Ini'), findsOneWidget);
+        expect(find.textContaining('Jakarta Pusat'), findsOneWidget);
+
+        final container = ProviderScope.containerOf(
+          tester.element(find.byType(HomeScreen)),
+        );
+
+        container.read(homeModulePreferencesProvider.notifier).toggleFinance(false);
+        await tester.pumpAndSettle();
+
+        expect(find.textContaining('Saldo'), findsNothing);
+        expect(find.text('Habit Hari Ini'), findsOneWidget);
+
+        container.read(homeModulePreferencesProvider.notifier).togglePrayer(false);
+        await tester.pumpAndSettle();
+
+        expect(find.textContaining('Jakarta Pusat'), findsNothing);
+      },
+    );
   });
 }

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:personal_hub/core/errors/app_exceptions.dart';
@@ -63,7 +64,9 @@ class _SecurityVaultSettingsPageState
                 children: [
                   Icon(LucideIcons.keyRound, size: 20, color: AppTokens.primary(context)),
                   const SizedBox(width: 8),
-                  Text(_hasPin ? 'Ubah PIN Brankas' : 'Atur PIN Brankas'),
+                  Expanded(
+                    child: Text(_hasPin ? 'Ubah PIN Brankas' : 'Atur PIN Brankas'),
+                  ),
                 ],
               ),
               content: SingleChildScrollView(
@@ -74,11 +77,18 @@ class _SecurityVaultSettingsPageState
                       controller: pinController,
                       obscureText: obscure,
                       keyboardType: TextInputType.number,
+                      maxLength: 8,
+                      inputFormatters: [
+                        FilteringTextInputFormatter.digitsOnly,
+                        LengthLimitingTextInputFormatter(8),
+                      ],
                       decoration: InputDecoration(
                         labelText: 'PIN Baru',
-                        hintText: 'Minimal 4 digit angka',
+                        hintText: '4-8 digit angka',
+                        counterText: '',
                         prefixIcon: const Icon(LucideIcons.pin),
                         suffixIcon: IconButton(
+                          tooltip: obscure ? 'Tampilkan PIN' : 'Sembunyikan PIN',
                           icon: Icon(
                             obscure ? LucideIcons.eye : LucideIcons.eyeOff,
                           ),
@@ -92,9 +102,15 @@ class _SecurityVaultSettingsPageState
                       controller: confirmController,
                       obscureText: obscure,
                       keyboardType: TextInputType.number,
+                      maxLength: 8,
+                      inputFormatters: [
+                        FilteringTextInputFormatter.digitsOnly,
+                        LengthLimitingTextInputFormatter(8),
+                      ],
                       decoration: const InputDecoration(
                         labelText: 'Konfirmasi PIN Baru',
                         hintText: 'Ulangi PIN yang sama',
+                        counterText: '',
                         prefixIcon: Icon(LucideIcons.shieldCheck),
                       ),
                     ),
@@ -180,7 +196,7 @@ class _SecurityVaultSettingsPageState
                 children: [
                   Icon(LucideIcons.shieldAlert, size: 20, color: AppTokens.warning(context)),
                   const SizedBox(width: 8),
-                  const Text('Atur Duress PIN'),
+                  const Expanded(child: Text('Atur Duress PIN')),
                 ],
               ),
               content: SingleChildScrollView(
@@ -189,7 +205,7 @@ class _SecurityVaultSettingsPageState
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Duress PIN adalah PIN umpan darurat. Saat dimasukkan di layar brankas, brankas akan membuka profil alternatif (decoy) yang aman tanpa membocorkan akun asli Anda.',
+                      'Duress PIN adalah PIN umpan darurat. Saat dimasukkan di layar brankas, brankas akan membuka profil penyamaran yang aman tanpa membocorkan akun asli Anda.',
                       style: TextStyle(
                         fontSize: 12,
                         color: AppTokens.textSecondary(context),
@@ -201,11 +217,18 @@ class _SecurityVaultSettingsPageState
                       controller: pinController,
                       obscureText: obscure,
                       keyboardType: TextInputType.number,
+                      maxLength: 8,
+                      inputFormatters: [
+                        FilteringTextInputFormatter.digitsOnly,
+                        LengthLimitingTextInputFormatter(8),
+                      ],
                       decoration: InputDecoration(
                         labelText: 'Duress PIN Baru',
-                        hintText: 'Minimal 4 digit angka',
+                        hintText: '4-8 digit angka',
+                        counterText: '',
                         prefixIcon: const Icon(LucideIcons.pin),
                         suffixIcon: IconButton(
+                          tooltip: obscure ? 'Tampilkan PIN' : 'Sembunyikan PIN',
                           icon: Icon(
                             obscure ? LucideIcons.eye : LucideIcons.eyeOff,
                           ),
@@ -219,9 +242,15 @@ class _SecurityVaultSettingsPageState
                       controller: confirmController,
                       obscureText: obscure,
                       keyboardType: TextInputType.number,
+                      maxLength: 8,
+                      inputFormatters: [
+                        FilteringTextInputFormatter.digitsOnly,
+                        LengthLimitingTextInputFormatter(8),
+                      ],
                       decoration: const InputDecoration(
                         labelText: 'Konfirmasi Duress PIN',
                         hintText: 'Ulangi PIN umpan',
+                        counterText: '',
                         prefixIcon: Icon(LucideIcons.shieldCheck),
                       ),
                     ),
@@ -334,16 +363,16 @@ class _SecurityVaultSettingsPageState
                         ),
                       ),
                     ),
-                    HubPill(
+                    const SizedBox(width: 8),
+                    HubStatusBadge(
                       label: _hasPin ? 'Terkonfigurasi' : 'Belum Diatur',
-                      color: _hasPin ? AppTokens.success(context) : AppTokens.warning(context),
-                      isSelected: true,
+                      type: _hasPin ? HubBadgeType.success : HubBadgeType.warning,
                     ),
                   ],
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'Melindungi seluruh data kata sandi dengan enkripsi AES-256-GCM zero-knowledge.',
+                  'Melindungi seluruh data kata sandi dengan enkripsi lokal yang hanya dapat dibuka dengan PIN Anda.',
                   style: theme.textTheme.bodySmall?.copyWith(
                     color: AppTokens.textSecondary(context),
                   ),
@@ -376,17 +405,19 @@ class _SecurityVaultSettingsPageState
                         ),
                       ),
                     ),
-                    HubPill(
+                    const SizedBox(width: 8),
+                    HubStatusBadge(
                       label: _hasDuressPin ? 'Aktif' : 'Nonaktif',
-                      color: _hasDuressPin ? AppTokens.success(context) : AppTokens.textSecondary(context),
-                      isSelected: _hasDuressPin,
+                      color: _hasDuressPin
+                          ? AppTokens.success(context)
+                          : AppTokens.textSecondary(context),
                     ),
                   ],
                 ),
                 const SizedBox(height: 8),
                 Text(
                   _hasDuressPin
-                      ? 'Duress PIN aktif. Jika dipaksa membuka brankas di bawah ancaman, masukkan PIN ini untuk membuka brankas profil umpan (decoy) tanpa membocorkan data akun asli Anda.'
+                      ? 'Duress PIN aktif. Jika dipaksa membuka brankas di bawah ancaman, masukkan PIN ini untuk membuka brankas profil penyamaran tanpa membocorkan data akun asli Anda.'
                       : 'Belum diatur. Konfigurasikan PIN umpan untuk perlindungan ekstra saat berada dalam ancaman atau pemaksaan.',
                   style: theme.textTheme.bodySmall?.copyWith(
                     color: AppTokens.textSecondary(context),
@@ -485,10 +516,12 @@ class _SecurityVaultSettingsPageState
                     ],
                   ),
                 ),
-                HubPill(
+                const SizedBox(width: 8),
+                HubStatusBadge(
                   label: _canUseBiometrics ? 'Tersedia' : 'Tidak Ada',
-                  color: _canUseBiometrics ? AppTokens.success(context) : AppTokens.textSecondary(context),
-                  isSelected: _canUseBiometrics,
+                  color: _canUseBiometrics
+                      ? AppTokens.success(context)
+                      : AppTokens.textSecondary(context),
                 ),
               ],
             ),
@@ -499,7 +532,7 @@ class _SecurityVaultSettingsPageState
           FilledButton.icon(
             style: FilledButton.styleFrom(
               backgroundColor: AppTokens.error(context),
-              foregroundColor: Colors.white,
+              foregroundColor: Theme.of(context).colorScheme.onError,
               minimumSize: const Size.fromHeight(48),
               shape: RoundedRectangleBorder(borderRadius: HubRadius.rSm),
             ),

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 
 /// WCAG AA/AAA compliant theme extension color tokens for Personal Hub v3.0 ("Calm Clarity").
 class HubColors extends ThemeExtension<HubColors> {
@@ -9,6 +10,7 @@ class HubColors extends ThemeExtension<HubColors> {
   final Color textPrimary;
   final Color textSecondary;
   final Color primary;
+  final Color onPrimary;
   final Color primarySoft;
   final Color success;
   final Color warning;
@@ -23,6 +25,7 @@ class HubColors extends ThemeExtension<HubColors> {
     required this.textPrimary,
     required this.textSecondary,
     required this.primary,
+    required this.onPrimary,
     required this.primarySoft,
     required this.success,
     required this.warning,
@@ -39,6 +42,7 @@ class HubColors extends ThemeExtension<HubColors> {
     textPrimary: Color(0xFF111827),
     textSecondary: Color(0xFF4B5563),
     primary: Color(0xFF0D6E66),
+    onPrimary: Color(0xFFFFFFFF),
     primarySoft: Color(0xFFE6F4F2),
     success: Color(0xFF15803D),
     warning: Color(0xFFB45309),
@@ -55,6 +59,7 @@ class HubColors extends ThemeExtension<HubColors> {
     textPrimary: Color(0xFFF1F5F9),
     textSecondary: Color(0xFF94A3B8),
     primary: Color(0xFF2DD4BF),
+    onPrimary: Color(0xFF062825),
     primarySoft: Color(0xFF123532),
     success: Color(0xFF34D399),
     warning: Color(0xFFFBBF24),
@@ -77,6 +82,7 @@ class HubColors extends ThemeExtension<HubColors> {
     Color? textPrimary,
     Color? textSecondary,
     Color? primary,
+    Color? onPrimary,
     Color? primarySoft,
     Color? success,
     Color? warning,
@@ -91,6 +97,7 @@ class HubColors extends ThemeExtension<HubColors> {
       textPrimary: textPrimary ?? this.textPrimary,
       textSecondary: textSecondary ?? this.textSecondary,
       primary: primary ?? this.primary,
+      onPrimary: onPrimary ?? this.onPrimary,
       primarySoft: primarySoft ?? this.primarySoft,
       success: success ?? this.success,
       warning: warning ?? this.warning,
@@ -113,6 +120,7 @@ class HubColors extends ThemeExtension<HubColors> {
       textSecondary:
           Color.lerp(textSecondary, other.textSecondary, t) ?? textSecondary,
       primary: Color.lerp(primary, other.primary, t) ?? primary,
+      onPrimary: Color.lerp(onPrimary, other.onPrimary, t) ?? onPrimary,
       primarySoft: Color.lerp(primarySoft, other.primarySoft, t) ?? primarySoft,
       success: Color.lerp(success, other.success, t) ?? success,
       warning: Color.lerp(warning, other.warning, t) ?? warning,
@@ -128,6 +136,8 @@ abstract final class AppTokens {
   // Brand Emerald-Teal
   static const Color primaryLight = Color(0xFF0D6E66);
   static const Color primaryDark = Color(0xFF2DD4BF);
+  static const Color onPrimaryLight = Color(0xFFFFFFFF);
+  static const Color onPrimaryDark = Color(0xFF062825);
   static const Color primarySoftLight = Color(0xFFE6F4F2);
   static const Color primarySoftDark = Color(0xFF123532);
 
@@ -165,6 +175,8 @@ abstract final class AppTokens {
 
   // Dynamic getters delegating to HubColors
   static Color primary(BuildContext context) => HubColors.of(context).primary;
+  static Color onPrimary(BuildContext context) =>
+      HubColors.of(context).onPrimary;
   static Color primarySoft(BuildContext context) =>
       HubColors.of(context).primarySoft;
   static Color canvas(BuildContext context) => HubColors.of(context).canvas;
@@ -184,6 +196,18 @@ abstract final class AppTokens {
   static Color error(BuildContext context) => HubColors.of(context).danger;
   static Color danger(BuildContext context) => HubColors.of(context).danger;
   static Color info(BuildContext context) => HubColors.of(context).info;
+
+  /// Returns a WCAG AA (>= 4.5:1) foreground color for text/icons placed on
+  /// soft tonal badge surfaces (10%-15% accent fill over light/dark cards).
+  static Color tonalForeground(BuildContext context, Color accent) {
+    if (Theme.of(context).brightness == Brightness.dark) {
+      return accent;
+    }
+    if (accent == warningLight) return const Color(0xFF92400E);
+    if (accent == successLight) return const Color(0xFF166534);
+    if (accent == dangerLight) return const Color(0xFFB91C1C);
+    return accent;
+  }
 }
 
 /// 5-step radius scale for tactile components.
@@ -222,4 +246,55 @@ abstract final class HubTypography {
       ],
     );
   }
+}
+
+/// Safely formats [dateTime] in Indonesian (`id_ID`), falling back cleanly
+/// when locale symbol data has not been initialized (e.g., isolated unit tests).
+String safeFormatIndonesianDate(DateTime dateTime, String pattern) {
+  final local = dateTime.toLocal();
+  try {
+    return DateFormat(pattern, 'id_ID').format(local);
+  } catch (_) {
+    return _fallbackIndonesianDateFormat(local, pattern);
+  }
+}
+
+String _fallbackIndonesianDateFormat(DateTime local, String pattern) {
+  const weekdays = [
+    'Senin',
+    'Selasa',
+    'Rabu',
+    'Kamis',
+    'Jumat',
+    'Sabtu',
+    'Minggu',
+  ];
+  const shortMonths = [
+    'Jan',
+    'Feb',
+    'Mar',
+    'Apr',
+    'Mei',
+    'Jun',
+    'Jul',
+    'Agu',
+    'Sep',
+    'Okt',
+    'Nov',
+    'Des',
+  ];
+
+  final dayName = weekdays[local.weekday - 1];
+  final shortMonth = shortMonths[local.month - 1];
+  final hour = local.hour.toString().padLeft(2, '0');
+  final minute = local.minute.toString().padLeft(2, '0');
+
+  return switch (pattern) {
+    'EEEE, d MMM yyyy' => '$dayName, ${local.day} $shortMonth ${local.year}',
+    'd MMM yyyy' => '${local.day} $shortMonth ${local.year}',
+    'd MMM, HH:mm' => '${local.day} $shortMonth, $hour:$minute',
+    'MMM' => shortMonth,
+    'HH:mm' => '$hour:$minute',
+    _ => DateFormat(pattern).format(local),
+  };
 }

@@ -86,6 +86,10 @@ void main() {
           controller.setupPin('123'),
           throwsA(isA<ValidationException>()),
         );
+        await expectLater(
+          controller.setupPin('123456789'),
+          throwsA(isA<ValidationException>()),
+        );
 
         await controller.setupPin('4321');
         expect(await controller.hasPin(), isTrue);
@@ -149,6 +153,10 @@ void main() {
         // Rejects invalid duress pin length
         await expectLater(
           controller.setupDuressPin('99'),
+          throwsA(isA<ValidationException>()),
+        );
+        await expectLater(
+          controller.setupDuressPin('123456789'),
           throwsA(isA<ValidationException>()),
         );
 

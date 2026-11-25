@@ -5,7 +5,13 @@ import 'package:personal_hub/core/database/app_database.dart';
 import 'package:personal_hub/core/errors/app_exceptions.dart';
 import 'package:personal_hub/features/ai/data/chat_repository.dart';
 import 'package:personal_hub/features/ai/models/ai_models.dart';
+import 'package:personal_hub/features/ai/services/ai_workspace_context_builder.dart';
 import 'package:personal_hub/features/ai/services/samudra_ai_client.dart';
+import 'package:personal_hub/features/finance/providers/finance_providers.dart';
+import 'package:personal_hub/features/meetings/providers/meetings_providers.dart';
+import 'package:personal_hub/features/notes/providers/notes_providers.dart';
+import 'package:personal_hub/features/prayer/providers/prayer_providers.dart';
+import 'package:personal_hub/features/tasks/providers/tasks_providers.dart';
 import 'package:uuid/uuid.dart';
 
 /// Provides a shared [http.Client] closed automatically on provider disposal.
@@ -26,6 +32,20 @@ final aiClientProvider = Provider<SamudraAiClient>((ref) {
 /// Provides [ChatRepository] backed by [appDatabaseProvider].
 final chatRepositoryProvider = Provider<ChatRepository>((ref) {
   return ChatRepository(ref.watch(appDatabaseProvider));
+});
+
+/// Provides [AiWorkspaceContextBuilder] backed by non-vault local repositories.
+final aiWorkspaceContextBuilderProvider = Provider<AiWorkspaceContextBuilder>((
+  ref,
+) {
+  return AiWorkspaceContextBuilder(
+    meetingsRepository: ref.watch(meetingsRepositoryProvider),
+    tasksRepository: ref.watch(tasksRepositoryProvider),
+    notesRepository: ref.watch(notesRepositoryProvider),
+    financeRepository: ref.watch(financeRepositoryProvider),
+    prayerPrefsRepository: ref.watch(prayerPrefsRepositoryProvider),
+    prayerTimeService: ref.watch(prayerTimeServiceProvider),
+  );
 });
 
 /// Immutable UI state for the AI chat feature.
@@ -125,12 +145,24 @@ class AiChatController extends AsyncNotifier<AiChatState> {
         ? updatedMessages.sublist(updatedMessages.length - _maxContextMessages)
         : updatedMessages;
 
+    String? effectiveSystemPrompt = current.systemContext;
+    try {
+      effectiveSystemPrompt = await ref
+          .read(aiWorkspaceContextBuilderProvider)
+          .buildSystemPrompt(
+            userQuery: text,
+            manualContext: current.systemContext,
+          );
+    } catch (_) {
+      effectiveSystemPrompt = current.systemContext;
+    }
+
     try {
       final response = await client.chat(
         messages: historyWindow
             .map((msg) => msg.toAiMessage())
             .toList(growable: false),
-        systemPrompt: current.systemContext,
+        systemPrompt: effectiveSystemPrompt,
       );
 
       final assistantMessage = ChatThreadMessage(

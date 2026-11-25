@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:personal_hub/core/config/secure_config_store.dart';
 import 'package:personal_hub/core/database/app_database.dart';
 import 'package:personal_hub/features/finance/data/finance_repository.dart';
@@ -186,7 +187,7 @@ void main() {
       expect(find.text('Kalkulator Zakat Fitrah Keluarga'), findsOneWidget);
 
       // Tap gold benchmark price badge
-      final goldBadge = find.byIcon(Icons.edit_rounded);
+      final goldBadge = find.byIcon(LucideIcons.pencil);
       expect(goldBadge, findsOneWidget);
       await tester.tap(goldBadge);
       await tester.pumpAndSettle();

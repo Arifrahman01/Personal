@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:personal_hub/core/errors/app_exceptions.dart';
 import 'package:personal_hub/core/theme/app_tokens.dart';
-import 'package:personal_hub/core/theme/glass_widgets.dart';
 import 'package:personal_hub/core/theme/hub_widgets.dart';
 import 'package:personal_hub/features/meetings/models/meeting.dart';
 import 'package:personal_hub/features/meetings/providers/meetings_providers.dart';
@@ -198,71 +197,73 @@ class _MeetingFormScreenState extends ConsumerState<MeetingFormScreen> {
     final isToday = _isSameDay(_scheduledAt, today);
     final isTomorrow = _isSameDay(_scheduledAt, tomorrow);
 
-    return GlassScaffold(
-      appBar: GlassAppBar(
+    return HubScaffold(
+      appBar: HubAppBar(
         title: Text(_isEditing ? 'Edit Meeting' : 'Meeting Baru'),
       ),
-      body: SafeArea(
-        top: false,
-        child: Form(
-          key: _formKey,
-          child: ListView(
-            padding: const EdgeInsets.all(16),
-            children: [
-              // 1. Judul Meeting
-              TextFormField(
-                controller: _titleController,
-                textInputAction: TextInputAction.next,
-                decoration: const InputDecoration(
-                  labelText: 'Judul Meeting *',
-                  hintText: 'Contoh: Sinkronisasi Mingguan Tim',
-                  prefixIcon: Icon(LucideIcons.calendar),
-                ),
-                validator: (value) {
-                  if (value == null || value.trim().isEmpty) {
-                    return 'Judul meeting tidak boleh kosong.';
-                  }
-                  return null;
-                },
+      body: Form(
+        key: _formKey,
+        child: ListView(
+          padding: const EdgeInsets.all(16),
+          children: [
+            // 1. Judul Meeting
+            TextFormField(
+              controller: _titleController,
+              textInputAction: TextInputAction.next,
+              decoration: const InputDecoration(
+                labelText: 'Judul Meeting *',
+                hintText: 'Contoh: Sinkronisasi Mingguan Tim',
+                prefixIcon: Icon(LucideIcons.calendar),
               ),
-              const SizedBox(height: 16),
+              validator: (value) {
+                if (value == null || value.trim().isEmpty) {
+                  return 'Judul meeting tidak boleh kosong.';
+                }
+                return null;
+              },
+            ),
+            const SizedBox(height: 16),
 
-              // 2. Tanggal & Jam (Tactile M3 dengan Chip Cepat Hari Ini / Besok)
-              Text(
-                'Jadwal & Waktu',
-                style: theme.textTheme.labelLarge?.copyWith(
-                  fontWeight: FontWeight.w700,
-                  color: AppTokens.textSecondary(context),
-                ),
+            // 2. Tanggal & Jam (Tactile M3 dengan Chip Cepat Hari Ini / Besok)
+            Text(
+              'Jadwal & Waktu',
+              style: theme.textTheme.labelLarge?.copyWith(
+                fontWeight: FontWeight.w700,
+                color: AppTokens.textSecondary(context),
               ),
-              const SizedBox(height: 8),
-              HubCard(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            ),
+            const SizedBox(height: 8),
+            HubCard(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  SizedBox(
+                    width: double.infinity,
+                    child: Wrap(
+                      alignment: WrapAlignment.spaceBetween,
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      spacing: 8,
+                      runSpacing: 8,
                       children: [
-                        Expanded(
-                          child: Text(
-                            formatMeetingDateTime(_scheduledAt),
-                            style: HubTypography.tabular(
-                              theme.textTheme.titleSmall?.copyWith(
-                                fontWeight: FontWeight.w700,
-                              ) ?? const TextStyle(fontWeight: FontWeight.w700),
-                            ),
+                        Text(
+                          formatMeetingDateTime(_scheduledAt),
+                          style: HubTypography.tabular(
+                            theme.textTheme.titleSmall?.copyWith(
+                                  fontWeight: FontWeight.w700,
+                                ) ??
+                                const TextStyle(fontWeight: FontWeight.w700),
                           ),
                         ),
                         // Quick chips Hari Ini / Besok
-                        Row(
-                          mainAxisSize: MainAxisSize.min,
+                        Wrap(
+                          spacing: 6,
+                          runSpacing: 6,
                           children: [
                             HubPill(
                               label: 'Hari Ini',
                               isSelected: isToday,
                               onTap: () => _setScheduledDate(today),
                             ),
-                            const SizedBox(width: 6),
                             HubPill(
                               label: 'Besok',
                               isSelected: isTomorrow,
@@ -272,29 +273,38 @@ class _MeetingFormScreenState extends ConsumerState<MeetingFormScreen> {
                         ),
                       ],
                     ),
-                    const SizedBox(height: 12),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: OutlinedButton.icon(
-                            onPressed: _pickDate,
-                            icon: const Icon(LucideIcons.calendar, size: 16),
-                            label: const Text('Pilih Tanggal'),
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: _pickDate,
+                          icon: const Icon(LucideIcons.calendar, size: 16),
+                          label: const Text(
+                            'Pilih Tanggal',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                           ),
                         ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: OutlinedButton.icon(
-                            onPressed: _pickTime,
-                            icon: const Icon(LucideIcons.clock, size: 16),
-                            label: const Text('Pilih Jam'),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: _pickTime,
+                          icon: const Icon(LucideIcons.clock, size: 16),
+                          label: const Text(
+                            'Pilih Jam',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                           ),
                         ),
-                      ],
-                    ),
-                  ],
-                ),
+                      ),
+                    ],
+                  ),
+                ],
               ),
+            ),
               const SizedBox(height: 16),
 
               // 3. Lokasi / Tautan
@@ -405,6 +415,10 @@ class _MeetingFormScreenState extends ConsumerState<MeetingFormScreen> {
               // 5. Tombol Simpan
               FilledButton.icon(
                 onPressed: _isSaving ? null : _handleSave,
+                style: FilledButton.styleFrom(
+                  backgroundColor: AppTokens.primary(context),
+                  foregroundColor: AppTokens.onPrimary(context),
+                ),
                 icon: _isSaving
                     ? const SizedBox(
                         width: 18,
@@ -417,7 +431,6 @@ class _MeetingFormScreenState extends ConsumerState<MeetingFormScreen> {
             ],
           ),
         ),
-      ),
     );
   }
 }

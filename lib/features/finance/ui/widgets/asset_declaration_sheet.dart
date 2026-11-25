@@ -131,7 +131,9 @@ class _AssetDeclarationSheetState extends ConsumerState<AssetDeclarationSheet> {
       onTap: onTap,
       borderRadius: HubRadius.rPill,
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+        constraints: const BoxConstraints(minHeight: 40),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        alignment: Alignment.center,
         decoration: BoxDecoration(
           color: chipColor.withValues(alpha: 0.12),
           borderRadius: HubRadius.rPill,
@@ -142,9 +144,16 @@ class _AssetDeclarationSheetState extends ConsumerState<AssetDeclarationSheet> {
         ),
         child: Text(
           label,
-          style: theme.textTheme.labelSmall?.copyWith(
-            fontWeight: FontWeight.w700,
-            color: chipColor,
+          style: HubTypography.tabular(
+            theme.textTheme.labelSmall?.copyWith(
+                  fontWeight: FontWeight.w700,
+                  color: chipColor,
+                ) ??
+                TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  color: chipColor,
+                ),
           ),
         ),
       ),
@@ -169,23 +178,31 @@ class _AssetDeclarationSheetState extends ConsumerState<AssetDeclarationSheet> {
             FilteringTextInputFormatter.digitsOnly,
             RupiahTextInputFormatter(),
           ],
+          style: HubTypography.tabular(
+            TextStyle(
+              color: AppTokens.textPrimary(context),
+              fontWeight: FontWeight.w700,
+            ),
+          ),
           onChanged: (_) => setState(() {}),
           decoration: InputDecoration(
             labelText: label,
             prefixText: 'Rp ',
             hintText: hint,
             helperText: formattedPreview != null ? 'Terbaca: $formattedPreview' : null,
-            helperStyle: TextStyle(
-              color: AppTokens.success(context),
-              fontWeight: FontWeight.w600,
-              fontSize: 12,
+            helperStyle: HubTypography.tabular(
+              TextStyle(
+                color: AppTokens.success(context),
+                fontWeight: FontWeight.w600,
+                fontSize: 12,
+              ),
             ),
           ),
         ),
-        const SizedBox(height: 6),
+        const SizedBox(height: 8),
         Wrap(
-          spacing: 6,
-          runSpacing: 4,
+          spacing: 8,
+          runSpacing: 8,
           children: [
             _buildQuickChip('+1 Jt', () => _addRupiah(controller, 1000000)),
             _buildQuickChip('+5 Jt', () => _addRupiah(controller, 5000000)),
@@ -205,48 +222,57 @@ class _AssetDeclarationSheetState extends ConsumerState<AssetDeclarationSheet> {
   Widget build(BuildContext context) {
     final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
 
-    return Padding(
-      padding: EdgeInsets.fromLTRB(20, 20, 20, 20 + bottomInset),
-      child: SingleChildScrollView(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Text(
-              'Deklarasi Aset & Hutang Zakat',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w800,
-                color: AppTokens.textPrimary(context),
-              ),
-            ),
-            const SizedBox(height: 6),
-            Text(
-              'Aset riil saldo kas dari mutasi transaksi sudah terhitung otomatis.',
-              style: TextStyle(
-                fontSize: 12,
-                color: AppTokens.textSecondary(context),
-              ),
-            ),
-            const SizedBox(height: 16),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                TextField(
-                  controller: _goldController,
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                  onChanged: (_) => setState(() {}),
-                  decoration: const InputDecoration(
-                    labelText: 'Emas Fisik (Gram)',
-                    hintText: 'Contoh: 15.5',
-                    suffixText: 'Gram',
-                  ),
+    return SafeArea(
+      top: false,
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(20, 12, 20, 20 + bottomInset),
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                'Deklarasi Aset & Hutang Zakat',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w800,
+                  color: AppTokens.textPrimary(context),
                 ),
-                const SizedBox(height: 6),
-                Wrap(
-                  spacing: 6,
-                  runSpacing: 4,
-                  children: [
+              ),
+              const SizedBox(height: 6),
+              Text(
+                'Aset riil saldo kas dari mutasi transaksi sudah terhitung otomatis.',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: AppTokens.textSecondary(context),
+                ),
+              ),
+              const SizedBox(height: 16),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  TextField(
+                    controller: _goldController,
+                    keyboardType:
+                        const TextInputType.numberWithOptions(decimal: true),
+                    style: HubTypography.tabular(
+                      TextStyle(
+                        color: AppTokens.textPrimary(context),
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    onChanged: (_) => setState(() {}),
+                    decoration: const InputDecoration(
+                      labelText: 'Emas Fisik (Gram)',
+                      hintText: 'Contoh: 15.5',
+                      suffixText: 'Gram',
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
                     _buildQuickChip('+1g', () => _addGold(1.0)),
                     _buildQuickChip('+5g', () => _addGold(5.0)),
                     _buildQuickChip('+10g', () => _addGold(10.0)),
@@ -287,7 +313,7 @@ class _AssetDeclarationSheetState extends ConsumerState<AssetDeclarationSheet> {
             FilledButton(
               style: FilledButton.styleFrom(
                 backgroundColor: AppTokens.primary(context),
-                foregroundColor: Colors.white,
+                foregroundColor: AppTokens.onPrimary(context),
                 padding: const EdgeInsets.symmetric(vertical: 14),
                 shape: RoundedRectangleBorder(
                   borderRadius: HubRadius.rSm,
@@ -299,7 +325,8 @@ class _AssetDeclarationSheetState extends ConsumerState<AssetDeclarationSheet> {
                 style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15),
               ),
             ),
-          ],
+            ],
+          ),
         ),
       ),
     );

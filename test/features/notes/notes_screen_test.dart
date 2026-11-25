@@ -146,6 +146,10 @@ void main() {
           find.widgetWithText(TextField, 'Judul catatan'),
           'Rencana Akhir Pekan',
         );
+        expect(find.widgetWithText(TextField, 'Tag'), findsNothing);
+        await tester.tap(find.text('Tambah Tag'));
+        await tester.pumpAndSettle();
+        expect(find.widgetWithText(TextField, 'Tag'), findsOneWidget);
         await tester.enterText(
           find.widgetWithText(TextField, 'Tag'),
           'pribadi, jadwal',
@@ -286,7 +290,7 @@ void main() {
         );
 
         // Open unified AI Assistant sheet
-        await tester.tap(find.text('✨ Asisten AI'));
+        await tester.tap(find.text('Asisten AI'));
         await tester.pumpAndSettle();
 
         expect(find.text('Ringkas catatan'), findsOneWidget);
@@ -310,7 +314,7 @@ void main() {
         );
 
         // Second action -> Gaya Bahasa tab -> Ubah jadi checklist -> Fallback badge + Terapkan
-        await tester.tap(find.text('✨ Asisten AI'));
+        await tester.tap(find.text('Asisten AI'));
         await tester.pumpAndSettle();
 
         await tester.tap(find.text('Gaya Bahasa'));
@@ -382,6 +386,43 @@ void main() {
 
         expect(find.text('Notulensi Sinkronisasi Tim'), findsOneWidget);
         expect(find.text('Daftar Belanja'), findsOneWidget);
+      },
+    );
+
+    testWidgets(
+      'shows unsaved-changes confirmation dialog when pressing back with dirty edits',
+      (tester) async {
+        final repo = _InMemoryNotesRepository();
+
+        await tester.pumpWidget(
+          ProviderScope(
+            overrides: [notesRepositoryProvider.overrideWithValue(repo)],
+            child: const MaterialApp(home: NotesScreen()),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        await tester.tap(find.text('Catatan Baru'));
+        await tester.pumpAndSettle();
+
+        await tester.enterText(
+          find.widgetWithText(TextField, 'Judul catatan'),
+          'Draf Belum Disimpan',
+        );
+        await tester.pumpAndSettle();
+
+        await tester.tap(find.byTooltip('Kembali'));
+        await tester.pumpAndSettle();
+
+        expect(find.text('Simpan Perubahan?'), findsOneWidget);
+        expect(find.text('Buang'), findsOneWidget);
+        expect(find.text('Batal'), findsOneWidget);
+        expect(find.text('Simpan'), findsWidgets);
+
+        await tester.tap(find.text('Buang'));
+        await tester.pumpAndSettle();
+
+        expect(find.text('Belum ada catatan'), findsOneWidget);
       },
     );
   });

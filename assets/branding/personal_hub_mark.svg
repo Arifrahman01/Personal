@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024" fill="none">
+  <defs>
+    <linearGradient id="calmTealBg" x1="0" y1="0" x2="1024" y2="1024" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#0D6E66" />
+      <stop offset="100%" stop-color="#094D47" />
+    </linearGradient>
+  </defs>
+  <!-- Full-bleed Calm Clarity Teal Canvas -->
+  <rect width="1024" height="1024" fill="url(#calmTealBg)" />
+  <!-- Minimalist Portal Ring (22% safe margin) -->
+  <rect x="228" y="228" width="568" height="568" rx="148" stroke="#FFFFFF" stroke-width="58" />
+  <!-- 4-Point Modern Clarity Star / Compass -->
+  <path d="M512 340 C526 456 568 498 684 512 C568 526 526 568 512 684 C498 568 456 526 340 512 C456 498 498 456 512 340 Z" fill="#FFFFFF" />
+  <!-- Luminous Mint-Teal Center Core -->
+  <circle cx="512" cy="512" r="34" fill="#2DD4BF" />
+</svg>

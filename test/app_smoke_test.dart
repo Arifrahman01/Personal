@@ -107,7 +107,7 @@ void main() {
       expect(find.text('Personal Hub'), findsOneWidget);
       expect(find.text('Hari Ini'), findsWidgets);
       expect(find.text('Ringkasan Hari Ini (AI)'), findsOneWidget);
-      expect(find.text('FOKUS HARI INI'), findsOneWidget);
+      expect(find.text('Fokus Hari Ini'), findsOneWidget);
       expect(find.text('Habit Hari Ini'), findsOneWidget);
       expect(find.textContaining('Saldo'), findsOneWidget);
       expect(find.text('Catat'), findsOneWidget);
@@ -142,8 +142,15 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Pengaturan'), findsOneWidget);
+      await tester.ensureVisible(find.text('Asisten AI'));
+      await tester.tap(find.text('Asisten AI'));
+      await tester.pumpAndSettle();
+
       expect(find.textContaining(AiConstants.freeModel), findsWidgets);
       expect(find.textContaining(AiConstants.fallbackModel), findsWidgets);
+
+      await tester.pageBack();
+      await tester.pumpAndSettle();
 
       // Back to Hari Ini
       await tester.pageBack();

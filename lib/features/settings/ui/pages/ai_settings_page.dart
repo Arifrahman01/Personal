@@ -3,10 +3,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:personal_hub/core/config/secure_config_store.dart';
 import 'package:personal_hub/core/constants/ai_constants.dart';
+import 'package:personal_hub/core/errors/app_exceptions.dart';
 import 'package:personal_hub/core/theme/app_tokens.dart';
 import 'package:personal_hub/core/theme/hub_widgets.dart';
 import 'package:personal_hub/features/ai/models/ai_models.dart';
 import 'package:personal_hub/features/ai/providers/ai_providers.dart';
+import 'package:personal_hub/features/meetings/services/whisper_model_manager.dart';
+import 'package:personal_hub/features/meetings/ui/widgets/offline_whisper_model_sheet.dart';
 
 /// Modular sub-page for Samudra AI settings:
 /// API Key, Base URL, Connection test, and model info.
@@ -23,6 +26,7 @@ class _AiSettingsPageState extends ConsumerState<AiSettingsPage> {
   bool _isTestingAi = false;
   String? _aiTestStatus;
   bool _aiTestSuccess = false;
+  OfflineWhisperModelOption? _installedWhisperModel;
 
   @override
   void initState() {
@@ -34,11 +38,18 @@ class _AiSettingsPageState extends ConsumerState<AiSettingsPage> {
     final config = ref.read(secureConfigStoreProvider);
     final apiKey = await config.getApiKey();
     final baseUrl = await config.getBaseUrl();
+    OfflineWhisperModelOption? whisperModel;
+    try {
+      whisperModel = await ref
+          .read(whisperModelManagerProvider)
+          .getInstalledPreferredModel();
+    } catch (_) {}
 
     if (!mounted) return;
     setState(() {
       _maskedApiKey = _maskSecret(apiKey);
       _baseUrl = baseUrl;
+      _installedWhisperModel = whisperModel;
     });
   }
 
@@ -196,12 +207,20 @@ class _AiSettingsPageState extends ConsumerState<AiSettingsPage> {
         _aiTestStatus =
             'Berhasil! Model: $model (${response.didFallback ? "Fallback" : "Free-First"})\nRespon: "${response.content.trim()}"';
       });
-    } catch (e) {
+    } on AppException catch (e) {
       if (!mounted) return;
       setState(() {
         _isTestingAi = false;
         _aiTestSuccess = false;
-        _aiTestStatus = 'Koneksi gagal: $e';
+        _aiTestStatus = 'Koneksi gagal: ${e.message}';
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _isTestingAi = false;
+        _aiTestSuccess = false;
+        _aiTestStatus =
+            'Koneksi gagal. Periksa koneksi internet dan konfigurasi API Key Anda.';
       });
     }
   }
@@ -342,6 +361,59 @@ class _AiSettingsPageState extends ConsumerState<AiSettingsPage> {
           ),
           const SizedBox(height: 16),
 
+          // Offline Whisper Transcription Card
+          HubCard(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(LucideIcons.cpu, size: 20, color: primary),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        'Transkripsi Rapat Offline (Whisper)',
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                    HubPill(
+                      label: _installedWhisperModel != null ? 'Siap' : 'Belum Ada',
+                      color: _installedWhisperModel != null
+                          ? AppTokens.success(context)
+                          : AppTokens.warning(context),
+                      isSelected: _installedWhisperModel != null,
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  _installedWhisperModel != null
+                      ? 'Model aktif: ${_installedWhisperModel!.displayName}. Rekaman audio dapat ditranskrip 100% offline tanpa kuota internet.'
+                      : 'Unduh model ringan (~31 MB) atau impor berkas .bin agar rekaman Audio Senyap dapat ditranskrip 100% offline.',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: AppTokens.textSecondary(context),
+                    height: 1.35,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                OutlinedButton.icon(
+                  onPressed: () async {
+                    await OfflineWhisperModelSheet.show(context);
+                    await _loadState();
+                  },
+                  icon: const Icon(LucideIcons.slidersHorizontal, size: 16),
+                  label: const Text('Kelola Model Offline'),
+                  style: OutlinedButton.styleFrom(
+                    minimumSize: const Size.fromHeight(48),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+
           // Test Connection Card
           HubCard(
             child: Column(
@@ -351,10 +423,12 @@ class _AiSettingsPageState extends ConsumerState<AiSettingsPage> {
                   children: [
                     Icon(LucideIcons.activity, size: 20, color: primary),
                     const SizedBox(width: 10),
-                    Text(
-                      'Uji Konektivitas AI',
-                      style: theme.textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w700,
+                    Expanded(
+                      child: Text(
+                        'Uji Konektivitas AI',
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w700,
+                        ),
                       ),
                     ),
                   ],
@@ -370,18 +444,18 @@ class _AiSettingsPageState extends ConsumerState<AiSettingsPage> {
                 FilledButton.icon(
                   style: FilledButton.styleFrom(
                     backgroundColor: primary,
-                    foregroundColor: Colors.white,
+                    foregroundColor: AppTokens.onPrimary(context),
                     minimumSize: const Size.fromHeight(46),
                     shape: RoundedRectangleBorder(borderRadius: HubRadius.rSm),
                   ),
                   onPressed: _isTestingAi ? null : _testAiConnection,
                   icon: _isTestingAi
-                      ? const SizedBox(
+                      ? SizedBox(
                           width: 16,
                           height: 16,
                           child: CircularProgressIndicator(
                             strokeWidth: 2,
-                            color: Colors.white,
+                            color: AppTokens.onPrimary(context),
                           ),
                         )
                       : const Icon(LucideIcons.play, size: 16),

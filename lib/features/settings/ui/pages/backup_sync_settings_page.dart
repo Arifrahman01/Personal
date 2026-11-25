@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:personal_hub/core/config/secure_config_store.dart';
+import 'package:personal_hub/core/errors/app_exceptions.dart';
 import 'package:personal_hub/core/theme/app_tokens.dart';
 import 'package:personal_hub/core/theme/hub_widgets.dart';
 import 'package:personal_hub/features/backup/providers/gfs_backup_providers.dart';
@@ -11,8 +12,8 @@ import 'package:personal_hub/features/backup/ui/backup_section.dart';
 import 'package:personal_hub/features/sync/providers/sync_providers.dart';
 
 /// Modular sub-page for Backup & Cloud Synchronization:
-/// Encrypted .phub export/import, GFS retention explained in human language
-/// (7 Harian • 4 Mingguan • 3 Bulanan), and clean advanced E2EE Cloud Sync panel.
+/// Encrypted .phub export/import, automatic rotation retention explained in human language
+/// (7 Harian • 4 Mingguan • 3 Bulanan), and clean advanced encrypted Cloud Sync panel.
 class BackupSyncSettingsPage extends ConsumerStatefulWidget {
   const BackupSyncSettingsPage({super.key});
 
@@ -96,11 +97,22 @@ class _BackupSyncSettingsPageState
           behavior: SnackBarBehavior.floating,
         ),
       );
-    } catch (e) {
+    } on AppException catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Sinkronisasi gagal: $e'),
+          content: Text('Sinkronisasi gagal: ${e.message}'),
+          backgroundColor: AppTokens.error(context),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text(
+            'Sinkronisasi gagal. Periksa koneksi dan pengaturan cloud Anda.',
+          ),
           backgroundColor: AppTokens.error(context),
           behavior: SnackBarBehavior.floating,
         ),
@@ -207,39 +219,54 @@ class _BackupSyncSettingsPageState
                   ),
                 ),
                 const SizedBox(height: 16),
-                // 3 Stat Boxes in Human Terms
-                Row(
-                  children: [
-                    Expanded(
-                      child: _buildGfsStatCard(
-                        title: 'Harian',
-                        count: summary.keptDailyCount,
-                        max: policy.maxDaily,
-                        subtitle: '7 Hari Terakhir',
-                        color: AppTokens.info(context),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: _buildGfsStatCard(
-                        title: 'Mingguan',
-                        count: summary.keptWeeklyCount,
-                        max: policy.maxWeekly,
-                        subtitle: '4 Minggu Terakhir',
-                        color: primary,
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: _buildGfsStatCard(
-                        title: 'Bulanan',
-                        count: summary.keptMonthlyCount,
-                        max: policy.maxMonthly,
-                        subtitle: '3 Bulan Terakhir',
-                        color: const Color(0xFF8B5CF6),
-                      ),
-                    ),
-                  ],
+                // 3 Stat Boxes in Human Terms (responsive on 320px)
+                LayoutBuilder(
+                  builder: (context, constraints) {
+                    final dailyCard = _buildGfsStatCard(
+                      title: 'Harian',
+                      count: summary.keptDailyCount,
+                      max: policy.maxDaily,
+                      subtitle: '7 Hari Terakhir',
+                      color: AppTokens.info(context),
+                    );
+                    final weeklyCard = _buildGfsStatCard(
+                      title: 'Mingguan',
+                      count: summary.keptWeeklyCount,
+                      max: policy.maxWeekly,
+                      subtitle: '4 Minggu Terakhir',
+                      color: primary,
+                    );
+                    final monthlyCard = _buildGfsStatCard(
+                      title: 'Bulanan',
+                      count: summary.keptMonthlyCount,
+                      max: policy.maxMonthly,
+                      subtitle: '3 Bulan Terakhir',
+                      color: AppTokens.warning(context),
+                    );
+
+                    if (constraints.maxWidth < 300) {
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          dailyCard,
+                          const SizedBox(height: 8),
+                          weeklyCard,
+                          const SizedBox(height: 8),
+                          monthlyCard,
+                        ],
+                      );
+                    }
+
+                    return Row(
+                      children: [
+                        Expanded(child: dailyCard),
+                        const SizedBox(width: 8),
+                        Expanded(child: weeklyCard),
+                        const SizedBox(width: 8),
+                        Expanded(child: monthlyCard),
+                      ],
+                    );
+                  },
                 ),
                 const SizedBox(height: 16),
                 FilledButton.tonalIcon(
@@ -256,7 +283,7 @@ class _BackupSyncSettingsPageState
           ),
           const SizedBox(height: 16),
 
-          // 3. Panel Lanjutan: Sinkronisasi Cloud E2EE (Clean Collapsible)
+          // 3. Panel Lanjutan: Sinkronisasi Cloud Terenkripsi (Clean Collapsible)
           HubCard(
             padding: EdgeInsets.zero,
             child: ExpansionTile(
@@ -269,11 +296,11 @@ class _BackupSyncSettingsPageState
                 child: const Icon(LucideIcons.cloud, size: 20),
               ),
               title: const Text(
-                'Sinkronisasi Cloud E2EE (Lanjutan)',
+                'Sinkronisasi Cloud Terenkripsi (Lanjutan)',
                 style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15),
               ),
               subtitle: Text(
-                'WebDAV, Nextcloud, atau Google Drive dengan enkripsi end-to-end.',
+                'WebDAV, Nextcloud, atau Google Drive dengan enkripsi ujung-ke-ujung.',
                 style: TextStyle(fontSize: 12, color: AppTokens.textSecondary(context)),
               ),
               childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
@@ -284,21 +311,42 @@ class _BackupSyncSettingsPageState
                 SizedBox(
                   width: double.infinity,
                   child: SegmentedButton<String>(
-                    segments: const [
+                    showSelectedIcon: false,
+                    segments: [
                       ButtonSegment(
                         value: 'WebDAV',
-                        label: Text('WebDAV'),
-                        icon: Icon(LucideIcons.folderSync, size: 14),
+                        label: const Text(
+                          'WebDAV',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        icon: MediaQuery.sizeOf(context).width < 380
+                            ? null
+                            : const Icon(LucideIcons.folderSync, size: 14),
                       ),
                       ButtonSegment(
                         value: 'Nextcloud',
-                        label: Text('Nextcloud'),
-                        icon: Icon(LucideIcons.cloudRain, size: 14),
+                        label: const Text(
+                          'Nextcloud',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        icon: MediaQuery.sizeOf(context).width < 380
+                            ? null
+                            : const Icon(LucideIcons.cloudRain, size: 14),
                       ),
                       ButtonSegment(
                         value: 'Google Drive AppData',
-                        label: Text('Google Drive'),
-                        icon: Icon(LucideIcons.hardDrive, size: 14),
+                        label: Text(
+                          MediaQuery.sizeOf(context).width < 380
+                              ? 'GDrive'
+                              : 'Google Drive',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        icon: MediaQuery.sizeOf(context).width < 380
+                            ? null
+                            : const Icon(LucideIcons.hardDrive, size: 14),
                       ),
                     ],
                     selected: {_syncProvider},
@@ -353,15 +401,15 @@ class _BackupSyncSettingsPageState
                   ),
                 ),
                 const SizedBox(height: 10),
-                // E2EE Passphrase
+                // End-to-end Encrypted Passphrase
                 TextField(
                   controller: _syncPassphraseController,
                   obscureText: _obscureSyncPassphrase,
                   decoration: InputDecoration(
-                    labelText: 'Master Sync Passphrase (E2EE)',
-                    hintText: 'Passphrase enkripsi end-to-end',
+                    labelText: 'Passphrase Enkripsi Ujung-ke-Ujung',
+                    hintText: 'Passphrase enkripsi pribadi',
                     helperText:
-                        'Kunci enkripsi zero-knowledge (server cloud tidak dapat membaca data).',
+                        'Kunci enkripsi pribadi (server cloud tidak dapat membaca data).',
                     prefixIcon: const Icon(LucideIcons.keyRound, size: 18),
                     suffixIcon: IconButton(
                       icon: Icon(
@@ -391,24 +439,34 @@ class _BackupSyncSettingsPageState
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Row(
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          crossAxisAlignment: WrapCrossAlignment.center,
                           children: [
-                            Icon(LucideIcons.clock, size: 16, color: primary),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: Text(
-                                syncState.lastSyncTime != null
-                                    ? 'Terakhir disinkronkan: ${DateFormat('dd MMM yyyy, HH:mm').format(syncState.lastSyncTime!.toLocal())}'
-                                    : 'Status: Belum pernah disinkronkan',
-                                style: const TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w600,
+                            Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(LucideIcons.clock, size: 16, color: primary),
+                                const SizedBox(width: 8),
+                                Flexible(
+                                  child: Text(
+                                    syncState.lastSyncTime != null
+                                        ? 'Terakhir disinkronkan: ${DateFormat('dd MMM yyyy, HH:mm').format(syncState.lastSyncTime!.toLocal())}'
+                                        : 'Status: Belum pernah disinkronkan',
+                                    style: const TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
                                 ),
-                              ),
+                              ],
                             ),
-                            HubPill(
+                            HubStatusBadge(
                               label: '${syncState.pendingCount} Tertunda',
-                              isSelected: syncState.pendingCount > 0,
+                              type: syncState.pendingCount > 0
+                                  ? HubBadgeType.warning
+                                  : HubBadgeType.primary,
                             ),
                           ],
                         ),
@@ -419,7 +477,7 @@ class _BackupSyncSettingsPageState
                         if (syncState.errorMessage != null) ...[
                           const SizedBox(height: 8),
                           Text(
-                            'Error: ${syncState.errorMessage}',
+                            'Gagal: ${syncState.errorMessage}',
                             style: TextStyle(
                               fontSize: 12,
                               color: AppTokens.error(context),
@@ -433,51 +491,75 @@ class _BackupSyncSettingsPageState
                     padding: EdgeInsets.all(12),
                     child: Center(child: CircularProgressIndicator()),
                   ),
-                  error: (e, _) => Padding(
-                    padding: const EdgeInsets.all(12),
-                    child: Text('Gagal memuat status sinkronisasi: $e'),
+                  error: (_, _) => const Padding(
+                    padding: EdgeInsets.all(12),
+                    child: Text('Gagal memuat status sinkronisasi.'),
                   ),
                 ),
                 const SizedBox(height: 14),
 
                 // Action Buttons
-                Row(
-                  children: [
-                    Expanded(
-                      child: FilledButton.icon(
-                        style: FilledButton.styleFrom(
-                          backgroundColor: primary,
-                          foregroundColor: Colors.white,
-                          shape: RoundedRectangleBorder(borderRadius: HubRadius.rSm),
-                        ),
-                        onPressed: syncStateAsync.asData?.value.isSyncing == true
-                            ? null
-                            : _handleSyncNow,
-                        icon: syncStateAsync.asData?.value.isSyncing == true
-                            ? const SizedBox(
-                                width: 14,
-                                height: 14,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  color: Colors.white,
-                                ),
-                              )
-                            : const Icon(LucideIcons.refreshCw, size: 16),
-                        label: const Text('Sinkronkan'),
+                LayoutBuilder(
+                  builder: (context, constraints) {
+                    final syncBtn = FilledButton.icon(
+                      style: FilledButton.styleFrom(
+                        backgroundColor: primary,
+                        foregroundColor: AppTokens.onPrimary(context),
+                        minimumSize: const Size(0, 48),
+                        shape: RoundedRectangleBorder(borderRadius: HubRadius.rSm),
                       ),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: OutlinedButton.icon(
-                        style: OutlinedButton.styleFrom(
-                          shape: RoundedRectangleBorder(borderRadius: HubRadius.rSm),
-                        ),
-                        onPressed: _saveCloudSyncConfig,
-                        icon: const Icon(LucideIcons.save, size: 16),
-                        label: const Text('Simpan'),
+                      onPressed: syncStateAsync.asData?.value.isSyncing == true
+                          ? null
+                          : _handleSyncNow,
+                      icon: syncStateAsync.asData?.value.isSyncing == true
+                          ? SizedBox(
+                              width: 14,
+                              height: 14,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: AppTokens.onPrimary(context),
+                              ),
+                            )
+                          : const Icon(LucideIcons.refreshCw, size: 16),
+                      label: const Text(
+                        'Sinkronkan',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
-                    ),
-                  ],
+                    );
+                    final saveBtn = OutlinedButton.icon(
+                      style: OutlinedButton.styleFrom(
+                        minimumSize: const Size(0, 48),
+                        shape: RoundedRectangleBorder(borderRadius: HubRadius.rSm),
+                      ),
+                      onPressed: _saveCloudSyncConfig,
+                      icon: const Icon(LucideIcons.save, size: 16),
+                      label: const Text(
+                        'Simpan',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    );
+
+                    if (constraints.maxWidth < 300) {
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          syncBtn,
+                          const SizedBox(height: 8),
+                          saveBtn,
+                        ],
+                      );
+                    }
+
+                    return Row(
+                      children: [
+                        Expanded(child: syncBtn),
+                        const SizedBox(width: 10),
+                        Expanded(child: saveBtn),
+                      ],
+                    );
+                  },
                 ),
               ],
             ),
@@ -515,10 +597,12 @@ class _BackupSyncSettingsPageState
           const SizedBox(height: 4),
           Text(
             '$count / $max',
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.w800,
-              color: color,
+            style: HubTypography.tabular(
+              TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w800,
+                color: color,
+              ),
             ),
           ),
           const SizedBox(height: 2),

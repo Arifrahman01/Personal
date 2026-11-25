@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:personal_hub/core/theme/app_tokens.dart';
 import 'package:personal_hub/core/theme/hub_widgets.dart';
 import 'package:personal_hub/features/finance/models/finance_models.dart';
@@ -73,11 +74,13 @@ class MonthSwitcherCard extends StatelessWidget {
           IconButton(
             tooltip: 'Bulan sebelumnya',
             onPressed: onPrevious,
-            icon: const Icon(Icons.chevron_left_rounded),
+            icon: const Icon(LucideIcons.chevronLeft),
           ),
           Expanded(
             child: Text(
               month.label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
               textAlign: TextAlign.center,
               style: TextStyle(
                 fontSize: 16,
@@ -89,7 +92,7 @@ class MonthSwitcherCard extends StatelessWidget {
           IconButton(
             tooltip: 'Bulan berikutnya',
             onPressed: onNext,
-            icon: const Icon(Icons.chevron_right_rounded),
+            icon: const Icon(LucideIcons.chevronRight),
           ),
         ],
       ),
@@ -153,7 +156,7 @@ class ErrorBanner extends StatelessWidget {
       child: Row(
         children: [
           Icon(
-            Icons.error_outline_rounded,
+            LucideIcons.alertCircle,
             size: 20,
             color: errColor,
           ),
@@ -165,9 +168,9 @@ class ErrorBanner extends StatelessWidget {
             ),
           ),
           IconButton(
-            visualDensity: VisualDensity.compact,
+            tooltip: 'Tutup',
             onPressed: onDismiss,
-            icon: Icon(Icons.close, size: 18, color: errColor),
+            icon: Icon(LucideIcons.x, size: 18, color: errColor),
           ),
         ],
       ),

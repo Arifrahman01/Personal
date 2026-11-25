@@ -55,6 +55,13 @@ class TasksNotifier extends AsyncNotifier<List<PersonalTask>> {
     await refresh();
   }
 
+  /// Updates an existing [task] non-destructively and refreshes the list.
+  Future<PersonalTask> updateTask(PersonalTask task) async {
+    final updated = await ref.read(tasksRepositoryProvider).updateTask(task);
+    await refresh();
+    return updated;
+  }
+
   /// Deletes the task identified by [id] and refreshes the list.
   Future<void> deleteTask(String id) async {
     await ref.read(tasksRepositoryProvider).deleteTask(id);

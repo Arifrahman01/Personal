@@ -406,6 +406,7 @@ class SecureConfigStore {
   static const String _zakatHaulTrackerStorageKey = 'zakat_haul_tracker';
   static const String _meetingDraftStorageKey = 'meeting_recording_draft';
   static const String _homeModuleVisibilityStorageKey = 'home_module_visibility';
+  static const String _firstRunDismissedStorageKey = 'home_first_run_dismissed';
 
   Future<String?> getMeetingDraftJson() =>
       _storage.read(_meetingDraftStorageKey);
@@ -427,6 +428,20 @@ class SecureConfigStore {
 
   Future<void> setHomeModuleVisibilityJson(String json) =>
       _storage.write(_homeModuleVisibilityStorageKey, json);
+
+  Future<String?> getHomeModulePrefsJson() =>
+      _storage.read(_homeModuleVisibilityStorageKey);
+
+  Future<void> setHomeModulePrefsJson(String json) =>
+      _storage.write(_homeModuleVisibilityStorageKey, json);
+
+  Future<bool> isFirstRunDismissed() async {
+    final stored = await _storage.read(_firstRunDismissedStorageKey);
+    return stored?.trim().toLowerCase() == 'true';
+  }
+
+  Future<void> setFirstRunDismissed(bool dismissed) =>
+      _storage.write(_firstRunDismissedStorageKey, dismissed.toString());
 
   Future<String?> getGoldBenchmarkJson() =>
       _storage.read(_goldBenchmarkStorageKey);

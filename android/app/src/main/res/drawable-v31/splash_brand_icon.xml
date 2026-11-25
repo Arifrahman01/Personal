@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="288dp"
+    android:height="288dp"
+    android:viewportWidth="288"
+    android:viewportHeight="288">
+    <!-- Rounded-square deep calm teal badge safely inside Android 12 160dp circular mask -->
+    <path
+        android:fillColor="#0D6E66"
+        android:pathData="M114,86 L174,86 Q202,86 202,114 L202,174 Q202,202 174,202 L114,202 Q86,202 86,174 L86,114 Q86,86 114,86 Z" />
+    <!-- Minimalist white rounded-square portal ring -->
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="6.5"
+        android:pathData="M128,112 L160,112 Q176,112 176,128 L176,160 Q176,176 160,176 L128,176 Q112,176 112,160 L112,128 Q112,112 128,112 Z" />
+    <!-- 4-point modern clarity compass star -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M144,124 C145.6,137.4 150.6,142.4 164,144 C150.6,145.6 145.6,150.6 144,164 C142.4,150.6 137.4,145.6 124,144 C137.4,142.4 142.4,137.4 144,124 Z" />
+    <!-- Mint-teal center core dot -->
+    <path
+        android:fillColor="#2DD4BF"
+        android:pathData="M144,140 A4,4 0 1,0 144,148 A4,4 0 1,0 144,140 Z" />
+</vector>

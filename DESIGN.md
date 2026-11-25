@@ -15,13 +15,14 @@ Setiap layar harus dapat menjawab dua pertanyaan utama dalam tempo ≤ 3 detik:
 
 ### B. Nol Efek Blur Berat (*Zero BackdropFilter in Scrolls*)
 - Dilarang menggunakan `BackdropFilter` pada kartu di dalam `ListView`, `GridView`, atau `SingleChildScrollView` untuk mencegah frame drop dan konsumsi baterai berlebih.
-- `BackdropFilter` hanya diizinkan pada overlay keamanan OS tingkat atas (`PrivacyShieldOverlay`).
+- `BackdropFilter` hanya diizinkan pada overlay keamanan OS tingkat atas (`_PrivacyShieldOverlay` di [`lib/app.dart`](file:///D:/Mobile/Scribd/lib/app.dart)).
 
 ### C. Paritas Penuh Mode Terang & Mode Gelap (*Full Light & Dark Parity*)
 - Dilarang meng-*hardcode* `Colors.white`, `Colors.black`, atau warna slate statis.
 - Semua warna harus diakses melalui token semantik: `Theme.of(context).colorScheme` atau `AppTokens` / `HubColors.of(context)`.
 
-### D. Ergonomi Sentuh & Tipografi
+### D. Ikonografi, Ergonomi Sentuh & Tipografi
+- **100% `LucideIcons`:** Seluruh layar menggunakan `LucideIcons.*` secara konsisten (0 Material `Icons.*` dan 0 emoji UI di tombol/badge).
 - **Target Sentuh Minimum:** 48×48dp untuk seluruh tombol interaktif dan ikon.
 - **Angka Tabular (`FontFeature.tabularFigures()`):** Wajib digunakan pada jadwal sholat, timer rekaman, countdown, saldo Rupiah, persentase, dan habit streak agar angka tidak bergoyang saat nilainya berubah.
 - **Skala Teks Fleksibel:** Komponen harus tetap rapi dan tidak overflow hingga skala font `1.3x`.
@@ -41,6 +42,7 @@ Semua token warna terdaftar di [`lib/core/theme/app_tokens.dart`](file:///D:/Mob
 | `textPrimary` | `#111827` | `#F1F5F9` | Judul, angka utama, teks body utama |
 | `textSecondary` | `#4B5563` | `#94A3B8` | Subtitle, metadata tanggal/jam, label bantuan |
 | `primary` | `#0D6E66` | `#2DD4BF` | Tombol utama, tab aktif, indikator fokus |
+| `onPrimary` | `#FFFFFF` | `#062825` | Teks & ikon di atas latar `primary` (WCAG AA/AAA) |
 | `primarySoft` | `#E6F4F2` | `#123532` | Container tonal primer, background avatar aktif |
 | `success` | `#15803D` | `#34D399` | Pemasukan, kebiasaan tuntas, kiblat akurat (±5°) |
 | `warning` | `#B45309` | `#FBBF24` | Konflik sholat, pengingat, anomali ringan |

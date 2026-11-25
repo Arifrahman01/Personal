@@ -21,6 +21,7 @@ class GlobalSearchSheet extends ConsumerStatefulWidget {
     return showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
+      useSafeArea: true,
       backgroundColor: Colors.transparent,
       builder: (_) => const GlobalSearchSheet(),
     );
@@ -48,11 +49,13 @@ class _GlobalSearchSheetState extends ConsumerState<GlobalSearchSheet> {
   }
 
   void _onQueryChanged(String query) {
+    setState(() {});
     ref.read(homeSearchQueryProvider.notifier).setQuery(query);
   }
 
   void _clearQuery() {
     _controller.clear();
+    setState(() {});
     ref.read(homeSearchQueryProvider.notifier).clear();
   }
 
@@ -90,7 +93,6 @@ class _GlobalSearchSheetState extends ConsumerState<GlobalSearchSheet> {
   @override
   Widget build(BuildContext context) {
     final searchAsync = ref.watch(globalSearchResultsProvider);
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     final bottomInset = MediaQuery.of(context).viewInsets.bottom;
 
     return Container(
@@ -118,7 +120,7 @@ class _GlobalSearchSheetState extends ConsumerState<GlobalSearchSheet> {
                 width: 36,
                 height: 4,
                 decoration: BoxDecoration(
-                  color: isDark ? Colors.white24 : Colors.black12,
+                  color: AppTokens.border(context),
                   borderRadius: HubRadius.rPill,
                 ),
               ),
@@ -147,6 +149,7 @@ class _GlobalSearchSheetState extends ConsumerState<GlobalSearchSheet> {
                         ),
                         suffixIcon: _controller.text.isNotEmpty
                             ? IconButton(
+                                tooltip: 'Bersihkan pencarian',
                                 icon: const Icon(LucideIcons.x, size: 16),
                                 onPressed: _clearQuery,
                               )
@@ -245,7 +248,7 @@ class _GlobalSearchSheetState extends ConsumerState<GlobalSearchSheet> {
                             Icon(
                               LucideIcons.search,
                               size: 40,
-                              color: AppTokens.textSecondary(context).withValues(alpha: 0.5),
+                              color: AppTokens.textSecondary(context),
                             ),
                             const SizedBox(height: 12),
                             Text(
@@ -259,7 +262,7 @@ class _GlobalSearchSheetState extends ConsumerState<GlobalSearchSheet> {
                             Text(
                               'Mencakup Catatan, Meeting, Tugas, dan Keuangan',
                               style: TextStyle(
-                                color: AppTokens.textSecondary(context).withValues(alpha: 0.7),
+                                color: AppTokens.textSecondary(context),
                                 fontSize: 12,
                               ),
                             ),
@@ -341,12 +344,8 @@ class _GlobalSearchSheetState extends ConsumerState<GlobalSearchSheet> {
                                           vertical: 2,
                                         ),
                                         decoration: BoxDecoration(
-                                          color: AppTokens.canvas(context),
+                                          color: AppTokens.surfaceSubtle(context),
                                           borderRadius: HubRadius.rXs,
-                                          border: Border.all(
-                                            color: AppTokens.border(context),
-                                            width: 1,
-                                          ),
                                         ),
                                         child: Text(
                                           item.category.label,

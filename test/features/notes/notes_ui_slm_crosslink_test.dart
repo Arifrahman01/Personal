@@ -137,6 +137,12 @@ void main() {
         );
         await tester.pumpAndSettle();
 
+        expect(find.text('Saran tag:'), findsNothing);
+        expect(find.widgetWithText(TextField, 'Tag'), findsNothing);
+
+        await tester.tap(find.text('Tambah Tag'));
+        await tester.pumpAndSettle();
+
         expect(find.text('Saran tag:'), findsOneWidget);
         expect(find.widgetWithText(HubPill, '#ide'), findsOneWidget);
         expect(find.widgetWithText(HubPill, '#kerja'), findsOneWidget);
@@ -180,8 +186,8 @@ void main() {
         );
         await tester.pumpAndSettle();
 
-        // Tap "✨ Asisten AI" on the bottom toolbar
-        await tester.tap(find.text('✨ Asisten AI'));
+        // Tap "Asisten AI" on the bottom toolbar
+        await tester.tap(find.text('Asisten AI'));
         await tester.pumpAndSettle();
 
         // Tap "Ringkas via AI Lokal (Offline)" on the Ringkas tab
@@ -234,16 +240,16 @@ void main() {
         );
         await tester.pumpAndSettle();
 
-        // Tap "✨ Asisten AI" on the bottom toolbar
-        await tester.tap(find.text('✨ Asisten AI'));
+        // Tap "Asisten AI" on the bottom toolbar
+        await tester.tap(find.text('Asisten AI'));
         await tester.pumpAndSettle();
 
         // Switch to "Ekstrak Tugas" tab
         await tester.tap(find.text('Ekstrak Tugas'));
         await tester.pumpAndSettle();
 
-        expect(find.text('Ekstrak Tugas via SLM'), findsOneWidget);
-        expect(find.text('SLM On-Device'), findsOneWidget);
+        expect(find.text('Ekstrak Daftar Tugas'), findsOneWidget);
+        expect(find.text('Offline'), findsOneWidget);
         expect(find.text('Tambahkan Checklist ke Catatan'), findsOneWidget);
 
         await tester.ensureVisible(find.text('Tambahkan Checklist ke Catatan'));
@@ -285,6 +291,7 @@ void main() {
 
         // Panel is initially hidden when there are no relevant links
         expect(find.text('Rekomendasi Tautan Semantik'), findsNothing);
+        expect(find.textContaining('Catatan Terkait'), findsNothing);
 
         // Enter text with high semantic overlap
         await tester.enterText(
@@ -295,6 +302,17 @@ void main() {
           find.widgetWithText(TextField, 'Isi catatan'),
           'Koordinasi rilis modul Apollo mobile app',
         );
+        await tester.pump(const Duration(milliseconds: 350));
+        await tester.pumpAndSettle();
+
+        // Compact clickable pill appears collapsed by default
+        final linkPill = find.text('1 Catatan Terkait');
+        expect(linkPill, findsOneWidget);
+        expect(find.text('Rekomendasi Tautan Semantik'), findsNothing);
+
+        // Tap pill to expand semantic link chips
+        await tester.ensureVisible(linkPill);
+        await tester.tap(linkPill);
         await tester.pumpAndSettle();
 
         // The smart chip for "Rapat Peluncuran Apollo" should now be discovered
@@ -315,7 +333,7 @@ void main() {
         final contentField = tester.widget<TextField>(
           find.widgetWithText(TextField, 'Isi catatan'),
         );
-        expect(contentField.controller?.text, contains('📌 Terkait [MEETING]: Rapat Peluncuran Apollo'));
+        expect(contentField.controller?.text, contains('Terkait [MEETING]: Rapat Peluncuran Apollo'));
       },
     );
   });

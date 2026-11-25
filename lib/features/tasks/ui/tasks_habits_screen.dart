@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:intl/intl.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:personal_hub/core/errors/app_exceptions.dart';
 import 'package:personal_hub/core/theme/app_tokens.dart';
@@ -9,6 +8,23 @@ import 'package:personal_hub/features/tasks/models/task_models.dart';
 import 'package:personal_hub/features/tasks/providers/tasks_providers.dart';
 
 enum _TasksSection { tasks, habits }
+
+/// Notifier managing the selected sub-section index in [TasksHabitsScreen].
+/// 0: Tugas, 1: Habit & Ibadah.
+class TasksHabitsSectionNotifier extends Notifier<int> {
+  @override
+  int build() => 0;
+
+  void setSection(int index) {
+    state = index.clamp(0, 1);
+  }
+}
+
+/// Shared section provider for [TasksHabitsScreen] (0: Tugas, 1: Habit & Ibadah).
+final tasksHabitsSectionProvider =
+    NotifierProvider<TasksHabitsSectionNotifier, int>(
+  TasksHabitsSectionNotifier.new,
+);
 
 class _StarterHabitPreset {
   const _StarterHabitPreset({
@@ -22,6 +38,302 @@ class _StarterHabitPreset {
   final String category;
   final int targetPerDay;
   final IconData icon;
+}
+
+/// Shared modal bottom sheet for creating a new [PersonalTask].
+Future<void> showCreateTaskSheet(BuildContext context, WidgetRef ref) async {
+  final titleController = TextEditingController();
+  var selectedPriority = TaskPriority.medium;
+  DateTime? selectedDueDate;
+  String? errorText;
+
+  final created = await showModalBottomSheet<bool>(
+    context: context,
+    isScrollControlled: true,
+    useSafeArea: true,
+    builder: (sheetContext) {
+      return StatefulBuilder(
+        builder: (context, setSheetState) {
+          final bottomInset = MediaQuery.of(context).viewInsets.bottom;
+          return SingleChildScrollView(
+            padding: EdgeInsets.fromLTRB(20, 20, 20, 20 + bottomInset),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(
+                  'Tambah Tugas Baru',
+                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: titleController,
+                  autofocus: true,
+                  textInputAction: TextInputAction.done,
+                  decoration: InputDecoration(
+                    labelText: 'Judul tugas',
+                    hintText: 'Misal: Kirim laporan mingguan',
+                    errorText: errorText,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  'Prioritas',
+                  style: Theme.of(context).textTheme.labelLarge,
+                ),
+                const SizedBox(height: 8),
+                SegmentedButton<TaskPriority>(
+                  showSelectedIcon: false,
+                  segments: [
+                    for (final priority in TaskPriority.values)
+                      ButtonSegment<TaskPriority>(
+                        value: priority,
+                        label: Text(
+                          priority.label,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                  ],
+                  selected: {selectedPriority},
+                  onSelectionChanged: (selection) {
+                    setSheetState(() {
+                      selectedPriority = selection.first;
+                    });
+                  },
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        icon: const Icon(LucideIcons.calendar),
+                        label: Text(
+                          selectedDueDate == null
+                              ? 'Pilih tenggat (opsional)'
+                              : safeFormatIndonesianDate(
+                                  selectedDueDate!,
+                                  'd MMM yyyy',
+                                ),
+                        ),
+                        onPressed: () async {
+                          final now = DateTime.now();
+                          final picked = await showDatePicker(
+                            context: context,
+                            initialDate: selectedDueDate ?? now,
+                            firstDate: DateTime(now.year - 1),
+                            lastDate: DateTime(now.year + 5),
+                          );
+                          if (picked != null) {
+                            setSheetState(() {
+                              selectedDueDate = picked;
+                            });
+                          }
+                        },
+                      ),
+                    ),
+                    if (selectedDueDate != null) ...[
+                      const SizedBox(width: 8),
+                      IconButton(
+                        tooltip: 'Hapus tenggat',
+                        constraints: const BoxConstraints(
+                          minWidth: 48,
+                          minHeight: 48,
+                        ),
+                        onPressed: () {
+                          setSheetState(() {
+                            selectedDueDate = null;
+                          });
+                        },
+                        icon: const Icon(LucideIcons.x),
+                      ),
+                    ],
+                  ],
+                ),
+                const SizedBox(height: 20),
+                FilledButton(
+                  onPressed: () async {
+                    try {
+                      await ref.read(tasksProvider.notifier).createTask(
+                            title: titleController.text,
+                            dueDate: selectedDueDate,
+                            priority: selectedPriority,
+                          );
+                      if (sheetContext.mounted) {
+                        Navigator.of(sheetContext).pop(true);
+                      }
+                    } on ValidationException catch (error) {
+                      setSheetState(() {
+                        errorText = error.message;
+                      });
+                    }
+                  },
+                  child: const Text('Simpan Tugas'),
+                ),
+              ],
+            ),
+          );
+        },
+      );
+    },
+  );
+
+  titleController.dispose();
+  if (created == true && context.mounted) {
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        const SnackBar(content: Text('Tugas berhasil ditambahkan.')),
+      );
+  }
+}
+
+/// Shared modal bottom sheet for creating a new [Habit].
+Future<void> showCreateHabitSheet(BuildContext context, WidgetRef ref) async {
+  final titleController = TextEditingController();
+  const categories = ['Ibadah', 'Kesehatan', 'Belajar', 'Umum'];
+  var selectedCategory = 'Ibadah';
+  var targetPerDay = 1;
+  String? errorText;
+
+  final created = await showModalBottomSheet<bool>(
+    context: context,
+    isScrollControlled: true,
+    useSafeArea: true,
+    builder: (sheetContext) {
+      return StatefulBuilder(
+        builder: (context, setSheetState) {
+          final bottomInset = MediaQuery.of(context).viewInsets.bottom;
+          return SingleChildScrollView(
+            padding: EdgeInsets.fromLTRB(20, 20, 20, 20 + bottomInset),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(
+                  'Tambah Habit & Ibadah',
+                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: titleController,
+                  autofocus: true,
+                  textInputAction: TextInputAction.done,
+                  decoration: InputDecoration(
+                    labelText: 'Nama habit / ibadah',
+                    hintText: 'Misal: Dzikir Pagi & Petang',
+                    errorText: errorText,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  'Kategori',
+                  style: Theme.of(context).textTheme.labelLarge,
+                ),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    for (final category in categories)
+                      ChoiceChip(
+                        label: Text(category),
+                        selected: selectedCategory == category,
+                        onSelected: (_) {
+                          setSheetState(() {
+                            selectedCategory = category;
+                          });
+                        },
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'Target per hari',
+                      style: Theme.of(context).textTheme.labelLarge,
+                    ),
+                    Row(
+                      children: [
+                        IconButton.outlined(
+                          tooltip: 'Kurangi target',
+                          constraints: const BoxConstraints(
+                            minWidth: 48,
+                            minHeight: 48,
+                          ),
+                          onPressed: targetPerDay > 1
+                              ? () => setSheetState(() => targetPerDay--)
+                              : null,
+                          icon: const Icon(LucideIcons.minus),
+                        ),
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 14),
+                          child: Text(
+                            '$targetPerDay',
+                            style: HubTypography.tabular(
+                              (Theme.of(context).textTheme.titleMedium ??
+                                      const TextStyle())
+                                  .copyWith(fontWeight: FontWeight.w700),
+                            ),
+                          ),
+                        ),
+                        IconButton.outlined(
+                          tooltip: 'Tambah target',
+                          constraints: const BoxConstraints(
+                            minWidth: 48,
+                            minHeight: 48,
+                          ),
+                          onPressed: targetPerDay < 20
+                              ? () => setSheetState(() => targetPerDay++)
+                              : null,
+                          icon: const Icon(LucideIcons.plus),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 20),
+                FilledButton(
+                  onPressed: () async {
+                    try {
+                      await ref.read(habitsProvider.notifier).createHabit(
+                            title: titleController.text,
+                            category: selectedCategory,
+                            targetPerDay: targetPerDay,
+                          );
+                      if (sheetContext.mounted) {
+                        Navigator.of(sheetContext).pop(true);
+                      }
+                    } on ValidationException catch (error) {
+                      setSheetState(() {
+                        errorText = error.message;
+                      });
+                    }
+                  },
+                  child: const Text('Simpan Habit'),
+                ),
+              ],
+            ),
+          );
+        },
+      );
+    },
+  );
+
+  titleController.dispose();
+  if (created == true && context.mounted) {
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        const SnackBar(content: Text('Habit berhasil ditambahkan.')),
+      );
+  }
 }
 
 /// Daily Tasks & Habit/Ibadah Tracker screen in Material 3 (Bahasa Indonesia).
@@ -62,9 +374,17 @@ class _TasksHabitsScreenState extends ConsumerState<TasksHabitsScreen> {
     ),
   ];
 
-  _TasksSection _section = _TasksSection.tasks;
+  late _TasksSection _section;
   bool _showCompletedTasks = true;
   final TextEditingController _quickTaskController = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    _section = ref.read(tasksHabitsSectionProvider) == 1
+        ? _TasksSection.habits
+        : _TasksSection.tasks;
+  }
 
   @override
   void dispose() {
@@ -132,7 +452,7 @@ class _TasksHabitsScreenState extends ConsumerState<TasksHabitsScreen> {
         return StatefulBuilder(
           builder: (context, setSheetState) {
             final bottomInset = MediaQuery.of(context).viewInsets.bottom;
-            return Padding(
+            return SingleChildScrollView(
               padding: EdgeInsets.fromLTRB(20, 20, 20, 20 + bottomInset),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
@@ -172,11 +492,16 @@ class _TasksHabitsScreenState extends ConsumerState<TasksHabitsScreen> {
                   ),
                   const SizedBox(height: 8),
                   SegmentedButton<TaskPriority>(
+                    showSelectedIcon: false,
                     segments: [
                       for (final priority in TaskPriority.values)
                         ButtonSegment<TaskPriority>(
                           value: priority,
-                          label: Text(priority.label),
+                          label: Text(
+                            priority.label,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
                         ),
                     ],
                     selected: {selectedPriority},
@@ -195,8 +520,10 @@ class _TasksHabitsScreenState extends ConsumerState<TasksHabitsScreen> {
                           label: Text(
                             selectedDueDate == null
                                 ? 'Pilih tenggat (opsional)'
-                                : DateFormat('d MMM yyyy')
-                                    .format(selectedDueDate!),
+                                : safeFormatIndonesianDate(
+                                    selectedDueDate!,
+                                    'd MMM yyyy',
+                                  ),
                           ),
                           onPressed: () async {
                             final now = DateTime.now();
@@ -240,16 +567,14 @@ class _TasksHabitsScreenState extends ConsumerState<TasksHabitsScreen> {
                         return;
                       }
                       try {
-                        await ref.read(tasksProvider.notifier).deleteTask(task.id);
-                        final created = await ref.read(tasksProvider.notifier).createTask(
-                          title: newTitle,
-                          dueDate: selectedDueDate,
-                          priority: selectedPriority,
-                          sourceMeetingId: task.sourceMeetingId,
-                        );
-                        if (task.isDone) {
-                          await ref.read(tasksProvider.notifier).toggleTaskDone(created.id);
-                        }
+                        await ref.read(tasksProvider.notifier).updateTask(
+                              task.copyWith(
+                                title: newTitle,
+                                dueDate: selectedDueDate,
+                                clearDueDate: selectedDueDate == null,
+                                priority: selectedPriority,
+                              ),
+                            );
                         if (sheetContext.mounted) {
                           Navigator.of(sheetContext).pop(true);
                         }
@@ -275,271 +600,9 @@ class _TasksHabitsScreenState extends ConsumerState<TasksHabitsScreen> {
     }
   }
 
-  Future<void> _openCreateTaskSheet() async {
-    final titleController = TextEditingController();
-    var selectedPriority = TaskPriority.medium;
-    DateTime? selectedDueDate;
-    String? errorText;
+  Future<void> _openCreateTaskSheet() => showCreateTaskSheet(context, ref);
 
-    final created = await showModalBottomSheet<bool>(
-      context: context,
-      isScrollControlled: true,
-      useSafeArea: true,
-      builder: (sheetContext) {
-        return StatefulBuilder(
-          builder: (context, setSheetState) {
-            final bottomInset = MediaQuery.of(context).viewInsets.bottom;
-            return Padding(
-              padding: EdgeInsets.fromLTRB(20, 20, 20, 20 + bottomInset),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Text(
-                    'Tambah Tugas Baru',
-                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                          fontWeight: FontWeight.w700,
-                        ),
-                  ),
-                  const SizedBox(height: 16),
-                  TextField(
-                    controller: titleController,
-                    autofocus: true,
-                    textInputAction: TextInputAction.done,
-                    decoration: InputDecoration(
-                      labelText: 'Judul tugas',
-                      hintText: 'Misal: Kirim laporan mingguan',
-                      errorText: errorText,
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    'Prioritas',
-                    style: Theme.of(context).textTheme.labelLarge,
-                  ),
-                  const SizedBox(height: 8),
-                  SegmentedButton<TaskPriority>(
-                    segments: [
-                      for (final priority in TaskPriority.values)
-                        ButtonSegment<TaskPriority>(
-                          value: priority,
-                          label: Text(priority.label),
-                        ),
-                    ],
-                    selected: {selectedPriority},
-                    onSelectionChanged: (selection) {
-                      setSheetState(() {
-                        selectedPriority = selection.first;
-                      });
-                    },
-                  ),
-                  const SizedBox(height: 16),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: OutlinedButton.icon(
-                          icon: const Icon(LucideIcons.calendar),
-                          label: Text(
-                            selectedDueDate == null
-                                ? 'Pilih tenggat (opsional)'
-                                : DateFormat('d MMM yyyy')
-                                    .format(selectedDueDate!),
-                          ),
-                          onPressed: () async {
-                            final now = DateTime.now();
-                            final picked = await showDatePicker(
-                              context: context,
-                              initialDate: selectedDueDate ?? now,
-                              firstDate: DateTime(now.year - 1),
-                              lastDate: DateTime(now.year + 5),
-                            );
-                            if (picked != null) {
-                              setSheetState(() {
-                                selectedDueDate = picked;
-                              });
-                            }
-                          },
-                        ),
-                      ),
-                      if (selectedDueDate != null) ...[
-                        const SizedBox(width: 8),
-                        IconButton(
-                          tooltip: 'Hapus tenggat',
-                          onPressed: () {
-                            setSheetState(() {
-                              selectedDueDate = null;
-                            });
-                          },
-                          icon: const Icon(LucideIcons.x),
-                        ),
-                      ],
-                    ],
-                  ),
-                  const SizedBox(height: 20),
-                  FilledButton(
-                    onPressed: () async {
-                      try {
-                        await ref.read(tasksProvider.notifier).createTask(
-                              title: titleController.text,
-                              dueDate: selectedDueDate,
-                              priority: selectedPriority,
-                            );
-                        if (sheetContext.mounted) {
-                          Navigator.of(sheetContext).pop(true);
-                        }
-                      } on ValidationException catch (error) {
-                        setSheetState(() {
-                          errorText = error.message;
-                        });
-                      }
-                    },
-                    child: const Text('Simpan Tugas'),
-                  ),
-                ],
-              ),
-            );
-          },
-        );
-      },
-    );
-
-    titleController.dispose();
-    if (created == true) {
-      _showSnack('Tugas berhasil ditambahkan.');
-    }
-  }
-
-  Future<void> _openCreateHabitSheet() async {
-    final titleController = TextEditingController();
-    const categories = ['Ibadah', 'Kesehatan', 'Belajar', 'Umum'];
-    var selectedCategory = 'Ibadah';
-    var targetPerDay = 1;
-    String? errorText;
-
-    final created = await showModalBottomSheet<bool>(
-      context: context,
-      isScrollControlled: true,
-      useSafeArea: true,
-      builder: (sheetContext) {
-        return StatefulBuilder(
-          builder: (context, setSheetState) {
-            final bottomInset = MediaQuery.of(context).viewInsets.bottom;
-            return Padding(
-              padding: EdgeInsets.fromLTRB(20, 20, 20, 20 + bottomInset),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Text(
-                    'Tambah Habit & Ibadah',
-                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                          fontWeight: FontWeight.w700,
-                        ),
-                  ),
-                  const SizedBox(height: 16),
-                  TextField(
-                    controller: titleController,
-                    autofocus: true,
-                    textInputAction: TextInputAction.done,
-                    decoration: InputDecoration(
-                      labelText: 'Nama habit / ibadah',
-                      hintText: 'Misal: Dzikir Pagi & Petang',
-                      errorText: errorText,
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    'Kategori',
-                    style: Theme.of(context).textTheme.labelLarge,
-                  ),
-                  const SizedBox(height: 8),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: [
-                      for (final category in categories)
-                        ChoiceChip(
-                          label: Text(category),
-                          selected: selectedCategory == category,
-                          onSelected: (_) {
-                            setSheetState(() {
-                              selectedCategory = category;
-                            });
-                          },
-                        ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        'Target per hari',
-                        style: Theme.of(context).textTheme.labelLarge,
-                      ),
-                      Row(
-                        children: [
-                          IconButton.outlined(
-                            tooltip: 'Kurangi target',
-                            onPressed: targetPerDay > 1
-                                ? () => setSheetState(() => targetPerDay--)
-                                : null,
-                            icon: const Icon(LucideIcons.minus),
-                          ),
-                          Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 14),
-                            child: Text(
-                              '$targetPerDay',
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .titleMedium
-                                  ?.copyWith(fontWeight: FontWeight.w700),
-                            ),
-                          ),
-                          IconButton.outlined(
-                            tooltip: 'Tambah target',
-                            onPressed: targetPerDay < 20
-                                ? () => setSheetState(() => targetPerDay++)
-                                : null,
-                            icon: const Icon(LucideIcons.plus),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 20),
-                  FilledButton(
-                    onPressed: () async {
-                      try {
-                        await ref.read(habitsProvider.notifier).createHabit(
-                              title: titleController.text,
-                              category: selectedCategory,
-                              targetPerDay: targetPerDay,
-                            );
-                        if (sheetContext.mounted) {
-                          Navigator.of(sheetContext).pop(true);
-                        }
-                      } on ValidationException catch (error) {
-                        setSheetState(() {
-                          errorText = error.message;
-                        });
-                      }
-                    },
-                    child: const Text('Simpan Habit'),
-                  ),
-                ],
-              ),
-            );
-          },
-        );
-      },
-    );
-
-    titleController.dispose();
-    if (created == true) {
-      _showSnack('Habit berhasil ditambahkan.');
-    }
-  }
+  Future<void> _openCreateHabitSheet() => showCreateHabitSheet(context, ref);
 
   Future<void> _addStarterPreset(_StarterHabitPreset preset) async {
     final existing = ref.read(habitsProvider).asData?.value ?? const <Habit>[];
@@ -562,8 +625,19 @@ class _TasksHabitsScreenState extends ConsumerState<TasksHabitsScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final showSegmentIcons = MediaQuery.sizeOf(context).width >= 360;
+
+    ref.listen<int>(tasksHabitsSectionProvider, (_, next) {
+      final target = next == 1 ? _TasksSection.habits : _TasksSection.tasks;
+      if (target != _section) {
+        setState(() {
+          _section = target;
+        });
+      }
+    });
 
     final bodyContent = SafeArea(
+      top: !widget.isEmbedded,
       child: Column(
         children: [
           Padding(
@@ -571,23 +645,46 @@ class _TasksHabitsScreenState extends ConsumerState<TasksHabitsScreen> {
             child: SizedBox(
               width: double.infinity,
               child: SegmentedButton<_TasksSection>(
-                segments: const [
+                showSelectedIcon: false,
+                segments: [
                   ButtonSegment<_TasksSection>(
                     value: _TasksSection.tasks,
-                    label: Text('Tugas'),
-                    icon: Icon(LucideIcons.checkSquare),
+                    label: const FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Text(
+                        'Tugas',
+                        maxLines: 1,
+                        softWrap: false,
+                      ),
+                    ),
+                    icon: showSegmentIcons
+                        ? const Icon(LucideIcons.checkSquare)
+                        : null,
                   ),
                   ButtonSegment<_TasksSection>(
                     value: _TasksSection.habits,
-                    label: Text('Habit & Ibadah'),
-                    icon: Icon(LucideIcons.flame),
+                    label: const FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Text(
+                        'Habit & Ibadah',
+                        maxLines: 1,
+                        softWrap: false,
+                      ),
+                    ),
+                    icon: showSegmentIcons
+                        ? const Icon(LucideIcons.flame)
+                        : null,
                   ),
                 ],
                 selected: {_section},
                 onSelectionChanged: (selection) {
+                  final next = selection.first;
                   setState(() {
-                    _section = selection.first;
+                    _section = next;
                   });
+                  ref.read(tasksHabitsSectionProvider.notifier).setSection(
+                        next == _TasksSection.habits ? 1 : 0,
+                      );
                 },
               ),
             ),
@@ -607,11 +704,9 @@ class _TasksHabitsScreenState extends ConsumerState<TasksHabitsScreen> {
 
     return Scaffold(
       backgroundColor: AppTokens.canvas(context),
-      appBar: AppBar(
-        title: const Text('Tugas & Habit'),
+      appBar: HubAppBar(
+        titleText: 'Tugas & Habit',
         backgroundColor: AppTokens.canvas(context),
-        elevation: 0,
-        scrolledUnderElevation: 0,
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: _section == _TasksSection.tasks
@@ -665,14 +760,21 @@ class _TasksHabitsScreenState extends ConsumerState<TasksHabitsScreen> {
                         textInputAction: TextInputAction.done,
                         onSubmitted: _handleQuickTaskSubmit,
                         decoration: const InputDecoration(
-                          hintText: '+ Tambah tugas baru...',
+                          hintText: 'Tambah tugas baru...',
+                          filled: false,
                           border: InputBorder.none,
+                          enabledBorder: InputBorder.none,
+                          focusedBorder: InputBorder.none,
                           isDense: true,
                         ),
                       ),
                     ),
                     IconButton(
                       key: const Key('quick_task_submit_button'),
+                      constraints: const BoxConstraints(
+                        minWidth: 48,
+                        minHeight: 48,
+                      ),
                       icon: const Icon(LucideIcons.arrowUp, size: 20),
                       tooltip: 'Tambah tugas',
                       onPressed: () => _handleQuickTaskSubmit(_quickTaskController.text),
@@ -683,30 +785,39 @@ class _TasksHabitsScreenState extends ConsumerState<TasksHabitsScreen> {
             ),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Expanded(
-                    child: Text(
+              child: SizedBox(
+                width: double.infinity,
+                child: Wrap(
+                  alignment: WrapAlignment.spaceBetween,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  spacing: 8,
+                  runSpacing: 6,
+                  children: [
+                    Text(
                       '$activeCount tugas aktif',
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant,
-                        fontWeight: FontWeight.w500,
+                      style: HubTypography.tabular(
+                        (theme.textTheme.bodyMedium ?? const TextStyle())
+                            .copyWith(
+                              color: theme.colorScheme.onSurfaceVariant,
+                              fontWeight: FontWeight.w500,
+                            ),
                       ),
-                      overflow: TextOverflow.ellipsis,
                     ),
-                  ),
-                  const SizedBox(width: 8),
-                  FilterChip(
-                    label: const Text('Tampilkan selesai'),
-                    selected: _showCompletedTasks,
-                    onSelected: (value) {
-                      setState(() {
-                        _showCompletedTasks = value;
-                      });
-                    },
-                  ),
-                ],
+                    FilterChip(
+                      label: const Text(
+                        'Tampilkan selesai',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      selected: _showCompletedTasks,
+                      onSelected: (value) {
+                        setState(() {
+                          _showCompletedTasks = value;
+                        });
+                      },
+                    ),
+                  ],
+                ),
               ),
             ),
             const SizedBox(height: 8),
@@ -718,8 +829,8 @@ class _TasksHabitsScreenState extends ConsumerState<TasksHabitsScreen> {
                       subtitle: _showCompletedTasks
                           ? 'Catat tugas harian agar pekerjaan tetap terarah.'
                           : 'Semua tugas aktif sudah selesai!',
-                      actionLabel: 'Buat Tugas',
-                      onAction: _openCreateTaskSheet,
+                      actionLabel: widget.isEmbedded ? null : 'Buat Tugas',
+                      onAction: widget.isEmbedded ? null : _openCreateTaskSheet,
                     )
                   : ListView.separated(
                       padding: const EdgeInsets.fromLTRB(16, 4, 16, 96),
@@ -765,17 +876,21 @@ class _TasksHabitsScreenState extends ConsumerState<TasksHabitsScreen> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(
-                  'Preset Rutinitas',
-                  style: theme.textTheme.labelLarge?.copyWith(
-                    fontWeight: FontWeight.w700,
-                    color: AppTokens.textSecondary(context),
+                Expanded(
+                  child: Text(
+                    'Preset Rutinitas',
+                    style: theme.textTheme.labelLarge?.copyWith(
+                      fontWeight: FontWeight.w700,
+                      color: AppTokens.textSecondary(context),
+                    ),
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ),
                 TextButton.icon(
                   onPressed: () {
                     showModalBottomSheet<void>(
                       context: context,
+                      useSafeArea: true,
                       builder: (sheetContext) => SafeArea(
                         child: Padding(
                           padding: const EdgeInsets.all(16),
@@ -807,38 +922,42 @@ class _TasksHabitsScreenState extends ConsumerState<TasksHabitsScreen> {
                       ),
                     );
                   },
+                  style: TextButton.styleFrom(
+                    minimumSize: const Size(0, 48),
+                  ),
                   icon: const Icon(LucideIcons.plus, size: 16),
-                  label: const Text('+ Preset'),
+                  label: const Text('Preset'),
                 ),
               ],
             ),
-            const SizedBox(height: 4),
-            SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: Row(
-                children: [
-                  for (final preset in _starterPresets) ...[
-                    ActionChip(
-                      avatar: Icon(preset.icon, size: 16),
-                      label: Text(preset.title),
-                      onPressed: () => _addStarterPreset(preset),
-                    ),
-                    const SizedBox(width: 8),
+            if (habits.isEmpty) ...[
+              const SizedBox(height: 4),
+              SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
+                  children: [
+                    for (final preset in _starterPresets) ...[
+                      ActionChip(
+                        avatar: Icon(preset.icon, size: 16),
+                        label: Text(preset.title),
+                        onPressed: () => _addStarterPreset(preset),
+                      ),
+                      const SizedBox(width: 8),
+                    ],
                   ],
-                ],
+                ),
               ),
-            ),
-            const SizedBox(height: 16),
-            if (habits.isEmpty)
+              const SizedBox(height: 16),
               _EmptyStateView(
                 icon: LucideIcons.flame,
                 title: 'Belum ada habit atau ibadah',
                 subtitle:
                     'Pilih preset cepat di atas atau tambahkan rutinitas harian Anda sendiri.',
-                actionLabel: 'Tambah Habit',
-                onAction: _openCreateHabitSheet,
-              )
-            else
+                actionLabel: widget.isEmbedded ? null : 'Tambah Habit',
+                onAction: widget.isEmbedded ? null : _openCreateHabitSheet,
+              ),
+            ] else ...[
+              const SizedBox(height: 8),
               for (final habit in habits) ...[
                 _HabitCard(
                   habit: habit,
@@ -855,6 +974,7 @@ class _TasksHabitsScreenState extends ConsumerState<TasksHabitsScreen> {
                 ),
                 const SizedBox(height: 10),
               ],
+            ],
           ],
         );
       },
@@ -938,15 +1058,39 @@ class _TaskCard extends StatelessWidget {
               ),
             ),
           ),
-          IconButton(
-            tooltip: 'Edit tugas',
-            onPressed: onEdit,
-            icon: const Icon(LucideIcons.pencil, size: 18),
-          ),
-          IconButton(
-            tooltip: 'Hapus tugas',
-            onPressed: onDelete,
-            icon: const Icon(LucideIcons.trash2, size: 18),
+          PopupMenuButton<String>(
+            tooltip: 'Opsi tugas',
+            constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
+            icon: const Icon(LucideIcons.moreVertical, size: 18),
+            onSelected: (value) {
+              if (value == 'edit') {
+                onEdit();
+              } else if (value == 'delete') {
+                onDelete();
+              }
+            },
+            itemBuilder: (context) => const [
+              PopupMenuItem<String>(
+                value: 'edit',
+                child: Row(
+                  children: [
+                    Icon(LucideIcons.pencil, size: 16),
+                    SizedBox(width: 8),
+                    Text('Edit'),
+                  ],
+                ),
+              ),
+              PopupMenuItem<String>(
+                value: 'delete',
+                child: Row(
+                  children: [
+                    Icon(LucideIcons.trash2, size: 16),
+                    SizedBox(width: 8),
+                    Text('Hapus'),
+                  ],
+                ),
+              ),
+            ],
           ),
         ],
       ),
@@ -982,7 +1126,7 @@ class _TaskCard extends StatelessWidget {
     if (diff == 0) return 'Hari ini';
     if (diff == 1) return 'Besok';
     if (diff == -1) return 'Kemarin';
-    return DateFormat('d MMM yyyy').format(dueDate);
+    return safeFormatIndonesianDate(dueDate, 'd MMM yyyy');
   }
 }
 
@@ -1038,7 +1182,7 @@ class _HabitCard extends StatelessWidget {
                         ),
                         _BadgePill(
                           icon: LucideIcons.flame,
-                          label: '${stats.streak} hari streak',
+                          label: '${stats.streak} hari beruntun',
                           backgroundColor: stats.streak > 0
                               ? theme.colorScheme.tertiaryContainer
                               : theme.colorScheme.surfaceContainerHighest,
@@ -1062,6 +1206,7 @@ class _HabitCard extends StatelessWidget {
               ),
               IconButton(
                 tooltip: 'Hapus habit',
+                constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
                 onPressed: onDelete,
                 icon: const Icon(LucideIcons.trash2, size: 18),
               ),
@@ -1079,25 +1224,35 @@ class _HabitCard extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
-                'Hari ini: ${stats.todayCount} / ${habit.targetPerDay}',
-                style: HubTypography.tabular(
-                  theme.textTheme.bodyMedium?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
-                    fontWeight: FontWeight.w600,
-                  ) ?? const TextStyle(),
+              Expanded(
+                child: Text(
+                  'Hari ini: ${stats.todayCount} / ${habit.targetPerDay}',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: HubTypography.tabular(
+                    theme.textTheme.bodyMedium?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                      fontWeight: FontWeight.w600,
+                    ) ?? const TextStyle(),
+                  ),
                 ),
               ),
+              const SizedBox(width: 8),
               Row(
+                mainAxisSize: MainAxisSize.min,
                 children: [
                   IconButton.outlined(
                     tooltip: 'Kurangi hitungan',
+                    constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
                     onPressed: stats.todayCount > 0 ? onDecrement : null,
                     icon: const Icon(LucideIcons.minus, size: 16),
                   ),
                   const SizedBox(width: 8),
                   FilledButton.tonalIcon(
                     onPressed: onIncrement,
+                    style: FilledButton.styleFrom(
+                      minimumSize: const Size(0, 48),
+                    ),
                     icon: const Icon(LucideIcons.plus, size: 16),
                     label: const Text('Catat'),
                   ),
@@ -1157,22 +1312,22 @@ class _EmptyStateView extends StatelessWidget {
     required this.icon,
     required this.title,
     required this.subtitle,
-    required this.actionLabel,
-    required this.onAction,
+    this.actionLabel,
+    this.onAction,
   });
 
   final IconData icon;
   final String title;
   final String subtitle;
-  final String actionLabel;
-  final VoidCallback onAction;
+  final String? actionLabel;
+  final VoidCallback? onAction;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return Center(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -1198,12 +1353,14 @@ class _EmptyStateView extends StatelessWidget {
               ),
               textAlign: TextAlign.center,
             ),
-            const SizedBox(height: 20),
-            FilledButton.icon(
-              onPressed: onAction,
-              icon: const Icon(LucideIcons.plus),
-              label: Text(actionLabel),
-            ),
+            if (actionLabel != null && onAction != null) ...[
+              const SizedBox(height: 20),
+              FilledButton.icon(
+                onPressed: onAction,
+                icon: const Icon(LucideIcons.plus),
+                label: Text(actionLabel!),
+              ),
+            ],
           ],
         ),
       ),

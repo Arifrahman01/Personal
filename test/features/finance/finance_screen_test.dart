@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:personal_hub/core/config/secure_config_store.dart';
 import 'package:personal_hub/core/database/app_database.dart';
 import 'package:personal_hub/features/finance/data/finance_repository.dart';
@@ -149,15 +150,15 @@ void main() {
         expect(find.text('Proyeksi Saldo Akhir'), findsOneWidget);
         expect(find.text('Burn-Rate Harian'), findsOneWidget);
 
-        // Recurring bills card
-        expect(find.text('Tagihan Rutin Terdeteksi'), findsOneWidget);
+        // Recurring bills card is hidden when empty
+        expect(find.text('Tagihan Rutin Terdeteksi'), findsNothing);
 
-        // Quick AI capture
-        expect(find.text('Catat Cepat AI'), findsOneWidget);
+        // Quick AI capture launcher pill
+        expect(find.text('Catat Cepat dengan AI'), findsOneWidget);
 
         // Transaction list
         expect(find.text('Riwayat Transaksi'), findsOneWidget);
-        expect(find.text('Ekspor ke CSV'), findsOneWidget);
+        expect(find.byTooltip('Ekspor ke CSV'), findsOneWidget);
         expect(find.text('WiFi'), findsWidgets);
       },
     );
@@ -215,6 +216,7 @@ void main() {
         ));
         await tester.pumpAndSettle();
 
+        expect(find.text('Tagihan Rutin Terdeteksi'), findsOneWidget);
         expect(find.text('Listrik PLN'), findsOneWidget);
         expect(find.text('Rp 450.000'), findsOneWidget);
         expect(find.text('95% akurat'), findsOneWidget);
@@ -279,7 +281,7 @@ void main() {
         expect(find.text('Rp 37.500'), findsOneWidget);
 
         // Tap add button [+]
-        final addButton = find.widgetWithIcon(IconButton, Icons.add_rounded);
+        final addButton = find.widgetWithIcon(IconButton, LucideIcons.plus);
         expect(addButton, findsWidgets);
         await tester.tap(addButton.first);
         await tester.pumpAndSettle();

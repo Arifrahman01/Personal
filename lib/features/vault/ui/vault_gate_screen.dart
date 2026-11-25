@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
+import 'package:personal_hub/app.dart';
 import 'package:personal_hub/core/errors/app_exceptions.dart';
 import 'package:personal_hub/core/theme/app_tokens.dart';
 import 'package:personal_hub/core/theme/hub_widgets.dart';
@@ -217,6 +218,8 @@ class _VaultGateScreenState extends ConsumerState<VaultGateScreen> {
   Widget _buildKeypadButton({
     required Widget content,
     required VoidCallback onTap,
+    double diameter = 64,
+    String? semanticLabel,
     Color? backgroundColor,
     Color? borderColor,
   }) {
@@ -225,25 +228,25 @@ class _VaultGateScreenState extends ConsumerState<VaultGateScreen> {
     final border = borderColor ?? AppTokens.border(context);
     final primary = AppTokens.primary(context);
 
-    return Material(
+    Widget button = Material(
       color: Colors.transparent,
       child: InkWell(
-        borderRadius: BorderRadius.circular(32),
+        borderRadius: BorderRadius.circular(diameter / 2),
         splashColor: primary.withValues(alpha: 0.20),
         highlightColor: primary.withValues(alpha: 0.10),
         onTap: onTap,
         child: Container(
-          width: 64,
-          height: 64,
+          width: diameter,
+          height: diameter,
           decoration: BoxDecoration(
             shape: BoxShape.circle,
             color: cardBg,
             border: Border.all(color: border, width: 1.2),
             boxShadow: [
               BoxShadow(
-                color: isDark
-                    ? Colors.black.withValues(alpha: 0.35)
-                    : Colors.black.withValues(alpha: 0.06),
+                color: Theme.of(context).colorScheme.shadow.withValues(
+                  alpha: isDark ? 0.35 : 0.06,
+                ),
                 blurRadius: 6,
                 offset: const Offset(0, 2),
               ),
@@ -254,12 +257,24 @@ class _VaultGateScreenState extends ConsumerState<VaultGateScreen> {
         ),
       ),
     );
+
+    if (semanticLabel != null) {
+      button = Semantics(
+        button: true,
+        label: semanticLabel,
+        child: Tooltip(
+          message: semanticLabel,
+          child: button,
+        ),
+      );
+    }
+
+    return button;
   }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
     final primary = AppTokens.primary(context);
     final textPrimary = AppTokens.textPrimary(context);
 
@@ -280,374 +295,425 @@ class _VaultGateScreenState extends ConsumerState<VaultGateScreen> {
         backgroundColor: AppTokens.canvas(context),
         centerTitle: false,
         elevation: 0,
+        actions: [
+          IconButton(
+            tooltip: 'Asisten AI',
+            icon: const Icon(LucideIcons.sparkles),
+            onPressed: () => MainNavigationShell.openAiChat(context),
+          ),
+          IconButton(
+            tooltip: 'Pengaturan',
+            icon: const Icon(LucideIcons.settings),
+            onPressed: () => MainNavigationShell.openSettings(context),
+          ),
+        ],
       ),
       body: SafeArea(
         child: KeyboardListener(
           focusNode: _keyboardFocusNode,
           autofocus: true,
           onKeyEvent: _hasPin ? _handleKeyEvent : null,
-          child: Center(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 400),
-                child: HubCard(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      // Shield Icon
-                      Center(
-                        child: Container(
-                          width: 46,
-                          height: 46,
-                          decoration: BoxDecoration(
-                            color: primary.withValues(alpha: 0.12),
-                            shape: BoxShape.circle,
-                          ),
-                          child: Icon(
-                            _hasPin ? LucideIcons.lock : LucideIcons.shieldCheck,
-                            size: 24,
-                            color: primary,
-                          ),
-                        ),
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final isCompactHeight = constraints.maxHeight < 660;
+              final keypadDiameter = isCompactHeight ? 52.0 : 64.0;
+              final keypadRowGap = isCompactHeight ? 6.0 : 10.0;
+              final shieldSize = isCompactHeight ? 40.0 : 46.0;
+              final sectionGap = isCompactHeight ? 6.0 : 10.0;
+
+              return Center(
+                child: SingleChildScrollView(
+                  padding: EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: isCompactHeight ? 4 : 8,
+                  ),
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 400),
+                    child: HubCard(
+                      padding: EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: isCompactHeight ? 12 : 16,
                       ),
-                      const SizedBox(height: 8),
-                      // Security Badge
-                      Center(
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 10,
-                            vertical: 4,
-                          ),
-                          decoration: BoxDecoration(
-                            color: primary.withValues(alpha: 0.10),
-                            borderRadius: HubRadius.rPill,
-                            border: Border.all(
-                              color: primary.withValues(alpha: 0.35),
-                              width: 1,
-                            ),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(LucideIcons.shield, size: 12, color: primary),
-                              const SizedBox(width: 5),
-                              Text(
-                                'Terkunci Aman',
-                                style: TextStyle(
-                                  color: primary,
-                                  fontWeight: FontWeight.w700,
-                                  fontSize: 11,
-                                  letterSpacing: 0.2,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    const SizedBox(height: 10),
-                    Text(
-                      _hasPin ? 'Brankas Terkunci' : 'Buat PIN Brankas',
-                      textAlign: TextAlign.center,
-                      style: theme.textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: -0.3,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      _hasPin
-                          ? 'Masukkan PIN (4-8 digit) atau gunakan biometrik.'
-                          : 'Atur PIN minimal 4 digit angka untuk melindungi brankas.',
-                      textAlign: TextAlign.center,
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: AppTokens.textSecondary(context),
-                        height: 1.3,
-                      ),
-                    ),
-                    if (_hasPin) ...[
-                      const SizedBox(height: 12),
-                      // PIN dots indicator with primary emerald-teal glow
-                      Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 4),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: List.generate(dotCount, (index) {
-                            final isFilled = index < pinLength;
-                            return AnimatedContainer(
-                              duration: const Duration(milliseconds: 180),
-                              curve: Curves.easeOutCubic,
-                              margin: const EdgeInsets.symmetric(horizontal: 7),
-                              width: isFilled ? 16 : 14,
-                              height: isFilled ? 16 : 14,
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          // Shield Icon
+                          Center(
+                            child: Container(
+                              width: shieldSize,
+                              height: shieldSize,
                               decoration: BoxDecoration(
+                                color: primary.withValues(alpha: 0.12),
                                 shape: BoxShape.circle,
-                                color: isFilled
-                                    ? primary
-                                    : (isDark
-                                        ? Colors.white.withValues(alpha: 0.08)
-                                        : Colors.black.withValues(alpha: 0.06)),
-                                border: Border.all(
-                                  color: isFilled
-                                      ? primary
-                                      : AppTokens.border(context),
-                                  width: 1.5,
-                                ),
-                                boxShadow: isFilled
-                                    ? [
-                                        BoxShadow(
-                                          color: primary.withValues(alpha: 0.45),
-                                          blurRadius: 8,
-                                          spreadRadius: 1,
-                                        ),
-                                      ]
-                                    : null,
                               ),
-                            );
-                          }),
-                        ),
-                      ),
-                      const SizedBox(height: 10),
-                      // Adaptive tactile keypad
-                      Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 2),
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                              children: [
-                                for (final d in ['1', '2', '3'])
-                                  _buildKeypadButton(
-                                    content: Text(
-                                      d,
-                                      style: TextStyle(
-                                        fontSize: 24,
-                                        fontWeight: FontWeight.w600,
-                                        color: textPrimary,
-                                      ),
-                                    ),
-                                    onTap: () => _onKeypadDigit(d),
-                                  ),
-                              ],
+                              child: Icon(
+                                _hasPin
+                                    ? LucideIcons.lock
+                                    : LucideIcons.shieldCheck,
+                                size: isCompactHeight ? 20 : 24,
+                                color: primary,
+                              ),
                             ),
-                            const SizedBox(height: 10),
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                              children: [
-                                for (final d in ['4', '5', '6'])
-                                  _buildKeypadButton(
-                                    content: Text(
-                                      d,
-                                      style: TextStyle(
-                                        fontSize: 24,
-                                        fontWeight: FontWeight.w600,
-                                        color: textPrimary,
-                                      ),
-                                    ),
-                                    onTap: () => _onKeypadDigit(d),
-                                  ),
-                              ],
-                            ),
-                            const SizedBox(height: 10),
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                              children: [
-                                for (final d in ['7', '8', '9'])
-                                  _buildKeypadButton(
-                                    content: Text(
-                                      d,
-                                      style: TextStyle(
-                                        fontSize: 24,
-                                        fontWeight: FontWeight.w600,
-                                        color: textPrimary,
-                                      ),
-                                    ),
-                                    onTap: () => _onKeypadDigit(d),
-                                  ),
-                              ],
-                            ),
-                            const SizedBox(height: 10),
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                              children: [
-                                // Action / Confirm / Biometric button on left
-                                if (pinLength > 0)
-                                  _buildKeypadButton(
-                                    backgroundColor: primary.withValues(alpha: 0.15),
-                                    borderColor: primary.withValues(alpha: 0.5),
-                                    content: Icon(
-                                      LucideIcons.check,
-                                      color: primary,
-                                      size: 24,
-                                    ),
-                                    onTap: _isSubmitting
-                                        ? () {}
-                                        : _handleUnlockWithPin,
-                                  )
-                                else if (_canUseBiometrics)
-                                  _buildKeypadButton(
-                                    content: Icon(
-                                      LucideIcons.fingerprint,
-                                      color: primary,
-                                      size: 24,
-                                    ),
-                                    onTap: _handleUnlockWithBiometrics,
-                                  )
-                                else
-                                  _buildKeypadButton(
-                                    content: Icon(
-                                      LucideIcons.rotateCcw,
-                                      color: AppTokens.textSecondary(context),
-                                      size: 20,
-                                    ),
-                                    onTap: _onKeypadClear,
-                                  ),
-                                // Digit 0
-                                _buildKeypadButton(
-                                  content: Text(
-                                    '0',
+                          ),
+                          SizedBox(height: sectionGap),
+                          // Security Badge
+                          Center(
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 10,
+                                vertical: 4,
+                              ),
+                              decoration: BoxDecoration(
+                                color: primary.withValues(alpha: 0.10),
+                                borderRadius: HubRadius.rPill,
+                                border: Border.all(
+                                  color: primary.withValues(alpha: 0.35),
+                                  width: 1,
+                                ),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(LucideIcons.shield, size: 12, color: primary),
+                                  const SizedBox(width: 5),
+                                  Text(
+                                    'Terkunci Aman',
                                     style: TextStyle(
-                                      fontSize: 24,
-                                      fontWeight: FontWeight.w600,
-                                      color: textPrimary,
+                                      color: primary,
+                                      fontWeight: FontWeight.w700,
+                                      fontSize: 11,
+                                      letterSpacing: 0.2,
                                     ),
                                   ),
-                                  onTap: () => _onKeypadDigit('0'),
-                                ),
-                                // Backspace button
-                                _buildKeypadButton(
-                                  content: Icon(
-                                    LucideIcons.delete,
-                                    color: AppTokens.textSecondary(context),
-                                    size: 20,
+                                ],
+                              ),
+                            ),
+                          ),
+                          SizedBox(height: sectionGap),
+                          Text(
+                            _hasPin ? 'Brankas Terkunci' : 'Buat PIN Brankas',
+                            textAlign: TextAlign.center,
+                            style: theme.textTheme.titleMedium?.copyWith(
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: -0.3,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            _hasPin
+                                ? 'Masukkan PIN (4-8 digit) atau gunakan biometrik.'
+                                : 'Atur PIN 4-8 digit angka untuk melindungi brankas.',
+                            textAlign: TextAlign.center,
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: AppTokens.textSecondary(context),
+                              height: 1.3,
+                            ),
+                          ),
+                          if (_hasPin) ...[
+                            SizedBox(height: isCompactHeight ? 8 : 12),
+                            // PIN dots indicator (clean flat tactile dots, no neon halo)
+                            Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 4),
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: List.generate(dotCount, (index) {
+                                  final isFilled = index < pinLength;
+                                  return AnimatedContainer(
+                                    duration: const Duration(milliseconds: 180),
+                                    curve: Curves.easeOutCubic,
+                                    margin: const EdgeInsets.symmetric(
+                                      horizontal: 6,
+                                    ),
+                                    width: isFilled ? 15 : 13,
+                                    height: isFilled ? 15 : 13,
+                                    decoration: BoxDecoration(
+                                      shape: BoxShape.circle,
+                                      color: isFilled
+                                          ? primary
+                                          : AppTokens.surfaceSubtle(context),
+                                      border: Border.all(
+                                        color: isFilled
+                                            ? primary
+                                            : AppTokens.border(context),
+                                        width: 1.5,
+                                      ),
+                                    ),
+                                  );
+                                }),
+                              ),
+                            ),
+                            SizedBox(height: isCompactHeight ? 6 : 10),
+                            // Adaptive tactile keypad
+                            Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 2),
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  for (final row in const [
+                                    ['1', '2', '3'],
+                                    ['4', '5', '6'],
+                                    ['7', '8', '9'],
+                                  ]) ...[
+                                    Row(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.spaceEvenly,
+                                      children: [
+                                        for (final d in row)
+                                          _buildKeypadButton(
+                                            diameter: keypadDiameter,
+                                            content: FittedBox(
+                                              fit: BoxFit.scaleDown,
+                                              child: Text(
+                                                d,
+                                                style: HubTypography.tabular(
+                                                  TextStyle(
+                                                    fontSize: isCompactHeight
+                                                        ? 20
+                                                        : 24,
+                                                    fontWeight: FontWeight.w600,
+                                                    color: textPrimary,
+                                                  ),
+                                                ),
+                                              ),
+                                            ),
+                                            onTap: () => _onKeypadDigit(d),
+                                          ),
+                                      ],
+                                    ),
+                                    SizedBox(height: keypadRowGap),
+                                  ],
+                                  Row(
+                                    mainAxisAlignment:
+                                        MainAxisAlignment.spaceEvenly,
+                                    children: [
+                                      if (pinLength > 0)
+                                        _buildKeypadButton(
+                                          diameter: keypadDiameter,
+                                          semanticLabel: 'Konfirmasi PIN',
+                                          backgroundColor:
+                                              primary.withValues(alpha: 0.15),
+                                          borderColor:
+                                              primary.withValues(alpha: 0.5),
+                                          content: Icon(
+                                            LucideIcons.check,
+                                            color: primary,
+                                            size: isCompactHeight ? 20 : 24,
+                                          ),
+                                          onTap: _isSubmitting
+                                              ? () {}
+                                              : _handleUnlockWithPin,
+                                        )
+                                      else if (_canUseBiometrics)
+                                        _buildKeypadButton(
+                                          diameter: keypadDiameter,
+                                          semanticLabel: 'Buka dengan Biometrik',
+                                          content: Icon(
+                                            LucideIcons.fingerprint,
+                                            color: primary,
+                                            size: isCompactHeight ? 20 : 24,
+                                          ),
+                                          onTap: _handleUnlockWithBiometrics,
+                                        )
+                                      else
+                                        _buildKeypadButton(
+                                          diameter: keypadDiameter,
+                                          semanticLabel: 'Bersihkan PIN',
+                                          content: Icon(
+                                            LucideIcons.rotateCcw,
+                                            color:
+                                                AppTokens.textSecondary(context),
+                                            size: 20,
+                                          ),
+                                          onTap: _onKeypadClear,
+                                        ),
+                                      _buildKeypadButton(
+                                        diameter: keypadDiameter,
+                                        content: FittedBox(
+                                          fit: BoxFit.scaleDown,
+                                          child: Text(
+                                            '0',
+                                            style: HubTypography.tabular(
+                                              TextStyle(
+                                                fontSize:
+                                                    isCompactHeight ? 20 : 24,
+                                                fontWeight: FontWeight.w600,
+                                                color: textPrimary,
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                        onTap: () => _onKeypadDigit('0'),
+                                      ),
+                                      _buildKeypadButton(
+                                        diameter: keypadDiameter,
+                                        semanticLabel: 'Hapus satu digit',
+                                        content: Icon(
+                                          LucideIcons.delete,
+                                          color:
+                                              AppTokens.textSecondary(context),
+                                          size: 20,
+                                        ),
+                                        onTap: _onKeypadBackspace,
+                                      ),
+                                    ],
                                   ),
-                                  onTap: _onKeypadBackspace,
-                                ),
+                                ],
+                              ),
+                            ),
+                          ] else ...[
+                            const SizedBox(height: 16),
+                            TextField(
+                              controller: _pinController,
+                              obscureText: _obscurePin,
+                              keyboardType: TextInputType.number,
+                              maxLength: 8,
+                              inputFormatters: [
+                                FilteringTextInputFormatter.digitsOnly,
+                                LengthLimitingTextInputFormatter(8),
                               ],
+                              textInputAction: TextInputAction.next,
+                              onChanged: (_) => setState(() {}),
+                              decoration: InputDecoration(
+                                labelText: 'Buat PIN (4-8 digit)',
+                                hintText: '4-8 digit angka',
+                                counterText: '',
+                                prefixIcon: const Icon(LucideIcons.keyRound),
+                                suffixIcon: IconButton(
+                                  tooltip: _obscurePin
+                                      ? 'Tampilkan PIN'
+                                      : 'Sembunyikan PIN',
+                                  icon: Icon(
+                                    _obscurePin
+                                        ? LucideIcons.eye
+                                        : LucideIcons.eyeOff,
+                                  ),
+                                  onPressed: () {
+                                    setState(() {
+                                      _obscurePin = !_obscurePin;
+                                    });
+                                  },
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                            TextField(
+                              controller: _confirmPinController,
+                              obscureText: _obscurePin,
+                              keyboardType: TextInputType.number,
+                              maxLength: 8,
+                              inputFormatters: [
+                                FilteringTextInputFormatter.digitsOnly,
+                                LengthLimitingTextInputFormatter(8),
+                              ],
+                              textInputAction: TextInputAction.done,
+                              onSubmitted: (_) {
+                                if (!_isSubmitting) {
+                                  _handleSetupPin();
+                                }
+                              },
+                              decoration: const InputDecoration(
+                                labelText: 'Ulangi PIN',
+                                hintText: 'Ulangi PIN yang sama',
+                                counterText: '',
+                                prefixIcon: Icon(LucideIcons.shieldCheck),
+                              ),
                             ),
                           ],
-                        ),
-                      ),
-                    ] else ...[
-                      const SizedBox(height: 16),
-                      TextField(
-                        controller: _pinController,
-                        obscureText: _obscurePin,
-                        keyboardType: TextInputType.number,
-                        textInputAction: TextInputAction.next,
-                        onChanged: (_) => setState(() {}),
-                        decoration: InputDecoration(
-                          labelText: 'Buat PIN (min. 4 digit)',
-                          hintText: 'Minimal 4 digit angka',
-                          prefixIcon: const Icon(LucideIcons.keyRound),
-                          suffixIcon: IconButton(
-                            tooltip: _obscurePin
-                                ? 'Tampilkan PIN'
-                                : 'Sembunyikan PIN',
-                            icon: Icon(
-                              _obscurePin
-                                  ? LucideIcons.eye
-                                  : LucideIcons.eyeOff,
-                            ),
-                            onPressed: () {
-                              setState(() {
-                                _obscurePin = !_obscurePin;
-                              });
-                            },
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      TextField(
-                        controller: _confirmPinController,
-                        obscureText: _obscurePin,
-                        keyboardType: TextInputType.number,
-                        textInputAction: TextInputAction.done,
-                        onSubmitted: (_) {
-                          if (!_isSubmitting) {
-                            _handleSetupPin();
-                          }
-                        },
-                        decoration: const InputDecoration(
-                          labelText: 'Ulangi PIN',
-                          hintText: 'Ulangi PIN yang sama',
-                          prefixIcon: Icon(LucideIcons.shieldCheck),
-                        ),
-                      ),
-                    ],
-                    if (_errorMessage != null) ...[
-                      const SizedBox(height: 12),
-                      Text(
-                        _errorMessage!,
-                        textAlign: TextAlign.center,
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: AppTokens.error(context),
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ],
-                    const SizedBox(height: 18),
-                    FilledButton.icon(
-                      style: FilledButton.styleFrom(
-                        backgroundColor: primary,
-                        foregroundColor: Colors.white,
-                        minimumSize: const Size.fromHeight(48),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: HubRadius.rSm,
-                        ),
-                      ),
-                      onPressed: _isSubmitting
-                          ? null
-                          : (_hasPin
-                              ? _handleUnlockWithPin
-                              : _handleSetupPin),
-                      icon: _isSubmitting
-                          ? const SizedBox(
-                              width: 18,
-                              height: 18,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                color: Colors.white,
+                          if (_errorMessage != null) ...[
+                            SizedBox(height: isCompactHeight ? 8 : 12),
+                            Text(
+                              _errorMessage!,
+                              textAlign: TextAlign.center,
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: AppTokens.error(context),
+                                fontWeight: FontWeight.w600,
                               ),
-                            )
-                          : Icon(
-                              _hasPin
-                                  ? LucideIcons.lockOpen
-                                  : LucideIcons.checkCircle,
-                              size: 18,
                             ),
-                      label: Text(
-                        _hasPin ? 'Buka Brankas' : 'Simpan PIN & Buka',
-                        style: const TextStyle(fontWeight: FontWeight.w700),
+                          ],
+                          SizedBox(height: isCompactHeight ? 10 : 18),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: FilledButton.icon(
+                                  style: FilledButton.styleFrom(
+                                    backgroundColor: primary,
+                                    foregroundColor:
+                                        AppTokens.onPrimary(context),
+                                    minimumSize: const Size.fromHeight(48),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: HubRadius.rSm,
+                                    ),
+                                  ),
+                                  onPressed: _isSubmitting
+                                      ? null
+                                      : (_hasPin
+                                          ? _handleUnlockWithPin
+                                          : _handleSetupPin),
+                                  icon: _isSubmitting
+                                      ? SizedBox(
+                                          width: 18,
+                                          height: 18,
+                                          child: CircularProgressIndicator(
+                                            strokeWidth: 2,
+                                            color: AppTokens.onPrimary(context),
+                                          ),
+                                        )
+                                      : Icon(
+                                          _hasPin
+                                              ? LucideIcons.lockOpen
+                                              : LucideIcons.checkCircle,
+                                          size: 18,
+                                        ),
+                                  label: Text(
+                                    _hasPin
+                                        ? 'Buka Brankas'
+                                        : 'Simpan PIN & Buka',
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              if (_hasPin && _canUseBiometrics) ...[
+                                const SizedBox(width: 8),
+                                Tooltip(
+                                  message: 'Buka dengan Biometrik',
+                                  child: SizedBox(
+                                    width: 48,
+                                    height: 48,
+                                    child: OutlinedButton(
+                                      style: OutlinedButton.styleFrom(
+                                        padding: EdgeInsets.zero,
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius: HubRadius.rSm,
+                                        ),
+                                      ),
+                                      onPressed: _isSubmitting
+                                          ? null
+                                          : _handleUnlockWithBiometrics,
+                                      child: const Icon(
+                                        LucideIcons.fingerprint,
+                                        size: 22,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ],
+                          ),
+                        ],
                       ),
                     ),
-                    if (_hasPin && _canUseBiometrics) ...[
-                      const SizedBox(height: 10),
-                      OutlinedButton.icon(
-                        style: OutlinedButton.styleFrom(
-                          minimumSize: const Size.fromHeight(48),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: HubRadius.rSm,
-                          ),
-                        ),
-                        onPressed: _isSubmitting
-                            ? null
-                            : _handleUnlockWithBiometrics,
-                        icon: const Icon(LucideIcons.fingerprint, size: 18),
-                        label: const Text('Buka dengan Biometrik'),
-                      ),
-                    ],
-                  ],
+                  ),
                 ),
-              ),
-            ),
+              );
+            },
           ),
         ),
       ),
-    ),
   );
 }
 }

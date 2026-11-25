@@ -6,6 +6,9 @@
     <uses-permission android:name="android.permission.USE_BIOMETRIC" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
     <application
         android:label="Personal Hub"
         android:name="${applicationName}"
@@ -35,6 +38,10 @@
                 android:name="android.app.shortcuts"
                 android:resource="@xml/shortcuts" />
         </activity>
+        <service
+            android:name=".MeetingRecordingForegroundService"
+            android:exported="false"
+            android:foregroundServiceType="microphone|shortService" />
         <meta-data
             android:name="com.google.firebase.messaging.default_notification_channel_id"
             android:value="adzan_channel" />
@@ -56,6 +63,9 @@
         </intent>
         <intent>
             <action android:name="android.speech.RecognitionService" />
+        </intent>
+        <intent>
+            <action android:name="android.speech.action.GET_LANGUAGE_DETAILS" />
         </intent>
     </queries>
 </manifest>

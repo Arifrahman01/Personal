@@ -1,11 +1,11 @@
 {
-    "name": "personal_hub",
-    "short_name": "personal_hub",
+    "name": "Personal Hub",
+    "short_name": "Personal Hub",
     "start_url": ".",
     "display": "standalone",
-    "background_color": "#0175C2",
-    "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
+    "background_color": "#0D6E66",
+    "theme_color": "#0D6E66",
+    "description": "Personal Hub — Pusat produktivitas harian, notulensi rapat AI, jadwal sholat, keuangan, dan brankas terenkripsi.",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

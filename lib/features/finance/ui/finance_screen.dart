@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
+import 'package:personal_hub/app.dart';
 import 'package:personal_hub/core/theme/app_tokens.dart';
 import 'package:personal_hub/features/finance/models/finance_models.dart';
 import 'package:personal_hub/features/finance/providers/asset_aggregator_providers.dart';
@@ -43,14 +45,17 @@ class _FinanceScreenState extends ConsumerState<FinanceScreen> {
     );
   }
 
-  Future<void> _openAddTransactionSheet() async {
+  Future<void> _openAddTransactionSheet({int initialSegment = 0}) async {
     final selectedMonth = ref.read(selectedFinanceMonthProvider);
     final added = await showModalBottomSheet<bool>(
       context: context,
       isScrollControlled: true,
       useSafeArea: true,
-      builder: (sheetContext) =>
-          AddTransactionSheet(selectedMonth: selectedMonth),
+      showDragHandle: true,
+      builder: (sheetContext) => AddTransactionSheet(
+        selectedMonth: selectedMonth,
+        initialSegment: initialSegment,
+      ),
     );
 
     if (added == true && mounted) {
@@ -70,6 +75,7 @@ class _FinanceScreenState extends ConsumerState<FinanceScreen> {
       context: context,
       isScrollControlled: true,
       useSafeArea: true,
+      showDragHandle: true,
       builder: (sheetContext) =>
           AssetDeclarationSheet(initialInput: currentInput),
     );
@@ -124,17 +130,14 @@ class _FinanceScreenState extends ConsumerState<FinanceScreen> {
       appBar: AppBar(
         title: const Text(
           'Keuangan & Zakat',
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
           style: TextStyle(fontWeight: FontWeight.w800),
         ),
         actions: [
-          IconButton(
-            tooltip: 'Deklarasi Aset Zakat',
-            icon: const Icon(Icons.account_balance_wallet_outlined),
-            onPressed: _openAssetDeclarationSheet,
-          ),
           PopupMenuButton<String>(
             tooltip: 'Ekspor ke CSV',
-            icon: const Icon(Icons.download_rounded),
+            icon: const Icon(LucideIcons.download),
             onSelected: (value) {
               if (value == 'month') {
                 _handleExportCsv(allTime: false);
@@ -147,7 +150,7 @@ class _FinanceScreenState extends ConsumerState<FinanceScreen> {
                 value: 'month',
                 child: Row(
                   children: [
-                    const Icon(Icons.calendar_today_rounded, size: 18),
+                    const Icon(LucideIcons.calendar, size: 18),
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
@@ -162,7 +165,7 @@ class _FinanceScreenState extends ConsumerState<FinanceScreen> {
                 value: 'all',
                 child: Row(
                   children: [
-                    Icon(Icons.inventory_2_outlined, size: 18),
+                    Icon(LucideIcons.archive, size: 18),
                     SizedBox(width: 8),
                     Expanded(
                       child: Text(
@@ -183,7 +186,7 @@ class _FinanceScreenState extends ConsumerState<FinanceScreen> {
                     height: 20,
                     child: CircularProgressIndicator(strokeWidth: 2),
                   )
-                : const Icon(Icons.auto_awesome_rounded),
+                : const Icon(LucideIcons.sparkles),
             onPressed: aiState.isAnalyzing || summaryAsync.asData?.value == null
                 ? null
                 : () => _handleAnalyzeMonth(
@@ -191,14 +194,19 @@ class _FinanceScreenState extends ConsumerState<FinanceScreen> {
                       selectedMonth,
                     ),
           ),
+          IconButton(
+            tooltip: 'Pengaturan',
+            icon: const Icon(LucideIcons.settings),
+            onPressed: () => MainNavigationShell.openSettings(context),
+          ),
         ],
       ),
       floatingActionButton: FloatingActionButton.extended(
         backgroundColor: AppTokens.primary(context),
-        foregroundColor: Colors.white,
+        foregroundColor: AppTokens.onPrimary(context),
         elevation: 2,
         onPressed: _openAddTransactionSheet,
-        icon: const Icon(Icons.add_rounded, color: Colors.white),
+        icon: Icon(LucideIcons.plus, color: AppTokens.onPrimary(context)),
         label: const Text(
           'Catat',
           style: TextStyle(fontWeight: FontWeight.w700),
@@ -225,6 +233,8 @@ class _FinanceScreenState extends ConsumerState<FinanceScreen> {
                 selectedMonth: selectedMonth,
                 onExportMonthCsv: () => _handleExportCsv(allTime: false),
                 onAnalyzeMonth: _handleAnalyzeMonth,
+                onOpenQuickAi: () =>
+                    _openAddTransactionSheet(initialSegment: 1),
               )
             else
               ZakatTab(
@@ -261,7 +271,7 @@ class _FinanceTabSelector extends StatelessWidget {
           Expanded(
             child: _TabPill(
               label: 'Arus Kas & Tagihan',
-              icon: Icons.auto_graph_rounded,
+              icon: LucideIcons.trendingUp,
               isSelected: selectedIndex == 0,
               onTap: () => onTabSelected(0),
             ),
@@ -270,7 +280,7 @@ class _FinanceTabSelector extends StatelessWidget {
           Expanded(
             child: _TabPill(
               label: 'Zakat Mal & Nisab',
-              icon: Icons.balance_rounded,
+              icon: LucideIcons.scale,
               isSelected: selectedIndex == 1,
               onTap: () => onTabSelected(1),
             ),
@@ -297,6 +307,7 @@ class _TabPill extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final activeColor = AppTokens.primary(context);
+    final onPrimaryColor = AppTokens.onPrimary(context);
     final inactiveColor = AppTokens.textSecondary(context);
 
     return Material(
@@ -307,6 +318,7 @@ class _TabPill extends StatelessWidget {
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 200),
           curve: Curves.easeOutCubic,
+          constraints: const BoxConstraints(minHeight: 40),
           padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 8),
           decoration: BoxDecoration(
             color: isSelected ? activeColor : Colors.transparent,
@@ -318,7 +330,7 @@ class _TabPill extends StatelessWidget {
               Icon(
                 icon,
                 size: 16,
-                color: isSelected ? Colors.white : inactiveColor,
+                color: isSelected ? onPrimaryColor : inactiveColor,
               ),
               const SizedBox(width: 6),
               Flexible(
@@ -329,7 +341,7 @@ class _TabPill extends StatelessWidget {
                   style: TextStyle(
                     fontSize: 13,
                     fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
-                    color: isSelected ? Colors.white : inactiveColor,
+                    color: isSelected ? onPrimaryColor : inactiveColor,
                   ),
                 ),
               ),

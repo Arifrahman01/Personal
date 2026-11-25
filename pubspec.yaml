@@ -1,5 +1,5 @@
 name: personal_hub
-description: "A new Flutter project."
+description: "Personal Hub — Pusat produktivitas harian, notulensi rapat AI, jadwal sholat, keuangan, dan brankas aman."
 # The following line prevents the package from being accidentally published to
 # pub.dev using `flutter pub publish`. This is preferred for private packages.
 publish_to: 'none' # Remove this line if you wish to publish to pub.dev
@@ -55,6 +55,7 @@ dependencies:
   firebase_core: ^5.2.0
   firebase_messaging: ^17.1.0
   speech_to_text: ^7.5.0
+  whisper_ggml_plus: ^1.5.2
   google_fonts: ^8.2.1
   flutter_animate: ^4.5.2
   lucide_icons_flutter: ^4.0.3

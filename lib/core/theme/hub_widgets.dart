@@ -143,9 +143,12 @@ class HubAppBar extends StatelessWidget implements PreferredSizeWidget {
     } else if (title is String) {
       effectiveTitle = Text(
         title as String,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
         style: TextStyle(
-          fontSize: 18,
-          fontWeight: FontWeight.w700,
+          fontSize: 20,
+          fontWeight: FontWeight.w800,
+          letterSpacing: -0.3,
           color: colors.textPrimary,
         ),
       );
@@ -158,8 +161,10 @@ class HubAppBar extends StatelessWidget implements PreferredSizeWidget {
           children: [
             Text(
               titleText!,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
               style: TextStyle(
-                fontSize: 18,
+                fontSize: 20,
                 fontWeight: FontWeight.w800,
                 color: colors.textPrimary,
                 letterSpacing: -0.3,
@@ -167,6 +172,8 @@ class HubAppBar extends StatelessWidget implements PreferredSizeWidget {
             ),
             Text(
               subtitleText!,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
               style: TextStyle(
                 fontSize: 12,
                 fontWeight: FontWeight.w500,
@@ -178,9 +185,12 @@ class HubAppBar extends StatelessWidget implements PreferredSizeWidget {
       } else {
         effectiveTitle = Text(
           titleText!,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
           style: TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.w700,
+            fontSize: 20,
+            fontWeight: FontWeight.w800,
+            letterSpacing: -0.3,
             color: colors.textPrimary,
           ),
         );
@@ -281,6 +291,7 @@ class HubStatusBadge extends StatelessWidget {
           HubBadgeType.info => colors.info,
           null => colors.primary,
         });
+    final fg = AppTokens.tonalForeground(context, primary);
     final bg = backgroundColor ?? primary.withValues(alpha: 0.12);
 
     final content = Container(
@@ -293,15 +304,19 @@ class HubStatusBadge extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           if (icon != null) ...[
-            Icon(icon, size: 14, color: primary),
+            Icon(icon, size: 14, color: fg),
             const SizedBox(width: 4),
           ],
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-              color: primary,
+          Flexible(
+            child: Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: fg,
+              ),
             ),
           ),
         ],
@@ -312,7 +327,10 @@ class HubStatusBadge extends StatelessWidget {
       return InkWell(
         onTap: onTap,
         borderRadius: HubRadius.rPill,
-        child: content,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
+          child: Center(widthFactor: 1.0, heightFactor: 1.0, child: content),
+        ),
       );
     }
 
@@ -344,7 +362,7 @@ class HubEmptyState extends StatelessWidget {
     final colors = HubColors.of(context);
 
     return Center(
-      child: Padding(
+      child: SingleChildScrollView(
         padding: const EdgeInsets.all(HubSpacing.xxl),
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -393,7 +411,7 @@ class HubEmptyState extends StatelessWidget {
                 onPressed: onAction,
                 style: FilledButton.styleFrom(
                   backgroundColor: colors.primary,
-                  foregroundColor: Colors.white,
+                  foregroundColor: colors.onPrimary,
                   shape: RoundedRectangleBorder(borderRadius: HubRadius.rSm),
                 ),
                 child: Text(actionLabel!),
@@ -429,35 +447,50 @@ class HubPill extends StatelessWidget {
     final primary = color ?? colors.primary;
     final bg = isSelected ? primary.withValues(alpha: 0.15) : colors.surfaceCard;
     final border = isSelected ? primary : colors.borderHairline;
-    final textColor = isSelected ? primary : colors.textPrimary;
+    final textColor = isSelected
+        ? AppTokens.tonalForeground(context, primary)
+        : colors.textPrimary;
 
-    return InkWell(
-      onTap: onTap,
-      borderRadius: HubRadius.rPill,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-        decoration: BoxDecoration(
-          color: bg,
-          borderRadius: HubRadius.rPill,
-          border: Border.all(color: border, width: 1),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            if (icon != null) ...[
-              Icon(icon, size: 14, color: textColor),
-              const SizedBox(width: 6),
-            ],
-            Text(
+    final pill = Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: HubRadius.rPill,
+        border: Border.all(color: border, width: 1),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (icon != null) ...[
+            Icon(icon, size: 14, color: textColor),
+            const SizedBox(width: 6),
+          ],
+          Flexible(
+            child: Text(
               label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
               style: TextStyle(
                 fontSize: 12,
                 fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
                 color: textColor,
               ),
             ),
-          ],
-        ),
+          ),
+        ],
+      ),
+    );
+
+    if (onTap == null) {
+      return pill;
+    }
+
+    return InkWell(
+      onTap: onTap,
+      borderRadius: HubRadius.rPill,
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
+        child: Center(widthFactor: 1.0, heightFactor: 1.0, child: pill),
       ),
     );
   }

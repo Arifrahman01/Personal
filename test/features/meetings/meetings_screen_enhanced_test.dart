@@ -4,6 +4,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:personal_hub/features/meetings/models/meeting.dart';
 import 'package:personal_hub/features/meetings/providers/meetings_providers.dart';
 import 'package:personal_hub/features/meetings/providers/schedule_guardian_providers.dart';
+import 'package:personal_hub/features/meetings/services/meeting_voice_recorder.dart';
+import 'package:personal_hub/features/meetings/ui/live_meeting_recorder_screen.dart';
 import 'package:personal_hub/features/meetings/ui/meetings_screen.dart';
 import 'package:personal_hub/features/prayer/models/prayer_models.dart';
 import 'package:personal_hub/features/prayer/providers/prayer_providers.dart';
@@ -41,6 +43,35 @@ class _FakeMeetingsNotifier extends MeetingsNotifier {
 
   @override
   Future<List<Meeting>> build() async => _initial;
+
+  @override
+  Future<Meeting> updateMeeting(Meeting meeting) async {
+    final current = state.asData?.value ?? _initial;
+    final updated = [
+      for (final item in current) item.id == meeting.id ? meeting : item,
+    ];
+    state = AsyncData(updated);
+    return meeting;
+  }
+}
+
+class _NoOpSpeechGateway implements SpeechRecognizerGateway {
+  @override
+  Future<bool> initialize() async => true;
+
+  @override
+  Future<void> startListening({
+    required String localeId,
+    required void Function(String text, bool isFinal) onResult,
+    void Function(String status)? onStatus,
+    void Function(double level)? onSoundLevelChange,
+  }) async {}
+
+  @override
+  Future<void> stopListening() async {}
+
+  @override
+  Future<void> cancel() async {}
 }
 
 void main() {
@@ -183,12 +214,12 @@ void main() {
         expect(find.text('+1'), findsOneWidget); // 4 attendees -> max 3 visible, +1 overflow
         expect(find.text('1 peserta'), findsOneWidget);
 
-        // Online Meeting Join Action Buttons
-        expect(find.text('Join Meeting Online'), findsOneWidget);
+        // Online Meeting Copy Action Buttons
+        expect(find.text('Salin Tautan Meeting'), findsOneWidget);
         expect(find.text('Online (Meet / Zoom)'), findsOneWidget);
 
-        // Tap Join Meeting Online copies link and triggers feedback
-        await tester.tap(find.text('Join Meeting Online'));
+        // Tap Salin Tautan Meeting copies link and triggers feedback
+        await tester.tap(find.text('Salin Tautan Meeting'));
         await tester.pumpAndSettle();
         expect(find.textContaining('Tautan rapat disalin'), findsOneWidget);
       },
@@ -224,8 +255,11 @@ void main() {
         );
         await tester.pumpAndSettle();
 
+        // Verify redundant Jadwalkan button was removed in favor of single FAB
+        expect(find.byKey(const Key('schedule_meeting_button')), findsNothing);
+
         // 1. Single meeting 1-tap iCal export icon button
-        final singleExportBtn = find.byTooltip('Salin iCal (.ics)');
+        final singleExportBtn = find.byTooltip('Tambah ke Kalender (.ics)');
         expect(singleExportBtn, findsOneWidget);
         await tester.tap(singleExportBtn);
         await tester.pumpAndSettle();
@@ -235,13 +269,13 @@ void main() {
         );
 
         // 2. AppBar 1-tap export button
-        final appbarExportBtn = find.byKey(const Key('export_ical_button'));
+        final appbarExportBtn = find.byTooltip('Ekspor Semua ke Kalender (.ics)');
         expect(appbarExportBtn, findsOneWidget);
         await tester.tap(appbarExportBtn);
         await tester.pumpAndSettle();
 
         // Bottom sheet options
-        expect(find.text('Ekspor Agenda iCal (.ics)'), findsOneWidget);
+        expect(find.text('Tambah ke Kalender (.ics)'), findsOneWidget);
         expect(find.text('Salin Format iCal (.ics)'), findsOneWidget);
         expect(find.text('Bagikan Berkas Kalender (.ics)'), findsOneWidget);
 
@@ -293,6 +327,96 @@ void main() {
           find.textContaining('Sholat Ashar (15:15)'),
           findsOneWidget,
         );
+      },
+    );
+
+    testWidgets(
+      'tapping record_now_button opens LiveMeetingRecorderScreen',
+      (WidgetTester tester) async {
+        tester.view.physicalSize = const Size(800, 1400);
+        tester.view.devicePixelRatio = 1.0;
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+
+        await tester.pumpWidget(
+          ProviderScope(
+            overrides: [
+              meetingsProvider.overrideWith(() => _FakeMeetingsNotifier(const [])),
+              scheduleGuardianConflictsProvider.overrideWithValue(
+                const AsyncData([]),
+              ),
+              todayPrayerTimesProvider.overrideWithValue(
+                AsyncData(_createSamplePrayerTimes(today)),
+              ),
+              speechRecognizerGatewayProvider.overrideWithValue(
+                _NoOpSpeechGateway(),
+              ),
+              recordingWakelockGatewayProvider.overrideWithValue(
+                NoOpRecordingWakelockGateway(),
+              ),
+              meetingDraftStoreProvider.overrideWithValue(
+                InMemoryMeetingDraftStore(),
+              ),
+            ],
+            child: const MaterialApp(
+              home: MeetingsScreen(),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        await tester.tap(find.byKey(const Key('record_now_button')));
+        await tester.pumpAndSettle();
+
+        expect(find.byType(LiveMeetingRecorderScreen), findsOneWidget);
+        expect(find.text('Rekam Meeting'), findsOneWidget);
+      },
+    );
+
+    testWidgets(
+      'tapping reschedule_conflict shifts meeting time and shows Undo SnackBar',
+      (WidgetTester tester) async {
+        tester.view.physicalSize = const Size(800, 1400);
+        tester.view.devicePixelRatio = 1.0;
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+
+        final conflictMeeting = Meeting(
+          id: 'm-conflict-ashar',
+          title: 'Review Sprint Ashar',
+          scheduledAt: DateTime(today.year, today.month, today.day, 15, 10),
+          createdAt: now,
+          updatedAt: now,
+        );
+
+        await tester.pumpWidget(
+          ProviderScope(
+            overrides: [
+              meetingsProvider.overrideWith(
+                () => _FakeMeetingsNotifier([conflictMeeting]),
+              ),
+              todayPrayerTimesProvider.overrideWithValue(
+                AsyncData(_createSamplePrayerTimes(today, withConflict: true)),
+              ),
+            ],
+            child: const MaterialApp(
+              home: MeetingsScreen(),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        final rescheduleBtn = find.byKey(
+          const Key('reschedule_conflict_m-conflict-ashar'),
+        );
+        expect(rescheduleBtn, findsOneWidget);
+
+        await tester.tap(rescheduleBtn);
+        await tester.pumpAndSettle();
+
+        expect(find.textContaining('digeser ke 15:35'), findsOneWidget);
+        expect(find.text('Batal'), findsOneWidget);
+        expect(find.byKey(const Key('prayer_conflict_banner')), findsNothing);
       },
     );
   });

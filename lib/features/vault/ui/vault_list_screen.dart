@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
+import 'package:personal_hub/app.dart';
 import 'package:personal_hub/core/errors/app_exceptions.dart';
 import 'package:personal_hub/core/theme/app_tokens.dart';
 import 'package:personal_hub/core/theme/hub_widgets.dart';
@@ -90,7 +91,7 @@ class _VaultListScreenState extends ConsumerState<VaultListScreen> {
         return AppTokens.primary(context);
       case 'Pribadi':
       default:
-        return const Color(0xFF8B5CF6);
+        return AppTokens.warning(context);
     }
   }
 
@@ -103,7 +104,11 @@ class _VaultListScreenState extends ConsumerState<VaultListScreen> {
         SnackBar(
           content: Row(
             children: [
-              const Icon(LucideIcons.timer, color: Colors.white, size: 16),
+              Icon(
+                LucideIcons.timer,
+                color: Theme.of(context).colorScheme.onInverseSurface,
+                size: 16,
+              ),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
@@ -185,6 +190,7 @@ class _VaultListScreenState extends ConsumerState<VaultListScreen> {
             FilledButton(
               style: FilledButton.styleFrom(
                 backgroundColor: AppTokens.error(context),
+                foregroundColor: Theme.of(context).colorScheme.onError,
               ),
               onPressed: () => Navigator.of(dialogContext).pop(true),
               child: const Text('Hapus'),
@@ -231,6 +237,11 @@ class _VaultListScreenState extends ConsumerState<VaultListScreen> {
         elevation: 0,
         actions: [
           IconButton(
+            tooltip: 'Asisten AI',
+            icon: const Icon(LucideIcons.sparkles),
+            onPressed: () => MainNavigationShell.openAiChat(context),
+          ),
+          IconButton(
             tooltip: 'Pengaturan Brankas & Duress PIN',
             icon: const Icon(LucideIcons.shieldCheck),
             onPressed: _openSecuritySettings,
@@ -246,7 +257,7 @@ class _VaultListScreenState extends ConsumerState<VaultListScreen> {
       ),
       floatingActionButton: FloatingActionButton.extended(
         backgroundColor: primary,
-        foregroundColor: Colors.white,
+        foregroundColor: AppTokens.onPrimary(context),
         shape: RoundedRectangleBorder(borderRadius: HubRadius.rPill),
         icon: const Icon(LucideIcons.plus, size: 20),
         label: const Text(
@@ -283,7 +294,7 @@ class _VaultListScreenState extends ConsumerState<VaultListScreen> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            'Decoy Mode Aktif',
+                            'Mode Penyamaran (Decoy) Aktif',
                             style: TextStyle(
                               fontWeight: FontWeight.w700,
                               fontSize: 13,
@@ -402,51 +413,32 @@ class _VaultListScreenState extends ConsumerState<VaultListScreen> {
                           .toList();
 
                   if (entries.isEmpty) {
-                    return Center(
-                      child: Padding(
-                        padding: const EdgeInsets.all(24),
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Container(
-                              width: 60,
-                              height: 60,
-                              decoration: BoxDecoration(
-                                color: primary.withValues(alpha: 0.12),
-                                shape: BoxShape.circle,
-                              ),
-                              child: Icon(
-                                LucideIcons.keyRound,
-                                size: 28,
-                                color: primary,
-                              ),
-                            ),
-                            const SizedBox(height: 16),
-                            Text(
-                              query.isEmpty
-                                  ? (_selectedCategory == 'Semua'
-                                      ? 'Brankas masih kosong'
-                                      : 'Tidak ada akun di kategori "$_selectedCategory"')
-                                  : 'Akun tidak ditemukan',
-                              style: const TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                            const SizedBox(height: 6),
-                            Text(
-                              query.isEmpty
-                                  ? 'Simpan kata sandi Anda dengan aman terlindungi enkripsi AES-256-GCM.'
-                                  : 'Coba ubah kata kunci pencarian Anda.',
-                              textAlign: TextAlign.center,
-                              style: TextStyle(
-                                fontSize: 13,
-                                color: AppTokens.textSecondary(context),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
+                    final isUnfilteredEmpty =
+                        query.isEmpty && _selectedCategory == 'Semua';
+                    return HubEmptyState(
+                      icon: LucideIcons.keyRound,
+                      title: query.isEmpty
+                          ? (_selectedCategory == 'Semua'
+                              ? 'Brankas masih kosong'
+                              : 'Tidak ada akun di kategori "$_selectedCategory"')
+                          : 'Akun tidak ditemukan',
+                      message: query.isEmpty
+                          ? 'Simpan kata sandi Anda dengan aman dan terenkripsi di perangkat ini.'
+                          : 'Coba ubah kata kunci pencarian Anda.',
+                      actionLabel: isUnfilteredEmpty
+                          ? 'Tambah Akun Pertama'
+                          : 'Reset Filter',
+                      onAction: isUnfilteredEmpty
+                          ? () => _openEntryForm()
+                          : () {
+                              _searchController.clear();
+                              ref
+                                  .read(vaultSearchQueryProvider.notifier)
+                                  .setQuery('');
+                              setState(() {
+                                _selectedCategory = 'Semua';
+                              });
+                            },
                     );
                   }
 
@@ -619,12 +611,14 @@ class _VaultAccountDetailSheetState extends State<_VaultAccountDetailSheet> {
     final catColor = _VaultListScreenState.getCategoryColor(category, context);
     final primary = AppTokens.primary(context);
 
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
+    return SafeArea(
+      top: false,
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
           // Drag handle
           Center(
             child: Container(
@@ -714,7 +708,7 @@ class _VaultAccountDetailSheetState extends State<_VaultAccountDetailSheet> {
                   if (widget.onCopyUsername != null)
                     IconButton(
                       tooltip: 'Salin username',
-                      constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
+                      constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
                       icon: const Icon(LucideIcons.copy, size: 18),
                       onPressed: widget.onCopyUsername,
                     ),
@@ -758,7 +752,7 @@ class _VaultAccountDetailSheetState extends State<_VaultAccountDetailSheet> {
                 ),
                 IconButton(
                   tooltip: _isPasswordRevealed ? 'Sembunyikan sandi' : 'Tampilkan sandi',
-                  constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
+                  constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
                   icon: Icon(
                     _isPasswordRevealed ? LucideIcons.eyeOff : LucideIcons.eye,
                     size: 18,
@@ -771,7 +765,7 @@ class _VaultAccountDetailSheetState extends State<_VaultAccountDetailSheet> {
                 ),
                 IconButton(
                   tooltip: 'Salin kata sandi',
-                  constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
+                  constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
                   icon: const Icon(LucideIcons.copy, size: 18),
                   onPressed: widget.onCopyPassword,
                 ),
@@ -813,7 +807,7 @@ class _VaultAccountDetailSheetState extends State<_VaultAccountDetailSheet> {
                   if (widget.onCopyUrl != null)
                     IconButton(
                       tooltip: 'Salin URL',
-                      constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
+                      constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
                       icon: const Icon(LucideIcons.copy, size: 18),
                       onPressed: widget.onCopyUrl,
                     ),
@@ -860,7 +854,11 @@ class _VaultAccountDetailSheetState extends State<_VaultAccountDetailSheet> {
                     shape: RoundedRectangleBorder(borderRadius: HubRadius.rSm),
                   ),
                   icon: const Icon(LucideIcons.pencil, size: 16),
-                  label: const Text('Edit Akun'),
+                  label: const Text(
+                    'Edit Akun',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
                   onPressed: widget.onEdit,
                 ),
               ),
@@ -869,18 +867,23 @@ class _VaultAccountDetailSheetState extends State<_VaultAccountDetailSheet> {
                 child: FilledButton.icon(
                   style: FilledButton.styleFrom(
                     backgroundColor: AppTokens.error(context),
-                    foregroundColor: Colors.white,
+                    foregroundColor: Theme.of(context).colorScheme.onError,
                     minimumSize: const Size.fromHeight(46),
                     shape: RoundedRectangleBorder(borderRadius: HubRadius.rSm),
                   ),
                   icon: const Icon(LucideIcons.trash2, size: 16),
-                  label: const Text('Hapus Akun'),
+                  label: const Text(
+                    'Hapus Akun',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
                   onPressed: widget.onDelete,
                 ),
               ),
             ],
           ),
         ],
+        ),
       ),
     );
   }
@@ -1006,115 +1009,118 @@ class _VaultEntryFormSheetState extends ConsumerState<_VaultEntryFormSheet> {
     final isEditing = widget.existing != null;
     final primary = AppTokens.primary(context);
 
-    return Padding(
-      padding: EdgeInsets.only(
-        bottom: MediaQuery.of(context).viewInsets.bottom,
-        left: 20,
-        right: 20,
-        top: 16,
-      ),
-      child: Form(
-        key: _formKey,
-        child: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Center(
-                child: Container(
-                  width: 38,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: AppTokens.border(context),
-                    borderRadius: HubRadius.rPill,
-                  ),
-                ),
-              ),
-              const SizedBox(height: 16),
-              Row(
-                children: [
-                  Icon(
-                    isEditing ? LucideIcons.pencil : LucideIcons.plusCircle,
-                    size: 22,
-                    color: primary,
-                  ),
-                  const SizedBox(width: 10),
-                  Text(
-                    isEditing ? 'Edit Akun' : 'Tambah Akun Baru',
-                    style: const TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w800,
+    return SafeArea(
+      top: false,
+      child: Padding(
+        padding: EdgeInsets.only(
+          bottom: MediaQuery.of(context).viewInsets.bottom,
+          left: 20,
+          right: 20,
+          top: 16,
+        ),
+        child: Form(
+          key: _formKey,
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Center(
+                  child: Container(
+                    width: 38,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: AppTokens.border(context),
+                      borderRadius: HubRadius.rPill,
                     ),
                   ),
-                ],
-              ),
-              const SizedBox(height: 16),
-              TextFormField(
-                controller: _titleController,
-                decoration: const InputDecoration(
-                  labelText: 'Judul Akun *',
-                  hintText: 'Misal: GitHub, Email Kantor, dsb.',
-                  prefixIcon: Icon(LucideIcons.tag),
                 ),
-                validator: (val) {
-                  if (val == null || val.trim().isEmpty) {
-                    return 'Judul akun tidak boleh kosong.';
-                  }
-                  return null;
-                },
-              ),
-              const SizedBox(height: 12),
-              TextFormField(
-                controller: _usernameController,
-                decoration: const InputDecoration(
-                  labelText: 'Username / Email',
-                  hintText: 'user@example.com',
-                  prefixIcon: Icon(LucideIcons.user),
-                ),
-              ),
-              const SizedBox(height: 12),
-              TextFormField(
-                controller: _passwordController,
-                obscureText: _obscurePassword,
-                decoration: InputDecoration(
-                  labelText: 'Kata Sandi *',
-                  hintText: 'Sandi rahasia',
-                  prefixIcon: const Icon(LucideIcons.lock),
-                  suffixIcon: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      IconButton(
-                        tooltip: 'Buat sandi acak kuat',
-                        icon: const Icon(LucideIcons.sparkles, size: 18),
-                        onPressed: _generatePassword,
-                      ),
-                      IconButton(
-                        tooltip: _obscurePassword
-                            ? 'Tampilkan sandi'
-                            : 'Sembunyikan sandi',
-                        icon: Icon(
-                          _obscurePassword
-                              ? LucideIcons.eye
-                              : LucideIcons.eyeOff,
-                          size: 18,
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    Icon(
+                      isEditing ? LucideIcons.pencil : LucideIcons.plusCircle,
+                      size: 22,
+                      color: primary,
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        isEditing ? 'Edit Akun' : 'Tambah Akun Baru',
+                        style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w800,
                         ),
-                        onPressed: () {
-                          setState(() {
-                            _obscurePassword = !_obscurePassword;
-                          });
-                        },
                       ),
-                    ],
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                TextFormField(
+                  controller: _titleController,
+                  decoration: const InputDecoration(
+                    labelText: 'Judul Akun *',
+                    hintText: 'Misal: GitHub, Email Kantor, dsb.',
+                    prefixIcon: Icon(LucideIcons.tag),
+                  ),
+                  validator: (val) {
+                    if (val == null || val.trim().isEmpty) {
+                      return 'Judul akun tidak boleh kosong.';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: _usernameController,
+                  decoration: const InputDecoration(
+                    labelText: 'Username / Email',
+                    hintText: 'user@example.com',
+                    prefixIcon: Icon(LucideIcons.user),
                   ),
                 ),
-                validator: (val) {
-                  if (val == null || val.isEmpty) {
-                    return 'Kata sandi tidak boleh kosong.';
-                  }
-                  return null;
-                },
-              ),
-              const SizedBox(height: 12),
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: _passwordController,
+                  obscureText: _obscurePassword,
+                  decoration: InputDecoration(
+                    labelText: 'Kata Sandi *',
+                    hintText: 'Sandi rahasia',
+                    prefixIcon: const Icon(LucideIcons.lock),
+                    suffixIcon: IconButton(
+                      tooltip: _obscurePassword
+                          ? 'Tampilkan sandi'
+                          : 'Sembunyikan sandi',
+                      icon: Icon(
+                        _obscurePassword
+                            ? LucideIcons.eye
+                            : LucideIcons.eyeOff,
+                        size: 18,
+                      ),
+                      onPressed: () {
+                        setState(() {
+                          _obscurePassword = !_obscurePassword;
+                        });
+                      },
+                    ),
+                  ),
+                  validator: (val) {
+                    if (val == null || val.isEmpty) {
+                      return 'Kata sandi tidak boleh kosong.';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 8),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: FilledButton.tonalIcon(
+                    onPressed: _generatePassword,
+                    icon: const Icon(LucideIcons.sparkles, size: 16),
+                    label: const Text('Buat Sandi Acak (16 Karakter)'),
+                  ),
+                ),
+                const SizedBox(height: 12),
               TextFormField(
                 controller: _urlController,
                 keyboardType: TextInputType.url,
@@ -1149,18 +1155,18 @@ class _VaultEntryFormSheetState extends ConsumerState<_VaultEntryFormSheet> {
               FilledButton.icon(
                 style: FilledButton.styleFrom(
                   backgroundColor: primary,
-                  foregroundColor: Colors.white,
+                  foregroundColor: AppTokens.onPrimary(context),
                   minimumSize: const Size.fromHeight(48),
                   shape: RoundedRectangleBorder(borderRadius: HubRadius.rSm),
                 ),
                 onPressed: _isSaving ? null : _handleSave,
                 icon: _isSaving
-                    ? const SizedBox(
+                    ? SizedBox(
                         width: 18,
                         height: 18,
                         child: CircularProgressIndicator(
                           strokeWidth: 2,
-                          color: Colors.white,
+                          color: AppTokens.onPrimary(context),
                         ),
                       )
                     : const Icon(LucideIcons.check, size: 18),
@@ -1170,7 +1176,8 @@ class _VaultEntryFormSheetState extends ConsumerState<_VaultEntryFormSheet> {
                 ),
               ),
               const SizedBox(height: 16),
-            ],
+              ],
+            ),
           ),
         ),
       ),

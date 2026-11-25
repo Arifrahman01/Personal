@@ -83,6 +83,38 @@ class TasksRepository {
     return updated;
   }
 
+  /// Updates an existing [task]'s title, dueDate, and priority in SQLite,
+  /// preserving its [id], completion status, and source meeting link.
+  ///
+  /// Throws [ValidationException] if title is blank or task does not exist.
+  Future<PersonalTask> updateTask(PersonalTask task) async {
+    final trimmedTitle = task.title.trim();
+    if (trimmedTitle.isEmpty) {
+      throw const ValidationException('Judul tugas tidak boleh kosong.');
+    }
+
+    final updated = task.copyWith(
+      title: trimmedTitle,
+      updatedAt: DateTime.now().toUtc(),
+    );
+
+    final affected = await _database.db.update(
+      _tasksTable,
+      {
+        'title': updated.title,
+        'due_date': updated.dueDate?.toUtc().toIso8601String(),
+        'priority': updated.priority.name,
+        'updated_at': updated.updatedAt.toIso8601String(),
+      },
+      where: 'id = ?',
+      whereArgs: [updated.id],
+    );
+    if (affected == 0) {
+      throw const ValidationException('Tugas tidak ditemukan.');
+    }
+    return updated;
+  }
+
   /// Deletes the task identified by [id].
   Future<void> deleteTask(String id) async {
     await _database.db.delete(

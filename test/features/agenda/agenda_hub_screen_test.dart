@@ -94,6 +94,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Agenda'), findsOneWidget);
+      expect(find.byTooltip('Cari'), findsOneWidget);
       expect(find.text('Meeting'), findsOneWidget);
       expect(find.text('Tugas & Habit'), findsOneWidget);
       expect(find.text('Sholat & Kiblat'), findsOneWidget);
@@ -174,6 +175,54 @@ void main() {
       await tester.tap(find.text('Sholat & Kiblat'));
       await tester.pumpAndSettle();
       expect(find.text('Arah Kiblat'), findsOneWidget);
+    });
+
+    testWidgets('contextual FAB switches across segments and sub-sections',
+        (tester) async {
+      tester.view.physicalSize = const Size(390 * 2, 844 * 2);
+      tester.view.devicePixelRatio = 2.0;
+      addTearDown(() {
+        tester.view.resetPhysicalSize();
+        tester.view.resetDevicePixelRatio();
+      });
+
+      final appDb = await AppDatabase.open(
+        pathOverride: inMemoryDatabasePath,
+        factoryOverride: databaseFactoryFfiNoIsolate,
+      );
+      addTearDown(() async => appDb.close());
+
+      await tester.pumpWidget(
+        buildTestableAgendaHubScreen(appDb: appDb, initialSection: 0),
+      );
+      await tester.pumpAndSettle();
+
+      // Segment 0: Meeting Baru
+      expect(find.byKey(const Key('agenda_add_meeting_fab')), findsOneWidget);
+      expect(find.text('Meeting Baru'), findsOneWidget);
+      expect(find.text('Tambah Tugas'), findsNothing);
+
+      // Segment 1: Tugas & Habit -> default sub-tab Tugas -> Tambah Tugas
+      await tester.tap(find.text('Tugas & Habit'));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('agenda_add_task_fab')), findsOneWidget);
+      expect(find.text('Tambah Tugas'), findsOneWidget);
+      expect(find.text('Meeting Baru'), findsNothing);
+
+      // Sub-tab Habit & Ibadah -> Tambah Habit
+      await tester.tap(find.text('Habit & Ibadah'));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('agenda_add_habit_fab')), findsOneWidget);
+      expect(find.text('Tambah Habit'), findsOneWidget);
+      expect(find.text('Tambah Tugas'), findsNothing);
+
+      // Segment 2: Sholat & Kiblat -> no FAB
+      await tester.tap(find.text('Sholat & Kiblat'));
+      await tester.pumpAndSettle();
+      expect(find.byType(FloatingActionButton), findsNothing);
+      expect(find.text('Meeting Baru'), findsNothing);
+      expect(find.text('Tambah Tugas'), findsNothing);
+      expect(find.text('Tambah Habit'), findsNothing);
     });
   });
 }

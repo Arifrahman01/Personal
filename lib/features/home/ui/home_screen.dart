@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:intl/intl.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:personal_hub/core/theme/app_tokens.dart';
 import 'package:personal_hub/core/theme/hub_widgets.dart';
@@ -11,10 +10,10 @@ import 'package:personal_hub/features/home/providers/home_module_preferences.dar
 import 'package:personal_hub/features/home/providers/home_providers.dart';
 import 'package:personal_hub/features/home/ui/global_search_sheet.dart';
 import 'package:personal_hub/features/home/ui/quick_capture_sheet.dart';
-import 'package:personal_hub/features/home/ui/widgets/today_briefing_card.dart';
+import 'package:personal_hub/features/home/ui/widgets/ai_daily_briefing_card.dart';
+import 'package:personal_hub/features/home/ui/widgets/kpi_summary_cards.dart';
+import 'package:personal_hub/features/home/ui/widgets/prayer_countdown_card.dart';
 import 'package:personal_hub/features/home/ui/widgets/today_focus_card.dart';
-import 'package:personal_hub/features/home/ui/widgets/today_kpi_row.dart';
-import 'package:personal_hub/features/home/ui/widgets/today_prayer_card.dart';
 import 'package:personal_hub/features/meetings/models/meeting.dart';
 import 'package:personal_hub/features/meetings/providers/meetings_providers.dart';
 import 'package:personal_hub/features/meetings/services/meeting_draft_store.dart';
@@ -26,8 +25,8 @@ import 'package:personal_hub/features/settings/ui/settings_screen.dart';
 import 'package:personal_hub/features/tasks/providers/tasks_providers.dart';
 
 /// Command Center Beranda Personal Hub v3.0 ("Calm Clarity").
-/// Exactly 5 Focused Blocks:
-/// 1. Greeting header + 2 Hero action buttons side-by-side: [🎙️ Rekam Meeting] & [+ Catat Cepat]
+/// Focused Dashboard Blocks:
+/// 1. Greeting header + full-width Hero action button: [🎙️ Rekam Meeting] (+ persistent Catat FAB)
 /// 2. Next Prayer Card (accurate interval ratio, tap -> Agenda: Sholat & Kiblat)
 /// 3. Today's Focus Card (nearest meeting + max 3 direct-toggle tasks, with 'Lihat Agenda →')
 /// 4. 2 Compact KPI Cards in 1 row: Saldo Bulan Ini & Habit Hari Ini
@@ -50,8 +49,6 @@ class HomeScreen extends ConsumerStatefulWidget {
 }
 
 class _HomeScreenState extends ConsumerState<HomeScreen> {
-  bool _isFirstRunDismissed = false;
-
   String _getGreeting() {
     final hour = DateTime.now().hour;
     if (hour < 11) return 'Selamat Pagi';
@@ -152,7 +149,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final now = DateTime.now();
     final prayerService = ref.watch(prayerTimeServiceProvider);
     final hijriDate = prayerService.formatHijriDate(now);
-    final gregorianDate = DateFormat('EEEE, d MMM yyyy').format(now);
+    final gregorianDate = safeFormatIndonesianDate(now, 'EEEE, d MMM yyyy');
 
     final prayerPrefsAsync = ref.watch(prayerPrefsProvider);
     final prayerTimesAsync = ref.watch(todayPrayerTimesProvider);
@@ -176,13 +173,23 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final habitStats = habitStatsAsync.value;
     final activeDraft = activeDraftAsync.value;
 
-    // Filter today's meetings
+    // Filter today's meetings in local timezone and prioritize nearest upcoming
     final todayMeetings = allMeetings.where((m) {
-      final scheduled = m.scheduledAt;
+      final scheduled = m.scheduledAt.toLocal();
       return scheduled.year == now.year &&
           scheduled.month == now.month &&
           scheduled.day == now.day;
-    }).toList();
+    }).toList()
+      ..sort(
+        (a, b) =>
+            a.scheduledAt.toLocal().compareTo(b.scheduledAt.toLocal()),
+      );
+    final upcomingTodayMeetings = todayMeetings
+        .where((m) => !m.scheduledAt.toLocal().isBefore(now))
+        .toList();
+    final prioritizedFocusMeetings = upcomingTodayMeetings.isNotEmpty
+        ? upcomingTodayMeetings
+        : todayMeetings;
 
     // Check if new user with empty data
     final isDataEmpty = allMeetings.isEmpty &&
@@ -193,32 +200,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
     return Scaffold(
       backgroundColor: AppTokens.canvas(context),
-      appBar: AppBar(
+      appBar: HubAppBar(
+        titleText: 'Personal Hub',
+        subtitleText: 'Hari Ini',
         backgroundColor: AppTokens.canvas(context),
-        elevation: 0,
-        scrolledUnderElevation: 0,
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Personal Hub',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w800,
-                color: AppTokens.textPrimary(context),
-                letterSpacing: -0.3,
-              ),
-            ),
-            Text(
-              'Hari Ini',
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w500,
-                color: AppTokens.textSecondary(context),
-              ),
-            ),
-          ],
-        ),
         actions: [
           IconButton(
             tooltip: 'Cari',
@@ -246,7 +231,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           style: TextStyle(fontWeight: FontWeight.w600),
         ),
         backgroundColor: AppTokens.primary(context),
-        foregroundColor: Colors.white,
+        foregroundColor: AppTokens.onPrimary(context),
       ),
       body: SafeArea(
         top: false,
@@ -295,53 +280,35 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                           ),
                           const SizedBox(height: 14),
 
-                          // 2 Hero Action Buttons (height >= 52dp)
-                          Row(
-                            children: [
-                              Expanded(
-                                child: FilledButton.icon(
-                                  key: const Key('home_record_meeting_button'),
-                                  style: FilledButton.styleFrom(
-                                    minimumSize: const Size.fromHeight(52),
-                                    backgroundColor: AppTokens.primary(context),
-                                    foregroundColor: Colors.white,
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: HubRadius.rSm,
-                                    ),
-                                  ),
-                                  onPressed: _openLiveMeetingRecorder,
-                                  icon: const Icon(LucideIcons.mic, size: 20),
-                                  label: const Text(
-                                    'Rekam Meeting',
-                                    style: TextStyle(
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.w700,
-                                    ),
-                                  ),
+                          // Full-width Hero CTA (height >= 54dp)
+                          SizedBox(
+                            width: double.infinity,
+                            child: FilledButton.icon(
+                              key: const Key('home_record_meeting_button'),
+                              style: FilledButton.styleFrom(
+                                minimumSize: const Size.fromHeight(54),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 14,
+                                  vertical: 14,
+                                ),
+                                backgroundColor: AppTokens.primary(context),
+                                foregroundColor: AppTokens.onPrimary(context),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: HubRadius.rSm,
                                 ),
                               ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: FilledButton.tonalIcon(
-                                  key: const Key('home_quick_capture_button'),
-                                  style: FilledButton.styleFrom(
-                                    minimumSize: const Size.fromHeight(52),
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: HubRadius.rSm,
-                                    ),
-                                  ),
-                                  onPressed: () => QuickCaptureSheet.show(context),
-                                  icon: const Icon(LucideIcons.plus, size: 20),
-                                  label: const Text(
-                                    'Catat Cepat',
-                                    style: TextStyle(
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.w700,
-                                    ),
-                                  ),
+                              onPressed: _openLiveMeetingRecorder,
+                              icon: const Icon(LucideIcons.mic, size: 20),
+                              label: const Text(
+                                'Rekam Meeting',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w700,
                                 ),
                               ),
-                            ],
+                            ),
                           ),
                         ],
                       ),
@@ -349,43 +316,66 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
                     // Draft Recovery Banner (if unfinalized recording detected)
                     if (activeDraft != null &&
-                        activeDraft.transcript.trim().isNotEmpty) ...[
+                        activeDraft.hasRecoverableContent) ...[
                       HubCard(
-                        padding: const EdgeInsets.all(12),
-                        child: Row(
+                        padding: const EdgeInsets.all(14),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
-                            Icon(
-                              LucideIcons.alertCircle,
-                              color: AppTokens.warning(context),
-                              size: 20,
-                            ),
-                            const SizedBox(width: 10),
-                            Expanded(
-                              child: Text(
-                                'Ada rekaman meeting belum dirapikan — Lanjutkan / Susun AI',
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w600,
-                                  color: AppTokens.textPrimary(context),
+                            Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Icon(
+                                  LucideIcons.alertCircle,
+                                  color: AppTokens.warning(context),
+                                  size: 20,
                                 ),
-                              ),
-                            ),
-                            TextButton(
-                              onPressed: _openLiveMeetingRecorder,
-                              child: const Text(
-                                'Lanjutkan',
-                                style: TextStyle(
-                                  fontWeight: FontWeight.w700,
-                                  fontSize: 12,
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: Text(
+                                    activeDraft.hasAudio &&
+                                            activeDraft.transcript
+                                                .trim()
+                                                .isEmpty
+                                        ? 'Ada rekaman audio meeting yang belum ditranskrip — Lanjutkan / Susun'
+                                        : 'Ada rekaman meeting belum dirapikan — Lanjutkan / Susun AI',
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w600,
+                                      color: AppTokens.textPrimary(context),
+                                    ),
+                                  ),
                                 ),
-                              ),
+                              ],
                             ),
-                            IconButton(
-                              icon: const Icon(LucideIcons.x, size: 16),
-                              tooltip: 'Buang draft',
-                              onPressed: () => ref
-                                  .read(activeMeetingDraftProvider.notifier)
-                                  .clear(),
+                            const SizedBox(height: 10),
+                            Wrap(
+                              alignment: WrapAlignment.end,
+                              spacing: 8,
+                              runSpacing: 8,
+                              children: [
+                                TextButton(
+                                  onPressed: () => ref
+                                      .read(activeMeetingDraftProvider.notifier)
+                                      .clear(),
+                                  style: TextButton.styleFrom(
+                                    minimumSize: const Size(0, 48),
+                                    foregroundColor:
+                                        AppTokens.textSecondary(context),
+                                  ),
+                                  child: const Text('Buang'),
+                                ),
+                                FilledButton.tonal(
+                                  onPressed: _openLiveMeetingRecorder,
+                                  style: FilledButton.styleFrom(
+                                    minimumSize: const Size(0, 48),
+                                  ),
+                                  child: const Text(
+                                    'Lanjutkan',
+                                    style: TextStyle(fontWeight: FontWeight.w700),
+                                  ),
+                                ),
+                              ],
                             ),
                           ],
                         ),
@@ -394,7 +384,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     ],
 
                     // First-run Guidance Card 'Mulai Cepat (3 Langkah)' (dismissible)
-                    if (isDataEmpty && !_isFirstRunDismissed) ...[
+                    if (modulePreferences.isLoaded &&
+                        isDataEmpty &&
+                        !modulePreferences.firstRunDismissed) ...[
                       HubCard(
                         padding: const EdgeInsets.all(16),
                         child: Column(
@@ -427,11 +419,15 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                                   ),
                                 ),
                                 IconButton(
+                                  constraints: const BoxConstraints(
+                                    minWidth: 48,
+                                    minHeight: 48,
+                                  ),
                                   icon: const Icon(LucideIcons.x, size: 16),
                                   tooltip: 'Tutup panduan',
-                                  onPressed: () => setState(
-                                    () => _isFirstRunDismissed = true,
-                                  ),
+                                  onPressed: () => ref
+                                      .read(homeModulePreferencesProvider.notifier)
+                                      .dismissFirstRun(),
                                 ),
                               ],
                             ),
@@ -461,7 +457,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
                     // Block 2: Next Prayer Card (tap navigates to Agenda: Sholat & Kiblat)
                     if (modulePreferences.showPrayer) ...[
-                      TodayPrayerCard(
+                      PrayerCountdownCard(
                         cityName: cityName,
                         hijriDate: hijriDate,
                         nextPrayer: nextPrayer,
@@ -475,7 +471,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     // Block 3: Today's Focus Card (nearest meeting + max 3 checked in-place)
                     if (modulePreferences.showFocus) ...[
                       TodayFocusCard(
-                        meetings: todayMeetings,
+                        meetings: prioritizedFocusMeetings,
                         tasks: allTasks,
                         onOpenMeeting: _openMeetingDetail,
                         onToggleTask: (taskId) => ref
@@ -492,11 +488,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     // Block 4: 2 Compact KPI Cards (1 row, 2 cols)
                     if (modulePreferences.showFinance ||
                         modulePreferences.showHabits) ...[
-                      TodayKpiRow(
+                      KpiSummaryCards(
                         summary: modulePreferences.showFinance ? summary : null,
                         habits: modulePreferences.showHabits ? habits : const [],
                         habitStats:
                             modulePreferences.showHabits ? habitStats : null,
+                        showFinance: modulePreferences.showFinance,
+                        showHabits: modulePreferences.showHabits,
                         onOpenFinance: () => widget.onSwitchTab?.call(3),
                         onOpenHabits: () {
                           ref.read(agendaSelectedSectionProvider.notifier).setSection(1);
@@ -508,7 +506,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
                     // Block 5: Today AI Briefing Card (compact/collapsible)
                     if (modulePreferences.showAiBriefing) ...[
-                      TodayBriefingCard(
+                      AiDailyBriefingCard(
                         briefingState: briefingState,
                         onGenerate: () => ref
                             .read(dailyBriefingControllerProvider.notifier)

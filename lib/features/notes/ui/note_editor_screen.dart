@@ -1,3 +1,6 @@
+import 'dart:async';
+
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
@@ -22,39 +25,159 @@ class NoteEditorScreen extends ConsumerStatefulWidget {
   ConsumerState<NoteEditorScreen> createState() => _NoteEditorScreenState();
 }
 
+enum _UnsavedAction { discard, cancel, save }
+
 class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
   late final TextEditingController _titleController;
   late final TextEditingController _tagsController;
   late final TextEditingController _contentController;
   final FocusNode _tagFocusNode = FocusNode();
 
+  late final String _initialTitle;
+  late final String _initialContent;
+  late final List<String> _initialTags;
+  late final bool _initialPinned;
+
   String? _titleError;
   bool _isSaving = false;
+  bool _isDirty = false;
+  bool _allowImmediatePop = false;
   late bool _isPinned;
   bool _isTagInputVisible = false;
+  int _semanticSyncVersion = 0;
 
   bool get _isEditing => widget.note != null;
 
   @override
   void initState() {
     super.initState();
-    _titleController = TextEditingController(text: widget.note?.title ?? '');
+    _initialTitle = widget.note?.title ?? '';
+    _initialContent = widget.note?.content ?? '';
+    _initialTags = List<String>.unmodifiable(
+      _parseTags(widget.note?.tags.join(', ') ?? ''),
+    );
+    _initialPinned = widget.note?.isPinned ?? false;
+
+    _titleController = TextEditingController(text: _initialTitle);
     _tagsController = TextEditingController(
       text: widget.note?.tags.join(', ') ?? '',
     );
-    _contentController = TextEditingController(
-      text: widget.note?.content ?? '',
-    );
-    _isPinned = widget.note?.isPinned ?? false;
+    _contentController = TextEditingController(text: _initialContent);
+    _isPinned = _initialPinned;
+
+    _titleController.addListener(_onEditorChanged);
+    _contentController.addListener(_onEditorChanged);
+    _tagsController.addListener(_onEditorChanged);
+
+    final initialNotes = ref.read(notesListProvider).asData?.value;
+    if (initialNotes != null) {
+      _syncNotesToSemanticMemory(initialNotes, notify: false);
+    }
   }
 
   @override
   void dispose() {
+    _titleController.removeListener(_onEditorChanged);
+    _contentController.removeListener(_onEditorChanged);
+    _tagsController.removeListener(_onEditorChanged);
     _titleController.dispose();
     _tagsController.dispose();
     _contentController.dispose();
     _tagFocusNode.dispose();
     super.dispose();
+  }
+
+  bool _computeIsDirty() {
+    if (_titleController.text != _initialTitle) return true;
+    if (_contentController.text != _initialContent) return true;
+    if (_isPinned != _initialPinned) return true;
+    final currentTags = _parseTags(_tagsController.text);
+    return !listEquals(currentTags, _initialTags);
+  }
+
+  void _onEditorChanged() {
+    final nextDirty = _computeIsDirty();
+    if (nextDirty != _isDirty && mounted) {
+      setState(() {
+        _isDirty = nextDirty;
+      });
+    }
+  }
+
+  void _syncNotesToSemanticMemory(
+    List<Note> allNotes, {
+    required bool notify,
+  }) {
+    final semanticService = ref.read(semanticMemoryServiceProvider);
+    var addedAny = false;
+    for (final otherNote in allNotes) {
+      if (otherNote.id != widget.note?.id &&
+          semanticService.getById('note_${otherNote.id}') == null) {
+        semanticService.embedAndStore(
+          id: 'note_${otherNote.id}',
+          entityType: 'note',
+          entityId: otherNote.id,
+          text: '${otherNote.title}\n${otherNote.content}',
+          metadata: {'title': otherNote.title, 'tags': otherNote.tags},
+        );
+        addedAny = true;
+      }
+    }
+    if (addedAny && notify && mounted) {
+      setState(() {
+        _semanticSyncVersion++;
+      });
+    }
+  }
+
+  Future<void> _handleBackPressed() async {
+    if (!_isDirty || _isSaving) {
+      Navigator.of(context).pop();
+      return;
+    }
+    await _confirmDiscardOrSave();
+  }
+
+  Future<void> _confirmDiscardOrSave() async {
+    final action = await showDialog<_UnsavedAction>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Simpan Perubahan?'),
+        content: const Text(
+          'Anda memiliki perubahan yang belum disimpan pada catatan ini.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () =>
+                Navigator.of(dialogContext).pop(_UnsavedAction.discard),
+            child: Text(
+              'Buang',
+              style: TextStyle(color: AppTokens.error(dialogContext)),
+            ),
+          ),
+          TextButton(
+            onPressed: () =>
+                Navigator.of(dialogContext).pop(_UnsavedAction.cancel),
+            child: const Text('Batal'),
+          ),
+          FilledButton(
+            onPressed: () =>
+                Navigator.of(dialogContext).pop(_UnsavedAction.save),
+            child: const Text('Simpan'),
+          ),
+        ],
+      ),
+    );
+
+    if (!mounted || action == null || action == _UnsavedAction.cancel) return;
+    if (action == _UnsavedAction.discard) {
+      setState(() {
+        _allowImmediatePop = true;
+      });
+      Navigator.of(context).pop();
+    } else if (action == _UnsavedAction.save) {
+      await _saveNote();
+    }
   }
 
   List<String> _parseTags(String raw) {
@@ -233,268 +356,307 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
     final theme = Theme.of(context);
     final parsedTags = _parseTags(_tagsController.text);
 
-    // Synchronize other notes into semantic memory for intelligent cross-linking
-    final allNotes = ref.watch(notesListProvider).asData?.value ?? [];
-    final semanticService = ref.watch(semanticMemoryServiceProvider);
-    for (final otherNote in allNotes) {
-      if (otherNote.id != widget.note?.id &&
-          semanticService.getById('note_${otherNote.id}') == null) {
-        semanticService.embedAndStore(
-          id: 'note_${otherNote.id}',
-          entityType: 'note',
-          entityId: otherNote.id,
-          text: '${otherNote.title}\n${otherNote.content}',
-          metadata: {'title': otherNote.title, 'tags': otherNote.tags},
-        );
+    ref.listen<AsyncValue<List<Note>>>(notesListProvider, (_, next) {
+      final notes = next.asData?.value;
+      if (notes != null) {
+        _syncNotesToSemanticMemory(notes, notify: true);
       }
-    }
+    });
 
-    final wordCount = _contentController.text
-        .trim()
-        .split(RegExp(r'\s+'))
-        .where((s) => s.isNotEmpty)
-        .length;
-
-    return Scaffold(
-      backgroundColor: AppTokens.canvas(context),
-      appBar: AppBar(
+    return PopScope(
+      canPop: _allowImmediatePop || !_isDirty || _isSaving,
+      onPopInvokedWithResult: (didPop, _) {
+        if (didPop) return;
+        _confirmDiscardOrSave();
+      },
+      child: Scaffold(
         backgroundColor: AppTokens.canvas(context),
-        elevation: 0,
-        scrolledUnderElevation: 0,
-        leading: IconButton(
-          icon: const Icon(LucideIcons.arrowLeft),
-          tooltip: 'Kembali',
-          onPressed: () => Navigator.of(context).pop(),
-        ),
-        title: Text(
-          _isEditing ? 'Edit Catatan' : 'Catatan Baru',
-          style: theme.textTheme.titleMedium?.copyWith(
-            fontWeight: FontWeight.w700,
-            color: AppTokens.textPrimary(context),
+        appBar: AppBar(
+          backgroundColor: AppTokens.canvas(context),
+          elevation: 0,
+          scrolledUnderElevation: 0,
+          leading: IconButton(
+            icon: const Icon(LucideIcons.arrowLeft),
+            tooltip: 'Kembali',
+            onPressed: _handleBackPressed,
           ),
-        ),
-        actions: [
-          if (_isEditing)
+          title: Text(
+            _isEditing ? 'Edit Catatan' : 'Catatan Baru',
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: theme.textTheme.titleMedium?.copyWith(
+              fontWeight: FontWeight.w700,
+              color: AppTokens.textPrimary(context),
+            ),
+          ),
+          actions: [
             IconButton(
-              tooltip: 'Ekspor ke Markdown',
-              icon: const Icon(LucideIcons.download),
-              onPressed: _exportCurrentNote,
-            ),
-          IconButton(
-            tooltip: _isPinned ? 'Lepas sematan' : 'Sematkan catatan',
-            icon: Icon(
-              _isPinned ? LucideIcons.pin : LucideIcons.pinOff,
-              color: _isPinned ? AppTokens.primary(context) : null,
-            ),
-            onPressed: () {
-              setState(() {
-                _isPinned = !_isPinned;
-              });
-            },
-          ),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            child: FilledButton(
-              style: FilledButton.styleFrom(
-                backgroundColor: AppTokens.primary(context),
-                foregroundColor: theme.brightness == Brightness.dark
-                    ? AppTokens.canvasDark
-                    : Colors.white,
-                shape: RoundedRectangleBorder(borderRadius: HubRadius.rPill),
+              tooltip: _isPinned ? 'Lepas sematan' : 'Sematkan catatan',
+              icon: Icon(
+                LucideIcons.pin,
+                color: _isPinned
+                    ? AppTokens.primary(context)
+                    : AppTokens.textSecondary(context),
               ),
-              onPressed: _isSaving ? null : _saveNote,
-              child: _isSaving
-                  ? const SizedBox(
-                      width: 16,
-                      height: 16,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: Colors.white,
-                      ),
-                    )
-                  : const Text('Simpan'),
+              onPressed: () {
+                setState(() {
+                  _isPinned = !_isPinned;
+                  _isDirty = _computeIsDirty();
+                });
+              },
             ),
-          ),
-        ],
-      ),
-      body: SafeArea(
-        child: Column(
-          children: [
-            // Distraction-free Canvas Body
-            Expanded(
-              child: SingleChildScrollView(
-                physics: const AlwaysScrollableScrollPhysics(
-                  parent: BouncingScrollPhysics(),
-                ),
-                padding: const EdgeInsets.symmetric(
-                  horizontal: HubSpacing.md,
-                  vertical: HubSpacing.sm,
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Borderless Large Title Field
-                    TextField(
-                      controller: _titleController,
-                      textCapitalization: TextCapitalization.sentences,
-                      style: theme.textTheme.headlineSmall?.copyWith(
-                        fontWeight: FontWeight.w700,
-                        color: AppTokens.textPrimary(context),
-                        letterSpacing: -0.3,
-                      ),
-                      decoration: InputDecoration(
-                        border: InputBorder.none,
-                        enabledBorder: InputBorder.none,
-                        focusedBorder: InputBorder.none,
-                        errorBorder: InputBorder.none,
-                        focusedErrorBorder: InputBorder.none,
-                        labelText: 'Judul catatan',
-                        floatingLabelBehavior: FloatingLabelBehavior.never,
-                        hintText: 'Judul catatan...',
-                        hintStyle: TextStyle(
-                          color: AppTokens.textSecondary(context).withValues(alpha: 0.5),
-                        ),
-                        isDense: true,
-                        contentPadding: EdgeInsets.zero,
-                      ),
-                      onChanged: (_) {
-                        if (_titleError != null) {
-                          setState(() {
-                            _titleError = null;
-                          });
-                        }
-                      },
+            if (_isEditing)
+              PopupMenuButton<String>(
+                tooltip: 'Opsi lainnya',
+                icon: const Icon(LucideIcons.ellipsisVertical),
+                onSelected: (value) {
+                  if (value == 'export') {
+                    _exportCurrentNote();
+                  }
+                },
+                itemBuilder: (_) => const [
+                  PopupMenuItem<String>(
+                    value: 'export',
+                    child: Row(
+                      children: [
+                        Icon(LucideIcons.download, size: 18),
+                        SizedBox(width: 8),
+                        Text('Ekspor ke Markdown'),
+                      ],
                     ),
-
-                    if (_titleError != null) ...[
-                      const SizedBox(height: 4),
-                      Text(
-                        _titleError!,
-                        style: TextStyle(
-                          color: AppTokens.error(context),
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
+                  ),
+                ],
+              ),
+            Padding(
+              padding: const EdgeInsets.only(right: 12, left: 4, top: 8, bottom: 8),
+              child: FilledButton(
+                style: FilledButton.styleFrom(
+                  backgroundColor: AppTokens.primary(context),
+                  foregroundColor: AppTokens.onPrimary(context),
+                  shape: RoundedRectangleBorder(borderRadius: HubRadius.rPill),
+                ),
+                onPressed: _isSaving ? null : _saveNote,
+                child: _isSaving
+                    ? SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: AppTokens.onPrimary(context),
                         ),
+                      )
+                    : const Text('Simpan'),
+              ),
+            ),
+          ],
+        ),
+        body: SafeArea(
+          child: Column(
+            children: [
+              // Distraction-free Canvas Body
+              Expanded(
+                child: SingleChildScrollView(
+                  physics: const AlwaysScrollableScrollPhysics(
+                    parent: BouncingScrollPhysics(),
+                  ),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: HubSpacing.md,
+                    vertical: HubSpacing.sm,
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Borderless Large Title Field
+                      TextField(
+                        controller: _titleController,
+                        textCapitalization: TextCapitalization.sentences,
+                        style: theme.textTheme.headlineSmall?.copyWith(
+                          fontWeight: FontWeight.w700,
+                          color: AppTokens.textPrimary(context),
+                          letterSpacing: -0.3,
+                        ),
+                        decoration: InputDecoration(
+                          border: InputBorder.none,
+                          enabledBorder: InputBorder.none,
+                          focusedBorder: InputBorder.none,
+                          errorBorder: InputBorder.none,
+                          focusedErrorBorder: InputBorder.none,
+                          labelText: 'Judul catatan',
+                          floatingLabelBehavior: FloatingLabelBehavior.never,
+                          hintText: 'Judul catatan...',
+                          hintStyle: TextStyle(
+                            color: AppTokens.textSecondary(context)
+                                .withValues(alpha: 0.8),
+                          ),
+                          isDense: true,
+                          contentPadding: EdgeInsets.zero,
+                        ),
+                        onChanged: (_) {
+                          if (_titleError != null) {
+                            setState(() {
+                              _titleError = null;
+                            });
+                          }
+                        },
                       ),
-                    ],
 
-                    const SizedBox(height: HubSpacing.md),
+                      if (_titleError != null) ...[
+                        const SizedBox(height: 4),
+                        Text(
+                          _titleError!,
+                          style: TextStyle(
+                            color: AppTokens.error(context),
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
 
-                    // Modern Pill-based Tag Editor
-                    _buildTagEditorSection(theme, parsedTags),
+                      const SizedBox(height: HubSpacing.md),
 
-                    const SizedBox(height: HubSpacing.sm),
+                      // Modern Pill-based Tag Editor
+                      _buildTagEditorSection(theme, parsedTags),
 
-                    // Compact Semantic Cross-Link Panel (Only visible when relevant links exist)
-                    _SemanticCrossLinkPanel(
-                      currentNoteId: widget.note?.id,
-                      currentTitle: _titleController.text,
-                      currentContent: _contentController.text,
-                      onInsertReference: (markdownRef) {
-                        final current = _contentController.text.trimRight();
-                        final next = current.isEmpty
-                            ? markdownRef
-                            : '$current\n\n$markdownRef';
-                        setState(() {
+                      const SizedBox(height: HubSpacing.sm),
+
+                      // Compact Semantic Cross-Link Panel (Only visible when relevant links exist)
+                      _SemanticCrossLinkPanel(
+                        currentNoteId: widget.note?.id,
+                        titleListenable: _titleController,
+                        contentListenable: _contentController,
+                        syncVersion: _semanticSyncVersion,
+                        onInsertReference: (markdownRef) {
+                          final current = _contentController.text.trimRight();
+                          final next = current.isEmpty
+                              ? markdownRef
+                              : '$current\n\n$markdownRef';
                           _contentController.text = next;
                           _contentController.selection =
                               TextSelection.collapsed(
                             offset: _contentController.text.length,
                           );
-                        });
-                      },
-                    ),
-
-                    const SizedBox(height: HubSpacing.sm),
-                    Divider(color: AppTokens.border(context), height: 1),
-                    const SizedBox(height: HubSpacing.sm),
-
-                    // Distraction-free Content Canvas
-                    TextField(
-                      controller: _contentController,
-                      textCapitalization: TextCapitalization.sentences,
-                      minLines: 14,
-                      maxLines: null,
-                      keyboardType: TextInputType.multiline,
-                      style: theme.textTheme.bodyLarge?.copyWith(
-                        color: AppTokens.textPrimary(context),
-                        height: 1.6,
+                        },
                       ),
-                      decoration: InputDecoration(
-                        border: InputBorder.none,
-                        enabledBorder: InputBorder.none,
-                        focusedBorder: InputBorder.none,
-                        errorBorder: InputBorder.none,
-                        focusedErrorBorder: InputBorder.none,
-                        labelText: 'Isi catatan',
-                        floatingLabelBehavior: FloatingLabelBehavior.never,
-                        hintText: 'Tulis catatan Anda di sini...',
-                        hintStyle: TextStyle(
-                          color: AppTokens.textSecondary(context).withValues(alpha: 0.45),
+
+                      const SizedBox(height: HubSpacing.sm),
+                      Divider(color: AppTokens.border(context), height: 1),
+                      const SizedBox(height: HubSpacing.sm),
+
+                      // Distraction-free Content Canvas
+                      TextField(
+                        controller: _contentController,
+                        textCapitalization: TextCapitalization.sentences,
+                        minLines: 14,
+                        maxLines: null,
+                        keyboardType: TextInputType.multiline,
+                        style: theme.textTheme.bodyLarge?.copyWith(
+                          color: AppTokens.textPrimary(context),
+                          height: 1.6,
                         ),
-                        alignLabelWithHint: true,
-                        contentPadding: EdgeInsets.zero,
+                        decoration: InputDecoration(
+                          border: InputBorder.none,
+                          enabledBorder: InputBorder.none,
+                          focusedBorder: InputBorder.none,
+                          errorBorder: InputBorder.none,
+                          focusedErrorBorder: InputBorder.none,
+                          labelText: 'Isi catatan',
+                          floatingLabelBehavior: FloatingLabelBehavior.never,
+                          hintText: 'Tulis catatan Anda di sini...',
+                          hintStyle: TextStyle(
+                            color: AppTokens.textSecondary(context)
+                                .withValues(alpha: 0.8),
+                          ),
+                          alignLabelWithHint: true,
+                          contentPadding: EdgeInsets.zero,
+                        ),
                       ),
-                      onChanged: (_) => setState(() {}),
+                    ],
+                  ),
+                ),
+              ),
+
+              // Unified AI Assistant Bottom Bar
+              Container(
+                decoration: BoxDecoration(
+                  color: AppTokens.card(context),
+                  border: Border(
+                    top: BorderSide(
+                      color: AppTokens.border(context),
+                      width: 1.0,
+                    ),
+                  ),
+                ),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: HubSpacing.md,
+                  vertical: HubSpacing.sm,
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Flexible(
+                      flex: 2,
+                      child: FilledButton.tonalIcon(
+                        style: FilledButton.styleFrom(
+                          backgroundColor: AppTokens.primary(
+                            context,
+                          ).withValues(alpha: 0.12),
+                          foregroundColor: AppTokens.primary(context),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: HubRadius.rPill,
+                          ),
+                          minimumSize: const Size(0, 48),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 12,
+                          ),
+                        ),
+                        onPressed: () => _openUnifiedAiSheet(),
+                        icon: const Icon(LucideIcons.sparkles, size: 18),
+                        label: const Text(
+                          'Asisten AI',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontWeight: FontWeight.w700,
+                            fontSize: 14,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Flexible(
+                      child: ValueListenableBuilder<TextEditingValue>(
+                        valueListenable: _contentController,
+                        builder: (context, value, _) {
+                          final wordCount = value.text
+                              .trim()
+                              .split(RegExp(r'\s+'))
+                              .where((s) => s.isNotEmpty)
+                              .length;
+                          return Text(
+                            '$wordCount kata',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            textAlign: TextAlign.end,
+                            style: HubTypography.tabular(
+                              theme.textTheme.bodySmall?.copyWith(
+                                    color: AppTokens.textSecondary(context),
+                                    fontWeight: FontWeight.w500,
+                                  ) ??
+                                  TextStyle(
+                                    fontSize: 12,
+                                    color: AppTokens.textSecondary(context),
+                                  ),
+                            ),
+                          );
+                        },
+                      ),
                     ),
                   ],
                 ),
               ),
-            ),
-
-            // Unified AI Assistant Bottom Bar
-            Container(
-              decoration: BoxDecoration(
-                color: AppTokens.card(context),
-                border: Border(
-                  top: BorderSide(
-                    color: AppTokens.border(context),
-                    width: 1.0,
-                  ),
-                ),
-              ),
-              padding: const EdgeInsets.symmetric(
-                horizontal: HubSpacing.md,
-                vertical: HubSpacing.sm,
-              ),
-              child: Row(
-                children: [
-                  FilledButton.tonalIcon(
-                    style: FilledButton.styleFrom(
-                      backgroundColor:
-                          AppTokens.primary(context).withValues(alpha: 0.12),
-                      foregroundColor: AppTokens.primary(context),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: HubRadius.rPill,
-                      ),
-                      minimumSize: const Size(0, 48),
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 12,
-                      ),
-                    ),
-                    onPressed: () => _openUnifiedAiSheet(),
-                    icon: const Icon(LucideIcons.sparkles, size: 18),
-                    label: const Text(
-                      '✨ Asisten AI',
-                      style: TextStyle(
-                        fontWeight: FontWeight.w700,
-                        fontSize: 14,
-                      ),
-                    ),
-                  ),
-                  const Spacer(),
-                  Text(
-                    '$wordCount kata',
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: AppTokens.textSecondary(context),
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -511,110 +673,100 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
           crossAxisAlignment: WrapCrossAlignment.center,
           children: [
             for (final tag in parsedTags)
-              Container(
-                padding: const EdgeInsets.only(left: 10, right: 4, top: 4, bottom: 4),
-                decoration: BoxDecoration(
-                  color: AppTokens.primary(context).withValues(alpha: 0.12),
-                  borderRadius: HubRadius.rPill,
-                  border: Border.all(
-                    color: AppTokens.primary(context).withValues(alpha: 0.3),
-                    width: 1,
+              InputChip(
+                label: Text(
+                  '#$tag',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: AppTokens.primary(context),
                   ),
                 ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      '#$tag',
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        color: AppTokens.primary(context),
-                      ),
-                    ),
-                    const SizedBox(width: 4),
-                    InkWell(
-                      borderRadius: BorderRadius.circular(12),
-                      onTap: () => _removeTag(tag),
-                      child: Padding(
-                        padding: const EdgeInsets.all(2),
-                        child: Icon(
-                          LucideIcons.x,
-                          size: 14,
-                          color: AppTokens.primary(context),
-                        ),
-                      ),
-                    ),
-                  ],
+                deleteIcon: Icon(
+                  LucideIcons.x,
+                  size: 14,
+                  color: AppTokens.primary(context),
                 ),
+                deleteButtonTooltipMessage: 'Hapus tag $tag',
+                onDeleted: () => _removeTag(tag),
+                backgroundColor:
+                    AppTokens.primary(context).withValues(alpha: 0.12),
+                side: BorderSide.none,
+                shape: RoundedRectangleBorder(borderRadius: HubRadius.rPill),
+                materialTapTargetSize: MaterialTapTargetSize.padded,
               ),
 
             // "+ Tambah Tag" pill
-            HubPill(
-              icon: LucideIcons.plus,
-              label: 'Tambah Tag',
-              onTap: () {
-                setState(() {
-                  _isTagInputVisible = !_isTagInputVisible;
-                });
-                if (_isTagInputVisible) {
-                  _tagFocusNode.requestFocus();
-                }
-              },
+            ConstrainedBox(
+              constraints: const BoxConstraints(minHeight: 40),
+              child: HubPill(
+                icon: LucideIcons.plus,
+                label: 'Tambah Tag',
+                onTap: () {
+                  setState(() {
+                    _isTagInputVisible = !_isTagInputVisible;
+                  });
+                  if (_isTagInputVisible) {
+                    _tagFocusNode.requestFocus();
+                  }
+                },
+              ),
             ),
           ],
         ),
 
-        // Text field for tag editing & backwards compatibility with tests
-        const SizedBox(height: 8),
-        TextField(
-          controller: _tagsController,
-          focusNode: _tagFocusNode,
-          decoration: InputDecoration(
-            labelText: 'Tag',
-            hintText: 'Pisahkan dengan koma (misal: kerja, ide)',
-            prefixIcon: const Icon(LucideIcons.tag, size: 16),
-            isDense: true,
-            border: OutlineInputBorder(
-              borderRadius: HubRadius.rSm,
-              borderSide: BorderSide(color: AppTokens.border(context)),
+        if (_isTagInputVisible) ...[
+          // Text field for tag editing & backwards compatibility with tests
+          const SizedBox(height: 8),
+          TextField(
+            controller: _tagsController,
+            focusNode: _tagFocusNode,
+            decoration: InputDecoration(
+              labelText: 'Tag',
+              hintText: 'Pisahkan dengan koma (misal: kerja, ide)',
+              prefixIcon: const Icon(LucideIcons.tag, size: 16),
+              isDense: true,
+              border: OutlineInputBorder(
+                borderRadius: HubRadius.rSm,
+                borderSide: BorderSide(color: AppTokens.border(context)),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: HubRadius.rSm,
+                borderSide: BorderSide(color: AppTokens.border(context)),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: HubRadius.rSm,
+                borderSide: BorderSide(color: AppTokens.primary(context), width: 1.5),
+              ),
+              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             ),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: HubRadius.rSm,
-              borderSide: BorderSide(color: AppTokens.border(context)),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: HubRadius.rSm,
-              borderSide: BorderSide(color: AppTokens.primary(context), width: 1.5),
-            ),
-            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            onChanged: (_) => setState(() {}),
           ),
-          onChanged: (_) => setState(() {}),
-        ),
 
-        const SizedBox(height: 8),
+          const SizedBox(height: 8),
 
-        // Quick tag suggestions: #ide, #kerja, #pribadi
-        Wrap(
-          spacing: 6,
-          runSpacing: 4,
-          crossAxisAlignment: WrapCrossAlignment.center,
-          children: [
-            Text(
-              'Saran tag:',
-              style: theme.textTheme.labelSmall?.copyWith(
-                color: AppTokens.textSecondary(context),
-                fontWeight: FontWeight.w600,
+          // Quick tag suggestions: #ide, #kerja, #pribadi
+          Wrap(
+            spacing: 6,
+            runSpacing: 4,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              Text(
+                'Saran tag:',
+                style: theme.textTheme.labelSmall?.copyWith(
+                  color: AppTokens.textSecondary(context),
+                  fontWeight: FontWeight.w600,
+                ),
               ),
-            ),
-            for (final suggestion in ['ide', 'kerja', 'pribadi'])
-              HubPill(
-                label: '#$suggestion',
-                isSelected: parsedTags.any((t) => t.toLowerCase() == suggestion),
-                onTap: () => _addTag(suggestion),
-              ),
-          ],
-        ),
+              for (final suggestion in ['ide', 'kerja', 'pribadi'])
+                HubPill(
+                  label: '#$suggestion',
+                  isSelected: parsedTags.any((t) => t.toLowerCase() == suggestion),
+                  onTap: () => _addTag(suggestion),
+                ),
+            ],
+          ),
+        ],
       ],
     );
   }
@@ -623,39 +775,155 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
 /// Compact semantic cross-link recommendation panel that queries [SemanticMemoryService]
 /// to suggest related notes, meetings, and tasks.
 /// ONLY displays if relevant links are detected.
-class _SemanticCrossLinkPanel extends ConsumerWidget {
+class _SemanticCrossLinkPanel extends ConsumerStatefulWidget {
   const _SemanticCrossLinkPanel({
     required this.currentNoteId,
-    required this.currentTitle,
-    required this.currentContent,
+    required this.titleListenable,
+    required this.contentListenable,
+    required this.syncVersion,
     required this.onInsertReference,
   });
 
   final String? currentNoteId;
-  final String currentTitle;
-  final String currentContent;
+  final ValueListenable<TextEditingValue> titleListenable;
+  final ValueListenable<TextEditingValue> contentListenable;
+  final int syncVersion;
   final ValueChanged<String> onInsertReference;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final theme = Theme.of(context);
-    final fullText = '$currentTitle\n$currentContent'.trim();
+  ConsumerState<_SemanticCrossLinkPanel> createState() =>
+      _SemanticCrossLinkPanelState();
+}
 
-    final semanticService = ref.watch(semanticMemoryServiceProvider);
+class _SemanticCrossLinkPanelState
+    extends ConsumerState<_SemanticCrossLinkPanel> {
+  bool _isExpanded = false;
+  Timer? _debounceTimer;
+  List<EntityLink> _links = const [];
 
-    List<EntityLink> links = [];
-    if (fullText.isNotEmpty) {
-      final vector = semanticService.pseudoEmbedder.embed(fullText);
-      links = semanticService.discoverEntityLinksFromStore(
-        currentNoteId ?? 'draft_note_temp',
-        vector,
-        threshold: 0.20,
-      );
+  @override
+  void initState() {
+    super.initState();
+    widget.titleListenable.addListener(_scheduleRefresh);
+    widget.contentListenable.addListener(_scheduleRefresh);
+    _links = _computeLinks();
+  }
+
+  @override
+  void didUpdateWidget(covariant _SemanticCrossLinkPanel oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.titleListenable != oldWidget.titleListenable) {
+      oldWidget.titleListenable.removeListener(_scheduleRefresh);
+      widget.titleListenable.addListener(_scheduleRefresh);
     }
+    if (widget.contentListenable != oldWidget.contentListenable) {
+      oldWidget.contentListenable.removeListener(_scheduleRefresh);
+      widget.contentListenable.addListener(_scheduleRefresh);
+    }
+    if (widget.syncVersion != oldWidget.syncVersion ||
+        widget.currentNoteId != oldWidget.currentNoteId) {
+      _links = _computeLinks();
+    }
+  }
+
+  @override
+  void dispose() {
+    _debounceTimer?.cancel();
+    widget.titleListenable.removeListener(_scheduleRefresh);
+    widget.contentListenable.removeListener(_scheduleRefresh);
+    super.dispose();
+  }
+
+  void _scheduleRefresh() {
+    _debounceTimer?.cancel();
+    _debounceTimer = Timer(const Duration(milliseconds: 300), () {
+      if (!mounted) return;
+      final nextLinks = _computeLinks();
+      setState(() {
+        _links = nextLinks;
+      });
+    });
+  }
+
+  List<EntityLink> _computeLinks() {
+    final fullText =
+        '${widget.titleListenable.value.text}\n${widget.contentListenable.value.text}'
+            .trim();
+    if (fullText.isEmpty) return const [];
+    final semanticService = ref.read(semanticMemoryServiceProvider);
+    final vector = semanticService.pseudoEmbedder.embed(fullText);
+    return semanticService.discoverEntityLinksFromStore(
+      widget.currentNoteId ?? 'draft_note_temp',
+      vector,
+      threshold: 0.20,
+    );
+  }
+
+  String _localizedEntityType(String type) {
+    switch (type.toLowerCase()) {
+      case 'meeting':
+        return 'Rapat';
+      case 'task':
+        return 'Tugas';
+      case 'note':
+      default:
+        return 'Catatan';
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final links = _links;
 
     // ONLY display if there are relevant links detected!
     if (links.isEmpty) {
       return const SizedBox.shrink();
+    }
+
+    if (!_isExpanded) {
+      return Padding(
+        padding: const EdgeInsets.only(top: HubSpacing.xs, bottom: HubSpacing.xs),
+        child: InkWell(
+          onTap: () => setState(() => _isExpanded = true),
+          borderRadius: HubRadius.rPill,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            decoration: BoxDecoration(
+              color: AppTokens.primary(context).withValues(alpha: 0.12),
+              borderRadius: HubRadius.rPill,
+              border: Border.all(
+                color: AppTokens.primary(context).withValues(alpha: 0.25),
+              ),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  LucideIcons.link2,
+                  size: 12,
+                  color: AppTokens.primary(context),
+                ),
+                const SizedBox(width: 4),
+                Text(
+                  '${links.length} Catatan Terkait',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    color: AppTokens.primary(context),
+                  ),
+                ),
+                const SizedBox(width: 4),
+                Icon(
+                  LucideIcons.chevronDown,
+                  size: 14,
+                  color: AppTokens.primary(context),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
     }
 
     return Container(
@@ -669,39 +937,60 @@ class _SemanticCrossLinkPanel extends ConsumerWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              Icon(
-                LucideIcons.sparkles,
-                size: 15,
-                color: AppTokens.primary(context),
-              ),
-              const SizedBox(width: 6),
-              Expanded(
-                child: Text(
-                  'Rekomendasi Tautan Semantik',
-                  style: theme.textTheme.labelMedium?.copyWith(
-                    fontWeight: FontWeight.w700,
-                    color: AppTokens.textPrimary(context),
+          InkWell(
+            onTap: () => setState(() => _isExpanded = false),
+            borderRadius: HubRadius.rSm,
+            child: Row(
+              children: [
+                Icon(
+                  LucideIcons.sparkles,
+                  size: 15,
+                  color: AppTokens.primary(context),
+                ),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    'Rekomendasi Tautan Semantik',
+                    style: theme.textTheme.labelMedium?.copyWith(
+                      fontWeight: FontWeight.w700,
+                      color: AppTokens.textPrimary(context),
+                    ),
                   ),
                 ),
-              ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                decoration: BoxDecoration(
-                  color: AppTokens.primary(context).withValues(alpha: 0.12),
-                  borderRadius: HubRadius.rPill,
-                ),
-                child: Text(
-                  '🔗 ${links.length} Catatan Terkait',
-                  style: TextStyle(
-                    fontSize: 10,
-                    fontWeight: FontWeight.w700,
-                    color: AppTokens.primary(context),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: AppTokens.primary(context).withValues(alpha: 0.12),
+                    borderRadius: HubRadius.rPill,
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        LucideIcons.link2,
+                        size: 12,
+                        color: AppTokens.primary(context),
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        '${links.length} Catatan Terkait',
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w700,
+                          color: AppTokens.primary(context),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-              ),
-            ],
+                const SizedBox(width: 4),
+                Icon(
+                  LucideIcons.chevronUp,
+                  size: 15,
+                  color: AppTokens.textSecondary(context),
+                ),
+              ],
+            ),
           ),
           const SizedBox(height: 6),
           Wrap(
@@ -806,7 +1095,7 @@ class _SemanticCrossLinkPanel extends ConsumerWidget {
               ),
               const SizedBox(height: 8),
               Text(
-                'Tipe: ${link.targetEntityType.toUpperCase()}',
+                'Tipe: ${_localizedEntityType(link.targetEntityType)}',
                 style: theme.textTheme.labelMedium?.copyWith(
                   color: AppTokens.primary(context),
                   fontWeight: FontWeight.w600,
@@ -836,15 +1125,13 @@ class _SemanticCrossLinkPanel extends ConsumerWidget {
                 child: FilledButton.icon(
                   style: FilledButton.styleFrom(
                     backgroundColor: AppTokens.primary(context),
-                    foregroundColor: theme.brightness == Brightness.dark
-                        ? AppTokens.canvasDark
-                        : Colors.white,
+                    foregroundColor: AppTokens.onPrimary(context),
                     shape: RoundedRectangleBorder(borderRadius: HubRadius.rPill),
                   ),
                   onPressed: () {
                     final refText =
-                        '📌 Terkait [${link.targetEntityType.toUpperCase()}]: $title';
-                    onInsertReference(refText);
+                        'Terkait [${link.targetEntityType.toUpperCase()}]: $title';
+                    widget.onInsertReference(refText);
                     Navigator.of(sheetContext).pop();
                   },
                   icon: const Icon(LucideIcons.link, size: 16),

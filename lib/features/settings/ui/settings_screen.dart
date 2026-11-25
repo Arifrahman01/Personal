@@ -39,10 +39,12 @@ class SettingsScreen extends ConsumerWidget {
                   children: [
                     Icon(LucideIcons.palette, size: 20, color: primary),
                     const SizedBox(width: 10),
-                    Text(
-                      'Tampilan Antarmuka',
-                      style: theme.textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w700,
+                    Expanded(
+                      child: Text(
+                        'Tampilan Antarmuka',
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w700,
+                        ),
                       ),
                     ),
                   ],
@@ -51,21 +53,40 @@ class SettingsScreen extends ConsumerWidget {
                 SizedBox(
                   width: double.infinity,
                   child: SegmentedButton<ThemeMode>(
-                    segments: const [
+                    showSelectedIcon: false,
+                    segments: [
                       ButtonSegment(
                         value: ThemeMode.system,
-                        label: Text('Sistem'),
-                        icon: Icon(LucideIcons.sunMoon, size: 16),
+                        label: const Text(
+                          'Sistem',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        icon: MediaQuery.sizeOf(context).width < 380
+                            ? null
+                            : const Icon(LucideIcons.sunMoon, size: 16),
                       ),
                       ButtonSegment(
                         value: ThemeMode.light,
-                        label: Text('Terang'),
-                        icon: Icon(LucideIcons.sun, size: 16),
+                        label: const Text(
+                          'Terang',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        icon: MediaQuery.sizeOf(context).width < 380
+                            ? null
+                            : const Icon(LucideIcons.sun, size: 16),
                       ),
                       ButtonSegment(
                         value: ThemeMode.dark,
-                        label: Text('Gelap'),
-                        icon: Icon(LucideIcons.moon, size: 16),
+                        label: const Text(
+                          'Gelap',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        icon: MediaQuery.sizeOf(context).width < 380
+                            ? null
+                            : const Icon(LucideIcons.moon, size: 16),
                       ),
                     ],
                     selected: {themeMode},
@@ -99,7 +120,7 @@ class SettingsScreen extends ConsumerWidget {
           // 2. Tampilkan di Beranda
           _SettingsMenuTile(
             icon: LucideIcons.layoutGrid,
-            iconColor: const Color(0xFFF59E0B),
+            iconColor: AppTokens.warning(context),
             title: 'Tampilkan di Beranda',
             subtitle: 'Atur kartu modul yang aktif di halaman Beranda Hari Ini.',
             onTap: () => _openHomeModulesSheet(context),
@@ -111,7 +132,7 @@ class SettingsScreen extends ConsumerWidget {
             icon: LucideIcons.bot,
             iconColor: primary,
             title: 'Asisten AI',
-            subtitle: 'Model deepseek-v4.1-flash:free, API Key & uji koneksi.',
+            subtitle: 'Koneksi Samudra AI, API Key & uji layanan.',
             onTap: () {
               Navigator.of(context).push(
                 MaterialPageRoute<void>(
@@ -157,7 +178,7 @@ class SettingsScreen extends ConsumerWidget {
           // 6. Backup & Sinkronisasi
           _SettingsMenuTile(
             icon: LucideIcons.hardDrive,
-            iconColor: const Color(0xFF8B5CF6),
+            iconColor: AppTokens.primary(context),
             title: 'Backup & Sinkronisasi',
             subtitle: 'Ekspor .phub, Simpan Otomatis: 7 Harian • 4 Mingguan • 3 Bulanan, & Cloud Sync.',
             onTap: () {
@@ -192,7 +213,8 @@ class SettingsScreen extends ConsumerWidget {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  'Enkripsi AES-256-GCM Lokal • Offline-First',
+                  'Terenkripsi Lokal di Perangkat • Tetap Berjalan Tanpa Internet',
+                  textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: 12,
                     color: AppTokens.textSecondary(context),
@@ -221,70 +243,72 @@ class SettingsScreen extends ConsumerWidget {
             final prefs = ref.watch(homeModulePreferencesProvider);
             final notifier = ref.read(homeModulePreferencesProvider.notifier);
 
-            return Padding(
-              padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Center(
-                    child: Container(
-                      width: 38,
-                      height: 4,
-                      decoration: BoxDecoration(
-                        color: AppTokens.border(context),
-                        borderRadius: HubRadius.rPill,
+            return SafeArea(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Center(
+                      child: Container(
+                        width: 38,
+                        height: 4,
+                        decoration: BoxDecoration(
+                          color: AppTokens.border(context),
+                          borderRadius: HubRadius.rPill,
+                        ),
                       ),
                     ),
-                  ),
-                  const SizedBox(height: 16),
-                  const Text(
-                    'Tampilkan di Beranda',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w800,
+                    const SizedBox(height: 16),
+                    const Text(
+                      'Tampilkan di Beranda',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w800,
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    'Pilih modul kartu yang ingin Anda tampilkan pada halaman Hari Ini.',
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: AppTokens.textSecondary(context),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Pilih modul kartu yang ingin Anda tampilkan pada halaman Hari Ini.',
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: AppTokens.textSecondary(context),
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 16),
-                  SwitchListTile(
-                    title: const Text('Jadwal Sholat'),
-                    subtitle: const Text('Waktu sholat berikutnya & countdown'),
-                    value: prefs.showPrayer,
-                    onChanged: notifier.togglePrayer,
-                  ),
-                  SwitchListTile(
-                    title: const Text('Fokus Hari Ini'),
-                    subtitle: const Text('Agenda rapat & tugas prioritas'),
-                    value: prefs.showFocus,
-                    onChanged: notifier.toggleFocus,
-                  ),
-                  SwitchListTile(
-                    title: const Text('Saldo Bulan Ini'),
-                    subtitle: const Text('Arus kas pemasukan & pengeluaran'),
-                    value: prefs.showFinance,
-                    onChanged: notifier.toggleFinance,
-                  ),
-                  SwitchListTile(
-                    title: const Text('Habit Hari Ini'),
-                    subtitle: const Text('Target kebiasaan harian & streak'),
-                    value: prefs.showHabits,
-                    onChanged: notifier.toggleHabits,
-                  ),
-                  SwitchListTile(
-                    title: const Text('Ringkasan AI Harian'),
-                    subtitle: const Text('Executive summary harian'),
-                    value: prefs.showAiBriefing,
-                    onChanged: notifier.toggleAiBriefing,
-                  ),
-                ],
+                    const SizedBox(height: 16),
+                    SwitchListTile(
+                      title: const Text('Jadwal Sholat'),
+                      subtitle: const Text('Waktu sholat berikutnya & countdown'),
+                      value: prefs.showPrayer,
+                      onChanged: notifier.togglePrayer,
+                    ),
+                    SwitchListTile(
+                      title: const Text('Fokus Hari Ini'),
+                      subtitle: const Text('Agenda rapat & tugas prioritas'),
+                      value: prefs.showFocus,
+                      onChanged: notifier.toggleFocus,
+                    ),
+                    SwitchListTile(
+                      title: const Text('Saldo Bulan Ini'),
+                      subtitle: const Text('Arus kas pemasukan & pengeluaran'),
+                      value: prefs.showFinance,
+                      onChanged: notifier.toggleFinance,
+                    ),
+                    SwitchListTile(
+                      title: const Text('Habit Hari Ini'),
+                      subtitle: const Text('Target kebiasaan harian & streak'),
+                      value: prefs.showHabits,
+                      onChanged: notifier.toggleHabits,
+                    ),
+                    SwitchListTile(
+                      title: const Text('Ringkasan AI Harian'),
+                      subtitle: const Text('Executive summary harian'),
+                      value: prefs.showAiBriefing,
+                      onChanged: notifier.toggleAiBriefing,
+                    ),
+                  ],
+                ),
               ),
             );
           },

@@ -33,7 +33,9 @@ final meetingsRepositoryProvider = Provider<MeetingsRepository>((ref) {
 
 /// Provides [MeetingReminderService] for scheduling local meeting notifications.
 final meetingReminderServiceProvider = Provider<MeetingReminderService>((ref) {
-  return MeetingReminderService();
+  final service = MeetingReminderService();
+  ref.onDispose(service.dispose);
+  return service;
 });
 
 /// Provides [MeetingNoteComposerService] for composing and dual-persisting meeting notes.

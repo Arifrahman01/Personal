@@ -66,15 +66,19 @@ class _AiDailyBriefingCardState extends State<AiDailyBriefingCard> {
                 FilledButton.tonal(
                   onPressed: widget.onGenerate,
                   style: FilledButton.styleFrom(
-                    visualDensity: VisualDensity.compact,
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    minimumSize: const Size(0, 48),
+                    tapTargetSize: MaterialTapTargetSize.padded,
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                     shape: RoundedRectangleBorder(borderRadius: HubRadius.rPill),
                   ),
                   child: const Text('Buat', style: TextStyle(fontSize: 12)),
                 )
               else if (hasBriefing)
                 IconButton(
-                  visualDensity: VisualDensity.compact,
+                  tooltip: _isExpanded
+                      ? 'Ciutkan ringkasan'
+                      : 'Luaskan ringkasan',
+                  constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
                   icon: Icon(
                     _isExpanded ? LucideIcons.chevronUp : LucideIcons.chevronDown,
                     size: 18,
@@ -124,6 +128,10 @@ class _AiDailyBriefingCardState extends State<AiDailyBriefingCard> {
               alignment: Alignment.centerLeft,
               child: TextButton.icon(
                 onPressed: widget.onGenerate,
+                style: TextButton.styleFrom(
+                  minimumSize: const Size(0, 48),
+                  tapTargetSize: MaterialTapTargetSize.padded,
+                ),
                 icon: const Icon(LucideIcons.refreshCw, size: 14),
                 label: const Text('Coba Lagi', style: TextStyle(fontSize: 12)),
               ),
@@ -145,35 +153,38 @@ class _AiDailyBriefingCardState extends State<AiDailyBriefingCard> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text(
-                    'Dibuat jam ${timeFmt.format(state.generatedAt!)} via ${state.response!.usedModel}',
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: AppTokens.textSecondary(context).withValues(alpha: 0.7),
+                  Expanded(
+                    child: Text(
+                      'Diperbarui pukul ${timeFmt.format(state.generatedAt!)}',
+                      style: HubTypography.tabular(
+                        TextStyle(
+                          fontSize: 11,
+                          color: AppTokens.textSecondary(context),
+                        ),
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ),
-                  InkWell(
-                    onTap: widget.onGenerate,
-                    borderRadius: HubRadius.rXs,
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            LucideIcons.refreshCw,
-                            size: 11,
-                            color: AppTokens.primary(context),
-                          ),
-                          const SizedBox(width: 4),
-                          Text(
-                            'Perbarui',
-                            style: TextStyle(
-                              fontSize: 11,
-                              color: AppTokens.primary(context),
-                            ),
-                          ),
-                        ],
+                  const SizedBox(width: 8),
+                  TextButton.icon(
+                    onPressed: widget.onGenerate,
+                    style: TextButton.styleFrom(
+                      minimumSize: const Size(0, 48),
+                      tapTargetSize: MaterialTapTargetSize.padded,
+                      padding: const EdgeInsets.symmetric(horizontal: 10),
+                    ),
+                    icon: Icon(
+                      LucideIcons.refreshCw,
+                      size: 13,
+                      color: AppTokens.primary(context),
+                    ),
+                    label: Text(
+                      'Perbarui',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: AppTokens.primary(context),
                       ),
                     ),
                   ),

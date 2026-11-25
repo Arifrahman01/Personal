@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:personal_hub/core/errors/app_exceptions.dart';
 import 'package:personal_hub/core/theme/app_tokens.dart';
 import 'package:personal_hub/core/utils/currency_input_formatter.dart';
@@ -13,9 +14,14 @@ import 'package:personal_hub/features/finance/ui/widgets/finance_shared_widgets.
 /// Modal bottom sheet for recording financial transactions.
 /// Features 2 Segments: Manual Entry & Natural Language AI Quick Capture.
 class AddTransactionSheet extends ConsumerStatefulWidget {
-  const AddTransactionSheet({super.key, required this.selectedMonth});
+  const AddTransactionSheet({
+    super.key,
+    required this.selectedMonth,
+    this.initialSegment = 0,
+  });
 
   final FinanceMonth selectedMonth;
+  final int initialSegment;
 
   @override
   ConsumerState<AddTransactionSheet> createState() =>
@@ -60,6 +66,7 @@ class _AddTransactionSheetState extends ConsumerState<AddTransactionSheet> {
   @override
   void initState() {
     super.initState();
+    _selectedSegment = widget.initialSegment.clamp(0, 1);
     final now = DateTime.now();
     final isCurrentMonth =
         widget.selectedMonth.year == now.year &&
@@ -176,22 +183,36 @@ class _AddTransactionSheetState extends ConsumerState<AddTransactionSheet> {
 
   Widget _buildManualSegment() {
     final isExpense = _type == TransactionType.expense;
+    final showSegmentIcons = MediaQuery.sizeOf(context).width >= 360;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         // Transaction Type Switcher
         SegmentedButton<TransactionType>(
-          segments: const [
+          showSelectedIcon: false,
+          segments: [
             ButtonSegment(
               value: TransactionType.expense,
-              label: Text('Pengeluaran'),
-              icon: Icon(Icons.north_east_rounded),
+              label: const Text(
+                'Pengeluaran',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+              icon: showSegmentIcons
+                  ? const Icon(LucideIcons.arrowUpRight)
+                  : null,
             ),
             ButtonSegment(
               value: TransactionType.income,
-              label: Text('Pemasukan'),
-              icon: Icon(Icons.south_west_rounded),
+              label: const Text(
+                'Pemasukan',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+              icon: showSegmentIcons
+                  ? const Icon(LucideIcons.arrowDownLeft)
+                  : null,
             ),
           ],
           selected: {_type},
@@ -215,19 +236,26 @@ class _AddTransactionSheetState extends ConsumerState<AddTransactionSheet> {
             FilteringTextInputFormatter.digitsOnly,
             RupiahTextInputFormatter(),
           ],
-          style: TextStyle(
-            fontSize: 22,
-            fontWeight: FontWeight.w800,
-            color: isExpense ? AppTokens.error(context) : AppTokens.success(context),
+          style: HubTypography.tabular(
+            TextStyle(
+              fontSize: 22,
+              fontWeight: FontWeight.w800,
+              color:
+                  isExpense ? AppTokens.error(context) : AppTokens.success(context),
+            ),
           ),
           decoration: InputDecoration(
             labelText: 'Nominal Transaksi (Rp)',
             prefixText: 'Rp ',
             hintText: '0',
-            prefixStyle: TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.w700,
-              color: isExpense ? AppTokens.error(context) : AppTokens.success(context),
+            prefixStyle: HubTypography.tabular(
+              TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.w700,
+                color: isExpense
+                    ? AppTokens.error(context)
+                    : AppTokens.success(context),
+              ),
             ),
           ),
         ),
@@ -235,8 +263,8 @@ class _AddTransactionSheetState extends ConsumerState<AddTransactionSheet> {
 
         // Quick Amount Chips
         Wrap(
-          spacing: 6,
-          runSpacing: 4,
+          spacing: 8,
+          runSpacing: 8,
           children: [
             _buildAmountChip('+10rb', 10000),
             _buildAmountChip('+25rb', 25000),
@@ -250,7 +278,12 @@ class _AddTransactionSheetState extends ConsumerState<AddTransactionSheet> {
                 },
                 borderRadius: HubRadius.rPill,
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  constraints: const BoxConstraints(minHeight: 40),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 8,
+                  ),
+                  alignment: Alignment.center,
                   decoration: BoxDecoration(
                     color: AppTokens.error(context).withValues(alpha: 0.12),
                     borderRadius: HubRadius.rPill,
@@ -313,7 +346,7 @@ class _AddTransactionSheetState extends ConsumerState<AddTransactionSheet> {
         // Date Picker Button
         OutlinedButton.icon(
           onPressed: _pickDate,
-          icon: const Icon(Icons.calendar_today_rounded, size: 18),
+          icon: const Icon(LucideIcons.calendar, size: 18),
           label: Text(
             'Tanggal: ${FinanceMonth.formatShortDate(_occurredAt)}',
           ),
@@ -332,18 +365,18 @@ class _AddTransactionSheetState extends ConsumerState<AddTransactionSheet> {
         FilledButton(
           style: FilledButton.styleFrom(
             backgroundColor: AppTokens.primary(context),
-            foregroundColor: Colors.white,
+            foregroundColor: AppTokens.onPrimary(context),
             padding: const EdgeInsets.symmetric(vertical: 14),
             shape: RoundedRectangleBorder(borderRadius: HubRadius.rSm),
           ),
           onPressed: _isSaving ? null : _submitManual,
           child: _isSaving
-              ? const SizedBox(
+              ? SizedBox(
                   width: 18,
                   height: 18,
                   child: CircularProgressIndicator(
                     strokeWidth: 2,
-                    color: Colors.white,
+                    color: AppTokens.onPrimary(context),
                   ),
                 )
               : const Text(
@@ -360,7 +393,9 @@ class _AddTransactionSheetState extends ConsumerState<AddTransactionSheet> {
       onTap: () => _addQuickAmount(amount),
       borderRadius: HubRadius.rPill,
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+        constraints: const BoxConstraints(minHeight: 40),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        alignment: Alignment.center,
         decoration: BoxDecoration(
           color: AppTokens.primary(context).withValues(alpha: 0.1),
           borderRadius: HubRadius.rPill,
@@ -370,10 +405,12 @@ class _AddTransactionSheetState extends ConsumerState<AddTransactionSheet> {
         ),
         child: Text(
           label,
-          style: TextStyle(
-            fontSize: 12,
-            fontWeight: FontWeight.w700,
-            color: AppTokens.primary(context),
+          style: HubTypography.tabular(
+            TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+              color: AppTokens.primary(context),
+            ),
           ),
         ),
       ),
@@ -382,6 +419,7 @@ class _AddTransactionSheetState extends ConsumerState<AddTransactionSheet> {
 
   Widget _buildAiSegment(FinanceAiState aiState) {
     final isBusy = aiState.isParsing || aiState.isSavingDrafts;
+    final onSuccessColor = AppTokens.onPrimary(context);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -389,25 +427,30 @@ class _AddTransactionSheetState extends ConsumerState<AddTransactionSheet> {
         Row(
           children: [
             Icon(
-              Icons.auto_awesome_rounded,
+              LucideIcons.sparkles,
               size: 18,
               color: AppTokens.primary(context),
             ),
             const SizedBox(width: 8),
-            Text(
-              'Pencatatan Cepat Berbasis Teks',
-              style: TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w700,
-                color: AppTokens.textPrimary(context),
+            Expanded(
+              child: Text(
+                'Pencatatan Cepat Berbasis Teks',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  color: AppTokens.textPrimary(context),
+                ),
               ),
             ),
-            const Spacer(),
-            if (aiState.lastParseUsedModel != null)
+            if (aiState.lastParseUsedModel != null) ...[
+              const SizedBox(width: 8),
               ModelBadgeChip(
                 didFallback: aiState.lastParseDidFallback,
                 usedModel: aiState.lastParseUsedModel,
               ),
+            ],
           ],
         ),
         const SizedBox(height: 4),
@@ -436,25 +479,34 @@ class _AddTransactionSheetState extends ConsumerState<AddTransactionSheet> {
         FilledButton.icon(
           style: FilledButton.styleFrom(
             backgroundColor: AppTokens.primary(context),
-            foregroundColor: Colors.white,
+            foregroundColor: AppTokens.onPrimary(context),
             padding: const EdgeInsets.symmetric(vertical: 12),
           ),
           onPressed: isBusy ? null : _handleQuickAiParse,
           icon: aiState.isParsing
-              ? const SizedBox(
+              ? SizedBox(
                   width: 16,
                   height: 16,
                   child: CircularProgressIndicator(
                     strokeWidth: 2,
-                    color: Colors.white,
+                    color: AppTokens.onPrimary(context),
                   ),
                 )
-              : const Icon(Icons.auto_awesome_rounded, size: 16),
+              : const Icon(LucideIcons.sparkles, size: 16),
           label: Text(
             aiState.isParsing ? 'Menganalisa Kalimat...' : 'Proses dengan AI',
             style: const TextStyle(fontWeight: FontWeight.w700),
           ),
         ),
+
+        if (aiState.errorMessage != null) ...[
+          const SizedBox(height: 10),
+          ErrorBanner(
+            message: aiState.errorMessage!,
+            onDismiss: () =>
+                ref.read(financeAiControllerProvider.notifier).clearError(),
+          ),
+        ],
 
         if (aiState.drafts.isNotEmpty) ...[
           const SizedBox(height: 16),
@@ -472,8 +524,11 @@ class _AddTransactionSheetState extends ConsumerState<AddTransactionSheet> {
             if (i < aiState.drafts.length - 1) const SizedBox(height: 6),
           ],
           const SizedBox(height: 12),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.end,
+          Wrap(
+            alignment: WrapAlignment.end,
+            spacing: 8,
+            runSpacing: 8,
+            crossAxisAlignment: WrapCrossAlignment.center,
             children: [
               TextButton(
                 onPressed: isBusy
@@ -483,23 +538,22 @@ class _AddTransactionSheetState extends ConsumerState<AddTransactionSheet> {
                         .clearDrafts(),
                 child: const Text('Batal'),
               ),
-              const SizedBox(width: 8),
               FilledButton.icon(
                 style: FilledButton.styleFrom(
                   backgroundColor: AppTokens.success(context),
-                  foregroundColor: Colors.white,
+                  foregroundColor: onSuccessColor,
                 ),
                 onPressed: isBusy ? null : _handleSaveAiDrafts,
                 icon: aiState.isSavingDrafts
-                    ? const SizedBox(
+                    ? SizedBox(
                         width: 16,
                         height: 16,
                         child: CircularProgressIndicator(
                           strokeWidth: 2,
-                          color: Colors.white,
+                          color: onSuccessColor,
                         ),
                       )
-                    : const Icon(Icons.check_rounded),
+                    : const Icon(LucideIcons.check),
                 label: const Text(
                   'Simpan Semua Draf',
                   style: TextStyle(fontWeight: FontWeight.w700),
@@ -526,7 +580,7 @@ class _AddTransactionSheetState extends ConsumerState<AddTransactionSheet> {
       child: Row(
         children: [
           Icon(
-            isIncome ? Icons.south_west_rounded : Icons.north_east_rounded,
+            isIncome ? LucideIcons.arrowDownLeft : LucideIcons.arrowUpRight,
             size: 16,
             color: color,
           ),
@@ -553,20 +607,21 @@ class _AddTransactionSheetState extends ConsumerState<AddTransactionSheet> {
           const SizedBox(width: 8),
           Text(
             formatRupiah(draft.amount),
-            style: TextStyle(
-              fontWeight: FontWeight.w800,
-              color: color,
+            style: HubTypography.tabular(
+              TextStyle(
+                fontWeight: FontWeight.w800,
+                color: color,
+              ),
             ),
           ),
           IconButton(
             tooltip: 'Hapus draf',
-            visualDensity: VisualDensity.compact,
             onPressed: isBusy
                 ? null
                 : () => ref
                     .read(financeAiControllerProvider.notifier)
                     .removeDraftAt(index),
-            icon: const Icon(Icons.close, size: 16),
+            icon: const Icon(LucideIcons.x, size: 16),
           ),
         ],
       ),
@@ -577,55 +632,59 @@ class _AddTransactionSheetState extends ConsumerState<AddTransactionSheet> {
   Widget build(BuildContext context) {
     final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
     final aiState = ref.watch(financeAiControllerProvider);
+    final showSegmentIcons = MediaQuery.sizeOf(context).width >= 360;
 
-    return Padding(
-      padding: EdgeInsets.fromLTRB(20, 16, 20, 20 + bottomInset),
-      child: SingleChildScrollView(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            // Header Handle
-            Center(
-              child: Container(
-                width: 36,
-                height: 4,
-                margin: const EdgeInsets.only(bottom: 12),
-                decoration: BoxDecoration(
-                  color: AppTokens.border(context),
-                  borderRadius: HubRadius.rPill,
-                ),
+    return SafeArea(
+      top: false,
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(20, 8, 20, 20 + bottomInset),
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // Top Segment Switcher: Manual vs AI
+              SegmentedButton<int>(
+                showSelectedIcon: false,
+                segments: [
+                  ButtonSegment(
+                    value: 0,
+                    label: const Text(
+                      'Manual',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    icon: showSegmentIcons
+                        ? const Icon(LucideIcons.fileEdit)
+                        : null,
+                  ),
+                  ButtonSegment(
+                    value: 1,
+                    label: const Text(
+                      'Ketik Cepat AI',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    icon: showSegmentIcons
+                        ? const Icon(LucideIcons.sparkles)
+                        : null,
+                  ),
+                ],
+                selected: {_selectedSegment},
+                onSelectionChanged: (val) {
+                  setState(() {
+                    _selectedSegment = val.first;
+                  });
+                },
               ),
-            ),
+              const SizedBox(height: 16),
 
-            // Top Segment Switcher: Manual vs AI
-            SegmentedButton<int>(
-              segments: const [
-                ButtonSegment(
-                  value: 0,
-                  label: Text('Manual'),
-                  icon: Icon(Icons.edit_note_rounded),
-                ),
-                ButtonSegment(
-                  value: 1,
-                  label: Text('Ketik Cepat AI'),
-                  icon: Icon(Icons.auto_awesome_rounded),
-                ),
-              ],
-              selected: {_selectedSegment},
-              onSelectionChanged: (val) {
-                setState(() {
-                  _selectedSegment = val.first;
-                });
-              },
-            ),
-            const SizedBox(height: 16),
-
-            if (_selectedSegment == 0)
-              _buildManualSegment()
-            else
-              _buildAiSegment(aiState),
-          ],
+              if (_selectedSegment == 0)
+                _buildManualSegment()
+              else
+                _buildAiSegment(aiState),
+            ],
+          ),
         ),
       ),
     );

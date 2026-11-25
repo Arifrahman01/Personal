@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
+import 'package:personal_hub/app.dart';
 import 'package:personal_hub/core/theme/app_tokens.dart';
+import 'package:personal_hub/core/theme/hub_widgets.dart';
 import 'package:personal_hub/features/meetings/models/meeting.dart';
 import 'package:personal_hub/features/meetings/ui/meeting_form_screen.dart';
 import 'package:personal_hub/features/meetings/ui/meetings_screen.dart';
 import 'package:personal_hub/features/prayer/ui/prayer_schedule_screen.dart';
-import 'package:personal_hub/features/tasks/models/task_models.dart';
-import 'package:personal_hub/features/tasks/providers/tasks_providers.dart';
 import 'package:personal_hub/features/tasks/ui/tasks_habits_screen.dart';
 
 /// Notifier managing the selected section index in [AgendaHubScreen].
@@ -94,159 +94,38 @@ class _AgendaHubScreenState extends ConsumerState<AgendaHubScreen> {
     );
   }
 
-  Future<void> _showAddTaskDialog() async {
-    final titleController = TextEditingController();
-    TaskPriority selectedPriority = TaskPriority.medium;
-
-    final created = await showModalBottomSheet<bool>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: AppTokens.card(context),
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(HubRadius.lg)),
-      ),
-      builder: (ctx) {
-        return StatefulBuilder(
-          builder: (context, setSheetState) {
-            final viewInsets = MediaQuery.of(context).viewInsets.bottom;
-            return SafeArea(
-              child: Padding(
-                padding: EdgeInsets.fromLTRB(
-                  HubSpacing.md,
-                  HubSpacing.md,
-                  HubSpacing.md,
-                  HubSpacing.md + viewInsets,
-                ),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Row(
-                      children: [
-                        Icon(
-                          LucideIcons.checkSquare,
-                          color: AppTokens.primary(context),
-                          size: 20,
-                        ),
-                        const SizedBox(width: HubSpacing.sm),
-                        Text(
-                          'Tambah Tugas Baru',
-                          style: Theme.of(context)
-                              .textTheme
-                              .titleMedium
-                              ?.copyWith(
-                                fontWeight: FontWeight.w700,
-                                color: AppTokens.textPrimary(context),
-                              ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: HubSpacing.md),
-                    TextField(
-                      controller: titleController,
-                      autofocus: true,
-                      decoration: const InputDecoration(
-                        labelText: 'Judul tugas',
-                        hintText: 'Contoh: Siapkan bahan presentasi',
-                        border: OutlineInputBorder(),
-                      ),
-                      onSubmitted: (value) {
-                        if (value.trim().isNotEmpty) {
-                          Navigator.of(context).pop(true);
-                        }
-                      },
-                    ),
-                    const SizedBox(height: HubSpacing.md),
-                    Text(
-                      'Prioritas',
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: AppTokens.textSecondary(context),
-                            fontWeight: FontWeight.w600,
-                          ),
-                    ),
-                    const SizedBox(height: HubSpacing.xs),
-                    SegmentedButton<TaskPriority>(
-                      style: SegmentedButton.styleFrom(
-                        visualDensity: VisualDensity.compact,
-                      ),
-                      segments: const [
-                        ButtonSegment(
-                          value: TaskPriority.low,
-                          label: Text('Rendah'),
-                        ),
-                        ButtonSegment(
-                          value: TaskPriority.medium,
-                          label: Text('Sedang'),
-                        ),
-                        ButtonSegment(
-                          value: TaskPriority.high,
-                          label: Text('Tinggi'),
-                        ),
-                      ],
-                      selected: {selectedPriority},
-                      onSelectionChanged: (set) {
-                        if (set.isNotEmpty) {
-                          setSheetState(() => selectedPriority = set.first);
-                        }
-                      },
-                    ),
-                    const SizedBox(height: HubSpacing.lg),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.end,
-                      children: [
-                        TextButton(
-                          onPressed: () => Navigator.of(context).pop(false),
-                          child: const Text('Batal'),
-                        ),
-                        const SizedBox(width: HubSpacing.sm),
-                        FilledButton.icon(
-                          onPressed: () {
-                            if (titleController.text.trim().isNotEmpty) {
-                              Navigator.of(context).pop(true);
-                            }
-                          },
-                          icon: const Icon(LucideIcons.plus, size: 16),
-                          label: const Text('Simpan'),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            );
-          },
-        );
-      },
-    );
-
-    if (created == true && titleController.text.trim().isNotEmpty) {
-      await ref.read(tasksProvider.notifier).createTask(
-            title: titleController.text.trim(),
-            priority: selectedPriority,
-          );
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Tugas berhasil ditambahkan')),
-        );
-      }
-    }
-  }
-
-  Widget? _buildContextualFab() {
+  Widget? _buildContextualFab(BuildContext context, int tasksSubSection) {
+    final bgColor = AppTokens.primary(context);
+    final fgColor = AppTokens.onPrimary(context);
     switch (_selectedSection) {
       case 0:
         return FloatingActionButton.extended(
           key: const Key('agenda_add_meeting_fab'),
           heroTag: 'agenda_add_meeting_fab',
+          backgroundColor: bgColor,
+          foregroundColor: fgColor,
           onPressed: _openAddMeeting,
           icon: const Icon(LucideIcons.plus),
           label: const Text('Meeting Baru'),
         );
       case 1:
+        if (tasksSubSection == 1) {
+          return FloatingActionButton.extended(
+            key: const Key('agenda_add_habit_fab'),
+            heroTag: 'agenda_add_habit_fab',
+            backgroundColor: bgColor,
+            foregroundColor: fgColor,
+            onPressed: () => showCreateHabitSheet(context, ref),
+            icon: const Icon(LucideIcons.plus),
+            label: const Text('Tambah Habit'),
+          );
+        }
         return FloatingActionButton.extended(
           key: const Key('agenda_add_task_fab'),
           heroTag: 'agenda_add_task_fab',
-          onPressed: _showAddTaskDialog,
+          backgroundColor: bgColor,
+          foregroundColor: fgColor,
+          onPressed: () => showCreateTaskSheet(context, ref),
           icon: const Icon(LucideIcons.plus),
           label: const Text('Tambah Tugas'),
         );
@@ -267,21 +146,31 @@ class _AgendaHubScreenState extends ConsumerState<AgendaHubScreen> {
       }
     });
 
+    final tasksSubSection = ref.watch(tasksHabitsSectionProvider);
+    final showSegmentIcons = MediaQuery.sizeOf(context).width >= 400;
+
     return Scaffold(
       backgroundColor: AppTokens.canvas(context),
-      appBar: AppBar(
+      appBar: HubAppBar(
+        titleText: 'Agenda',
         backgroundColor: AppTokens.canvas(context),
-        elevation: 0,
-        scrolledUnderElevation: 0,
-        title: Text(
-          'Agenda',
-          style: TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.w800,
-            color: AppTokens.textPrimary(context),
-            letterSpacing: -0.3,
+        actions: [
+          IconButton(
+            tooltip: 'Cari',
+            icon: const Icon(LucideIcons.search),
+            onPressed: () => MainNavigationShell.openSearch(context),
           ),
-        ),
+          IconButton(
+            tooltip: 'AI Copilot',
+            icon: const Icon(LucideIcons.sparkles),
+            onPressed: () => MainNavigationShell.openAiChat(context),
+          ),
+          IconButton(
+            tooltip: 'Pengaturan',
+            icon: const Icon(LucideIcons.settings),
+            onPressed: () => MainNavigationShell.openSettings(context),
+          ),
+        ],
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(56),
           child: Padding(
@@ -289,21 +178,49 @@ class _AgendaHubScreenState extends ConsumerState<AgendaHubScreen> {
             child: SizedBox(
               width: double.infinity,
               child: SegmentedButton<int>(
-                segments: const [
+                showSelectedIcon: false,
+                segments: [
                   ButtonSegment<int>(
                     value: 0,
-                    label: Text('Meeting'),
-                    icon: Icon(LucideIcons.calendar, size: 16),
+                    label: const FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Text(
+                        'Meeting',
+                        maxLines: 1,
+                        softWrap: false,
+                      ),
+                    ),
+                    icon: showSegmentIcons
+                        ? const Icon(LucideIcons.calendar, size: 16)
+                        : null,
                   ),
                   ButtonSegment<int>(
                     value: 1,
-                    label: Text('Tugas & Habit'),
-                    icon: Icon(LucideIcons.checkSquare, size: 16),
+                    label: const FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Text(
+                        'Tugas & Habit',
+                        maxLines: 1,
+                        softWrap: false,
+                      ),
+                    ),
+                    icon: showSegmentIcons
+                        ? const Icon(LucideIcons.checkSquare, size: 16)
+                        : null,
                   ),
                   ButtonSegment<int>(
                     value: 2,
-                    label: Text('Sholat & Kiblat'),
-                    icon: Icon(LucideIcons.compass, size: 16),
+                    label: const FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Text(
+                        'Sholat & Kiblat',
+                        maxLines: 1,
+                        softWrap: false,
+                      ),
+                    ),
+                    icon: showSegmentIcons
+                        ? const Icon(LucideIcons.compass, size: 16)
+                        : null,
                   ),
                 ],
                 selected: {_selectedSection},
@@ -317,18 +234,21 @@ class _AgendaHubScreenState extends ConsumerState<AgendaHubScreen> {
           ),
         ),
       ),
-      body: IndexedStack(
-        index: _selectedSection,
-        children: [
-          MeetingsScreen(
-            isEmbedded: true,
-            onPromoteActionItem: widget.onPromoteActionItem,
-          ),
-          const TasksHabitsScreen(isEmbedded: true),
-          const PrayerScheduleScreen(isEmbedded: true),
-        ],
+      body: SafeArea(
+        top: false,
+        child: IndexedStack(
+          index: _selectedSection,
+          children: [
+            MeetingsScreen(
+              isEmbedded: true,
+              onPromoteActionItem: widget.onPromoteActionItem,
+            ),
+            const TasksHabitsScreen(isEmbedded: true),
+            const PrayerScheduleScreen(isEmbedded: true),
+          ],
+        ),
       ),
-      floatingActionButton: _buildContextualFab(),
+      floatingActionButton: _buildContextualFab(context, tasksSubSection),
     );
   }
 }

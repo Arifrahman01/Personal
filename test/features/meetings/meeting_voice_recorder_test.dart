@@ -11,7 +11,13 @@ import 'package:personal_hub/features/meetings/data/meetings_repository.dart';
 import 'package:personal_hub/features/meetings/models/meeting.dart';
 import 'package:personal_hub/features/meetings/providers/meetings_providers.dart';
 import 'package:personal_hub/features/meetings/services/meeting_voice_recorder.dart';
+import 'package:personal_hub/features/meetings/ui/live_meeting_recorder_screen.dart';
 import 'package:personal_hub/features/meetings/ui/meeting_detail_screen.dart';
+import 'package:personal_hub/features/meetings/ui/meeting_note_result_sheet.dart';
+import 'package:personal_hub/features/notes/data/notes_repository.dart';
+import 'package:personal_hub/features/notes/models/note.dart';
+import 'package:personal_hub/features/notes/providers/notes_providers.dart';
+import 'package:uuid/uuid.dart';
 
 class _FakeSpeechRecognizerGateway implements SpeechRecognizerGateway {
   _FakeSpeechRecognizerGateway({this.available = true});
@@ -24,6 +30,7 @@ class _FakeSpeechRecognizerGateway implements SpeechRecognizerGateway {
 
   void Function(String text, bool isFinal)? _onResult;
   void Function(String status)? _onStatus;
+  void Function(double level)? _onSoundLevel;
 
   @override
   Future<bool> initialize() async {
@@ -36,10 +43,12 @@ class _FakeSpeechRecognizerGateway implements SpeechRecognizerGateway {
     required String localeId,
     required void Function(String text, bool isFinal) onResult,
     void Function(String status)? onStatus,
+    void Function(double level)? onSoundLevelChange,
   }) async {
     startedLocales.add(localeId);
     _onResult = onResult;
     _onStatus = onStatus;
+    _onSoundLevel = onSoundLevelChange;
     _onStatus?.call('listening');
   }
 
@@ -61,6 +70,10 @@ class _FakeSpeechRecognizerGateway implements SpeechRecognizerGateway {
 
   void emitStatus(String status) {
     _onStatus?.call(status);
+  }
+
+  void emitSoundLevel(double level) {
+    _onSoundLevel?.call(level);
   }
 }
 
@@ -116,6 +129,38 @@ class _InMemoryMeetingsRepository implements MeetingsRepository {
     _items[idx] = meeting;
     return meeting;
   }
+}
+
+class _InMemoryNotesRepository implements NotesRepository {
+  final List<Note> items = [];
+  static const _uuid = Uuid();
+
+  @override
+  Future<Note> createNote({
+    required String title,
+    required String content,
+    List<String> tags = const [],
+  }) async {
+    final now = DateTime.now();
+    final created = Note(
+      id: _uuid.v4(),
+      title: title,
+      content: content,
+      tags: tags,
+      isPinned: false,
+      createdAt: now,
+      updatedAt: now,
+    );
+    items.add(created);
+    return created;
+  }
+
+  @override
+  Future<List<Note>> getNotes({String? query, String? tag}) async =>
+      List.from(items);
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
 
 class _FakeAiClient implements SamudraAiClient {
@@ -304,7 +349,7 @@ void main() {
     },
   );
 
-  test('pause and resume manages state, timer, and wakelock', () async {
+  test('pause and resume keeps screen wakelock off by default and honors opt-in keepScreenOn', () async {
     final gateway = _FakeSpeechRecognizerGateway();
     final wakelock = NoOpRecordingWakelockGateway();
     final draftStore = InMemoryMeetingDraftStore();
@@ -315,10 +360,17 @@ void main() {
     );
     addTearDown(recorder.dispose);
 
+    // Default keepScreenOn == false saves battery during long meetings
     await recorder.start(title: 'Rapat Koordinasi');
     expect(recorder.state.isRecording, isTrue);
     expect(recorder.state.isPaused, isFalse);
     expect(recorder.state.isActiveSession, isTrue);
+    expect(recorder.state.keepScreenOn, isFalse);
+    expect(wakelock.isEnabled, isFalse);
+
+    // Opt-in enables wakelock immediately while recording
+    await recorder.setKeepScreenOn(true);
+    expect(recorder.state.keepScreenOn, isTrue);
     expect(wakelock.isEnabled, isTrue);
 
     gateway.emitResult('Poin 1 disepakati', isFinal: true);
@@ -374,8 +426,13 @@ void main() {
   });
 
   testWidgets(
-    'MeetingDetailScreen records live transcript and summarizes with AI in 1 tap',
+    'MeetingDetailScreen opens LiveMeetingRecorderScreen, records transcript, and displays MeetingNoteResultSheet',
     (WidgetTester tester) async {
+      tester.view.physicalSize = const Size(800, 1400);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
       final now = DateTime.now();
       final seeded = Meeting(
         id: 'm-voice-1',
@@ -386,6 +443,7 @@ void main() {
         updatedAt: now,
       );
       final repository = _InMemoryMeetingsRepository([seeded]);
+      final notesRepository = _InMemoryNotesRepository();
       final fakeAi = _FakeAiClient();
       final gateway = _FakeSpeechRecognizerGateway();
 
@@ -393,8 +451,18 @@ void main() {
         ProviderScope(
           overrides: [
             meetingsRepositoryProvider.overrideWithValue(repository),
+            notesRepositoryProvider.overrideWithValue(notesRepository),
             aiClientProvider.overrideWithValue(fakeAi),
             speechRecognizerGatewayProvider.overrideWithValue(gateway),
+            backgroundRecordingGatewayProvider.overrideWithValue(
+              NoOpBackgroundRecordingGateway(),
+            ),
+            meetingDraftStoreProvider.overrideWithValue(
+              InMemoryMeetingDraftStore(),
+            ),
+            recordingWakelockGatewayProvider.overrideWithValue(
+              NoOpRecordingWakelockGateway(),
+            ),
           ],
           child: const MaterialApp(
             home: MeetingDetailScreen(meetingId: 'm-voice-1'),
@@ -403,16 +471,15 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      final openRecorderButton = find.text('Rekam Percakapan');
+      final openRecorderButton = find.byKey(
+        const Key('start_recording_meeting_button'),
+      );
       await tester.ensureVisible(openRecorderButton);
       await tester.tap(openRecorderButton);
       await tester.pumpAndSettle();
 
-      expect(find.text('Bahasa Indonesia (id_ID)'), findsOneWidget);
-      expect(find.text('English (en_US)'), findsOneWidget);
-
-      await tester.tap(find.text('Mulai Rekam'));
-      await tester.pumpAndSettle();
+      expect(find.byType(LiveMeetingRecorderScreen), findsOneWidget);
+      expect(find.text('ID'), findsOneWidget);
 
       gateway.emitResult('Kita rilis aplikasi pekan depan', isFinal: true);
       gateway.emitResult('dan siapkan QA build', isFinal: false);
@@ -423,7 +490,7 @@ void main() {
         findsOneWidget,
       );
 
-      await tester.tap(find.text('Hentikan & Simpulkan dengan AI'));
+      await tester.tap(find.text('Selesai & Susun Catatan'));
       await tester.pumpAndSettle();
 
       final updated = (await repository.getMeetings()).first;
@@ -433,12 +500,342 @@ void main() {
         contains('Kita rilis aplikasi pekan depan dan siapkan QA build'),
       );
       expect(fakeAi.lastUserPrompt, contains('dan siapkan QA build'));
-      expect(find.text('Free'), findsOneWidget);
+      expect(notesRepository.items.length, 1);
+
+      expect(find.byType(MeetingNoteResultSheet), findsOneWidget);
+      expect(find.text('Hasil Notulensi Rapat'), findsOneWidget);
+      expect(find.text('Tersimpan ke Catatan & Meeting'), findsOneWidget);
       expect(
         find.text('Tim menyepakati peluncuran aplikasi pekan depan.'),
         findsOneWidget,
       );
       expect(find.text('Finalisasi QA build'), findsOneWidget);
+    },
+  );
+
+  test(
+    'fatal error followed by done stops recording cleanly and preserves errorMessage',
+    () async {
+      final gateway = _FakeSpeechRecognizerGateway();
+      final recorder = MeetingVoiceRecorder(gateway);
+      addTearDown(recorder.dispose);
+
+      await recorder.start();
+      expect(recorder.state.isRecording, isTrue);
+      expect(gateway.startedLocales, ['id_ID']);
+
+      gateway.emitStatus('error:error_network');
+      gateway.emitStatus('done');
+      await Future<void>.delayed(const Duration(milliseconds: 550));
+
+      expect(recorder.state.isRecording, isFalse);
+      expect(recorder.shouldKeepListening, isFalse);
+      expect(recorder.state.errorMessage, isNotNull);
+      expect(recorder.state.errorMessage!.toLowerCase(), contains('internet'));
+      expect(gateway.startedLocales.length, 1);
+    },
+  );
+
+  test(
+    'back-to-back error_no_match and done triggers only 1 debounced restart',
+    () async {
+      final gateway = _FakeSpeechRecognizerGateway();
+      final recorder = MeetingVoiceRecorder(gateway);
+      addTearDown(recorder.dispose);
+
+      await recorder.start();
+      expect(gateway.startedLocales.length, 1);
+
+      gateway.emitStatus('error:error_no_match');
+      gateway.emitStatus('done');
+      await Future<void>.delayed(const Duration(milliseconds: 550));
+
+      expect(recorder.state.isRecording, isTrue);
+      expect(gateway.startedLocales.length, 2);
+    },
+  );
+
+  test(
+    'empty partial emission does not wipe existing partialTranscript',
+    () async {
+      final gateway = _FakeSpeechRecognizerGateway();
+      final recorder = MeetingVoiceRecorder(gateway);
+      addTearDown(recorder.dispose);
+
+      await recorder.start();
+      gateway.emitResult('Rapat evaluasi sprint', isFinal: false);
+      expect(recorder.state.partialTranscript, 'Rapat evaluasi sprint');
+
+      gateway.emitResult('', isFinal: false);
+      expect(recorder.state.partialTranscript, 'Rapat evaluasi sprint');
+
+      gateway.emitStatus('done');
+      expect(recorder.state.finalizedTranscript, 'Rapat evaluasi sprint');
+    },
+  );
+
+  test(
+    'error_language_unavailable falls back once to system default locale and sets statusHint',
+    () async {
+      final gateway = _FakeSpeechRecognizerGateway();
+      final recorder = MeetingVoiceRecorder(gateway);
+      addTearDown(recorder.dispose);
+
+      await recorder.start(localeId: 'id_ID');
+      expect(gateway.startedLocales, ['id_ID']);
+
+      gateway.emitStatus('error:error_language_unavailable');
+      await Future<void>.delayed(const Duration(milliseconds: 650));
+
+      expect(recorder.state.isRecording, isTrue);
+      expect(recorder.state.errorMessage, isNull);
+      expect(recorder.state.statusHint, isNotNull);
+      expect(gateway.startedLocales, ['id_ID', '']);
+    },
+  );
+
+  test(
+    'sound level callback normalizes RMS/dB updates into 0.0..1.0',
+    () async {
+      final gateway = _FakeSpeechRecognizerGateway();
+      final recorder = MeetingVoiceRecorder(gateway);
+      addTearDown(recorder.dispose);
+
+      await recorder.start();
+      expect(recorder.state.soundLevel, 0.0);
+
+      gateway.emitSoundLevel(7.0);
+      expect(recorder.state.soundLevel, greaterThan(0.5));
+      expect(recorder.state.soundLevel, lessThanOrEqualTo(1.0));
+    },
+  );
+
+  test(
+    'starts and stops BackgroundRecordingGateway lifecycle across start, pause, resume, stop, and fatal error',
+    () async {
+      final gateway = _FakeSpeechRecognizerGateway();
+      final bg = NoOpBackgroundRecordingGateway();
+      final recorder = MeetingVoiceRecorder(gateway, backgroundService: bg);
+      addTearDown(recorder.dispose);
+
+      await recorder.start(title: 'Rapat Direksi');
+      expect(bg.isActive, isTrue);
+      expect(bg.startCount, 1);
+      expect(bg.lastTitle, 'Rapat Direksi');
+      expect(recorder.state.isBackgroundServiceActive, isTrue);
+
+      await recorder.pause();
+      expect(bg.isActive, isFalse);
+      expect(bg.stopCount, 1);
+      expect(recorder.state.isBackgroundServiceActive, isFalse);
+
+      await recorder.resume();
+      expect(bg.isActive, isTrue);
+      expect(bg.startCount, 2);
+      expect(recorder.state.isBackgroundServiceActive, isTrue);
+
+      gateway.emitStatus('error:error_network');
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+      expect(bg.isActive, isFalse);
+      expect(bg.stopCount, 2);
+      expect(recorder.state.isBackgroundServiceActive, isFalse);
+
+      await recorder.start(title: 'Rapat Kedua');
+      expect(bg.isActive, isTrue);
+      await recorder.stop();
+      expect(bg.isActive, isFalse);
+      expect(bg.stopCount, 3);
+    },
+  );
+
+  test(
+    'silentAudioOffline lifecycle: start -> pause -> resume(append) -> stop -> transcribe -> clear',
+    () async {
+      final speechGateway = _FakeSpeechRecognizerGateway();
+      final audioGateway = NoOpAudioRecorderGateway(supported: true);
+      final transcriber = NoOpOfflineAudioTranscriberGateway(
+        supported: true,
+        readyModel: true,
+        scriptedChunks: ['Pembukaan presentasi.', 'Keputusan rilis Jumat.'],
+      );
+      final bg = NoOpBackgroundRecordingGateway();
+      final draftStore = InMemoryMeetingDraftStore();
+
+      final recorder = MeetingVoiceRecorder(
+        speechGateway,
+        audioRecorder: audioGateway,
+        offlineTranscriber: transcriber,
+        backgroundService: bg,
+        draftStore: draftStore,
+        audioDirectoryProvider: () async => '/tmp/test_audio',
+      );
+      addTearDown(recorder.dispose);
+
+      expect(recorder.state.mode, MeetingRecordingMode.silentAudioOffline);
+      expect(recorder.isSilentAudioSupported, isTrue);
+
+      final started = await recorder.start(title: 'Presentasi Produk');
+      expect(started, isTrue);
+      expect(audioGateway.startCount, 1);
+      expect(audioGateway.lastAppend, isFalse);
+      expect(recorder.state.hasPendingAudio, isTrue);
+      final audioPath = recorder.state.recordedAudioPath!;
+      expect(speechGateway.startedLocales, isEmpty);
+
+      // Pause & resume should append to the same WAV file
+      await recorder.pause();
+      expect(audioGateway.pauseCount, 1);
+      expect(recorder.state.isPaused, isTrue);
+
+      final draft = await draftStore.loadDraft();
+      expect(draft, isNotNull);
+      expect(draft!.audioFilePath, audioPath);
+      expect(draft.hasRecoverableContent, isTrue);
+
+      final resumed = await recorder.resume();
+      expect(resumed, isTrue);
+      expect(audioGateway.startCount, 2);
+      expect(audioGateway.lastAppend, isTrue);
+      expect(audioGateway.lastOutputPath, audioPath);
+
+      // Add a manual note while recording silently
+      recorder.appendManualNote('Slide ke-4 penting');
+
+      await recorder.stop();
+      expect(audioGateway.stopCount, 1);
+      expect(recorder.state.hasPendingAudio, isTrue);
+
+      // Run 100% offline transcription
+      final transcript = await recorder.transcribeRecordedAudio();
+      expect(transcriber.transcribeCallCount, 1);
+      expect(transcriber.lastWavPath, audioPath);
+      expect(bg.startTranscriptionCount, 1);
+      expect(bg.stopTranscriptionCount, 1);
+      expect(
+        transcript,
+        '[Catatan]: Slide ke-4 penting Pembukaan presentasi. Keputusan rilis Jumat.',
+      );
+
+      await recorder.clearRecordedAudioFile();
+      expect(audioGateway.deletedPaths, contains(audioPath));
+      expect(recorder.state.hasPendingAudio, isFalse);
+    },
+  );
+
+  test(
+    'syncs notification actions (notifQuickNote, notifPause, notifResume, notifStop, micSilenced)',
+    () async {
+      final speechGateway = _FakeSpeechRecognizerGateway();
+      final audioGateway = NoOpAudioRecorderGateway(supported: true);
+      final recorder = MeetingVoiceRecorder(
+        speechGateway,
+        audioRecorder: audioGateway,
+        audioDirectoryProvider: () async => '/tmp/test_audio',
+      );
+      addTearDown(recorder.dispose);
+
+      await recorder.start(title: 'Rapat Lapangan');
+      expect(recorder.state.isRecording, isTrue);
+
+      audioGateway.emitEvent(
+        const AudioRecorderServiceEvent(
+          type: AudioRecorderEventType.notifQuickNote,
+          text: 'Cek vendor logistik',
+        ),
+      );
+      await Future<void>.delayed(Duration.zero);
+      expect(
+        recorder.state.finalizedTranscript,
+        '[Catatan]: Cek vendor logistik',
+      );
+
+      audioGateway.emitEvent(
+        const AudioRecorderServiceEvent(
+          type: AudioRecorderEventType.micSilenced,
+          silenced: true,
+        ),
+      );
+      await Future<void>.delayed(Duration.zero);
+      expect(recorder.state.isMicSilenced, isTrue);
+      expect(recorder.state.statusHint, isNotNull);
+
+      audioGateway.emitEvent(
+        const AudioRecorderServiceEvent(
+          type: AudioRecorderEventType.notifPause,
+          sizeBytes: 12000,
+        ),
+      );
+      await Future<void>.delayed(Duration.zero);
+      expect(recorder.state.isPaused, isTrue);
+      expect(recorder.state.recordedAudioBytes, 12000);
+
+      audioGateway.emitEvent(
+        const AudioRecorderServiceEvent(
+          type: AudioRecorderEventType.notifResume,
+        ),
+      );
+      await Future<void>.delayed(Duration.zero);
+      expect(recorder.state.isRecording, isTrue);
+
+      audioGateway.emitEvent(
+        const AudioRecorderServiceEvent(
+          type: AudioRecorderEventType.notifStop,
+          sizeBytes: 24000,
+        ),
+      );
+      await Future<void>.delayed(Duration.zero);
+      expect(recorder.state.isRecording, isFalse);
+      expect(recorder.state.isPaused, isFalse);
+      expect(recorder.state.recordedAudioBytes, 24000);
+    },
+  );
+
+  test(
+    'decoupled soundLevelListenable and elapsedListenable update without triggering main ChangeNotifier rebuilds',
+    () async {
+      final gateway = _FakeSpeechRecognizerGateway();
+      final recorder = MeetingVoiceRecorder(gateway);
+      addTearDown(recorder.dispose);
+
+      await recorder.start();
+      int mainNotifyCount = 0;
+      recorder.addListener(() => mainNotifyCount++);
+
+      gateway.emitSoundLevel(8.0);
+      expect(recorder.soundLevelListenable.value, greaterThan(0.5));
+      expect(mainNotifyCount, 0);
+
+      // Also verify cached wordCount updates cleanly on text emissions
+      gateway.emitResult('Satu dua tiga', isFinal: false);
+      expect(recorder.state.wordCount, 3);
+      expect(mainNotifyCount, 1);
+
+      gateway.emitResult('Satu dua tiga empat', isFinal: true);
+      expect(recorder.state.wordCount, 4);
+    },
+  );
+
+  test(
+    'live mode recovers from transient error_busy and error_client with backoff',
+    () async {
+      final gateway = _FakeSpeechRecognizerGateway();
+      final recorder = MeetingVoiceRecorder(gateway);
+      addTearDown(recorder.dispose);
+
+      await recorder.start();
+      expect(gateway.startedLocales.length, 1);
+
+      gateway.emitStatus('error:error_busy');
+      expect(recorder.state.isRecording, isTrue);
+      expect(recorder.state.statusHint, isNotNull);
+
+      await Future<void>.delayed(const Duration(milliseconds: 550));
+      expect(gateway.startedLocales.length, 2);
+
+      gateway.emitStatus('error:error_client');
+      await Future<void>.delayed(const Duration(milliseconds: 950));
+      expect(recorder.state.isRecording, isTrue);
+      expect(gateway.startedLocales.length, 3);
     },
   );
 }
@@ -458,6 +855,7 @@ class _PendingSpeechRecognizerGateway implements SpeechRecognizerGateway {
     required String localeId,
     required void Function(String text, bool isFinal) onResult,
     void Function(String status)? onStatus,
+    void Function(double level)? onSoundLevelChange,
   }) async {
     startListeningCalled = true;
   }

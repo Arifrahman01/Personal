@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:personal_hub/core/theme/app_tokens.dart';
 import 'package:personal_hub/core/theme/hub_widgets.dart';
 import 'package:personal_hub/features/finance/models/finance_models.dart';
@@ -7,6 +8,7 @@ import 'package:personal_hub/features/finance/providers/asset_aggregator_provide
 import 'package:personal_hub/features/finance/providers/finance_providers.dart';
 import 'package:personal_hub/features/finance/providers/predictive_cashflow_providers.dart';
 import 'package:personal_hub/features/finance/services/predictive_cashflow_service.dart';
+import 'package:personal_hub/features/finance/ui/widgets/add_transaction_sheet.dart';
 import 'package:personal_hub/features/finance/ui/widgets/finance_shared_widgets.dart';
 
 /// Tab 1: Arus Kas, Tagihan Rutin & Riwayat Transaksi Modular.
@@ -16,43 +18,50 @@ class CashflowTab extends ConsumerStatefulWidget {
     required this.selectedMonth,
     required this.onExportMonthCsv,
     required this.onAnalyzeMonth,
+    this.onOpenQuickAi,
   });
 
   final FinanceMonth selectedMonth;
   final VoidCallback onExportMonthCsv;
   final void Function(MonthlySummary summary, FinanceMonth month) onAnalyzeMonth;
+  final VoidCallback? onOpenQuickAi;
 
   @override
   ConsumerState<CashflowTab> createState() => _CashflowTabState();
 }
 
 class _CashflowTabState extends ConsumerState<CashflowTab> {
-  final TextEditingController _aiInputController = TextEditingController();
-  bool _isProjectionExpanded = true;
+  bool? _userProjectionExpanded;
 
   @override
-  void dispose() {
-    _aiInputController.dispose();
-    super.dispose();
+  void didUpdateWidget(covariant CashflowTab oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.selectedMonth != oldWidget.selectedMonth) {
+      _userProjectionExpanded = null;
+    }
   }
 
-  Future<void> _handleQuickAiParse() async {
-    final text = _aiInputController.text.trim();
-    if (text.isEmpty) return;
-    FocusScope.of(context).unfocus();
-    await ref.read(financeAiControllerProvider.notifier).parseNaturalInput(text);
-  }
-
-  Future<void> _handleSaveDrafts() async {
-    final saved = await ref
-        .read(financeAiControllerProvider.notifier)
-        .saveAllDrafts();
-    if (!mounted || saved == 0) return;
-    _aiInputController.clear();
-    _invalidateFinanceProviders();
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('$saved transaksi berhasil disimpan.')),
+  Future<void> _openQuickAiSheet() async {
+    if (widget.onOpenQuickAi != null) {
+      widget.onOpenQuickAi!();
+      return;
+    }
+    final added = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      showDragHandle: true,
+      builder: (sheetContext) => AddTransactionSheet(
+        selectedMonth: widget.selectedMonth,
+        initialSegment: 1,
+      ),
     );
+    if (added == true && mounted) {
+      _invalidateFinanceProviders();
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Transaksi berhasil ditambahkan.')),
+      );
+    }
   }
 
   void _invalidateFinanceProviders() {
@@ -99,6 +108,11 @@ class _CashflowTabState extends ConsumerState<CashflowTab> {
     final anomaliesAsync = ref.watch(spendingAnomaliesProvider);
     final recurringBillsAsync = ref.watch(recurringBillsProvider);
 
+    final summaryData = summaryAsync.asData?.value;
+    final hasActivity = summaryData != null &&
+        (summaryData.totalIncome > 0 || summaryData.totalExpense > 0);
+    final isProjectionExpanded = _userProjectionExpanded ?? hasActivity;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -140,10 +154,10 @@ class _CashflowTabState extends ConsumerState<CashflowTab> {
           cashflowAsync: cashflowAsync,
           selectedMonth: widget.selectedMonth,
           isAnalyzing: aiState.isAnalyzing,
-          isExpanded: _isProjectionExpanded,
+          isExpanded: isProjectionExpanded,
           onToggleExpand: () {
             setState(() {
-              _isProjectionExpanded = !_isProjectionExpanded;
+              _userProjectionExpanded = !isProjectionExpanded;
             });
           },
           onAnalyze: () {
@@ -157,21 +171,21 @@ class _CashflowTabState extends ConsumerState<CashflowTab> {
         ),
         const SizedBox(height: 12),
 
-        // 4. Recurring Bills Card (Tagihan Rutin Panel)
-        _RecurringBillsCard(recurringBillsAsync: recurringBillsAsync),
-        const SizedBox(height: 12),
+        // 4. Recurring Bills Card (hidden when empty)
+        recurringBillsAsync.maybeWhen(
+          data: (bills) => bills.isNotEmpty
+              ? Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: _RecurringBillsCard(bills: bills),
+                )
+              : const SizedBox.shrink(),
+          orElse: () => const SizedBox.shrink(),
+        ),
 
-        // 5. Quick AI Capture Card
+        // 5. Compact Quick AI Capture Launcher Pill
         _QuickAiCaptureCard(
-          controller: _aiInputController,
           aiState: aiState,
-          onParse: _handleQuickAiParse,
-          onRemoveDraft: (index) => ref
-              .read(financeAiControllerProvider.notifier)
-              .removeDraftAt(index),
-          onClearDrafts: () =>
-              ref.read(financeAiControllerProvider.notifier).clearDrafts(),
-          onSaveAll: _handleSaveDrafts,
+          onTap: _openQuickAiSheet,
         ),
 
         // 6. Category Breakdown Card
@@ -182,7 +196,7 @@ class _CashflowTabState extends ConsumerState<CashflowTab> {
         const SizedBox(height: 16),
 
         // 7. Transaction History Header & Grouped List with Swipe-to-delete + Undo
-        _TransactionSectionHeader(onExportCsv: widget.onExportMonthCsv),
+        const _TransactionSectionHeader(),
         const SizedBox(height: 8),
         _GroupedTransactionListView(
           transactionsAsync: transactionsAsync,
@@ -223,7 +237,7 @@ class _SpendingAnomalyBanner extends StatelessWidget {
                   shape: BoxShape.circle,
                 ),
                 child: Icon(
-                  Icons.warning_amber_rounded,
+                  LucideIcons.alertTriangle,
                   color: warnColor,
                   size: 20,
                 ),
@@ -272,14 +286,19 @@ class _SpendingAnomalyBanner extends StatelessWidget {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text(
-                        anomaly.category,
-                        style: TextStyle(
-                          fontWeight: FontWeight.w700,
-                          fontSize: 13,
-                          color: AppTokens.textPrimary(context),
+                      Expanded(
+                        child: Text(
+                          anomaly.category,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontWeight: FontWeight.w700,
+                            fontSize: 13,
+                            color: AppTokens.textPrimary(context),
+                          ),
                         ),
                       ),
+                      const SizedBox(width: 8),
                       Text(
                         '${anomaly.deviationMultiple}x Normal',
                         style: TextStyle(
@@ -334,9 +353,9 @@ class _PredictiveCashflowCard extends StatelessWidget {
         padding: EdgeInsets.all(32),
         child: Center(child: CircularProgressIndicator()),
       ),
-      error: (error, _) => HubCard(
-        padding: const EdgeInsets.all(16),
-        child: Text('Gagal memuat ringkasan: $error'),
+      error: (_, _) => const HubCard(
+        padding: EdgeInsets.all(16),
+        child: Text('Gagal memuat ringkasan keuangan.'),
       ),
       data: (summary) {
         final isNegative = summary.netBalance < 0;
@@ -351,63 +370,73 @@ class _PredictiveCashflowCard extends StatelessWidget {
               // Top label & Status badge
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Saldo Bersih (${selectedMonth.label})',
-                        style: TextStyle(
-                          fontSize: 13,
-                          color: AppTokens.textSecondary(context),
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        formatRupiah(summary.netBalance),
-                        style: HubTypography.tabular(
-                          TextStyle(
-                            fontSize: 26,
-                            fontWeight: FontWeight.w800,
-                            color: netColor,
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Saldo Bersih (${selectedMonth.label})',
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: AppTokens.textSecondary(context),
+                            fontWeight: FontWeight.w500,
                           ),
                         ),
-                      ),
-                    ],
+                        const SizedBox(height: 4),
+                        FittedBox(
+                          fit: BoxFit.scaleDown,
+                          alignment: Alignment.centerLeft,
+                          child: Text(
+                            formatRupiah(summary.netBalance),
+                            style: HubTypography.tabular(
+                              TextStyle(
+                                fontSize: 26,
+                                fontWeight: FontWeight.w800,
+                                color: netColor,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                   cashflowAsync.maybeWhen(
                     data: (projection) => projection.isDeficitRisk
-                        ? Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 10,
-                              vertical: 4,
-                            ),
-                            decoration: BoxDecoration(
-                              color: AppTokens.error(context).withValues(alpha: 0.12),
-                              borderRadius: HubRadius.rPill,
-                              border: Border.all(
-                                color: AppTokens.error(context).withValues(alpha: 0.5),
+                        ? Padding(
+                            padding: const EdgeInsets.only(left: 8),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 10,
+                                vertical: 4,
                               ),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(
-                                  Icons.warning_rounded,
-                                  size: 13,
-                                  color: AppTokens.error(context),
+                              decoration: BoxDecoration(
+                                color: AppTokens.error(context).withValues(alpha: 0.12),
+                                borderRadius: HubRadius.rPill,
+                                border: Border.all(
+                                  color: AppTokens.error(context).withValues(alpha: 0.5),
                                 ),
-                                const SizedBox(width: 4),
-                                Text(
-                                  'Risiko Defisit',
-                                  style: TextStyle(
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.w800,
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    LucideIcons.alertTriangle,
+                                    size: 13,
                                     color: AppTokens.error(context),
                                   ),
-                                ),
-                              ],
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    'Risiko Defisit',
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w800,
+                                      color: AppTokens.error(context),
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ),
                           )
                         : const SizedBox.shrink(),
@@ -424,7 +453,7 @@ class _PredictiveCashflowCard extends StatelessWidget {
                     child: _MetricTile(
                       label: 'Pemasukan',
                       value: formatRupiah(summary.totalIncome),
-                      icon: Icons.south_west_rounded,
+                      icon: LucideIcons.arrowDownLeft,
                       color: AppTokens.success(context),
                     ),
                   ),
@@ -433,7 +462,7 @@ class _PredictiveCashflowCard extends StatelessWidget {
                     child: _MetricTile(
                       label: 'Pengeluaran',
                       value: formatRupiah(summary.totalExpense),
-                      icon: Icons.north_east_rounded,
+                      icon: LucideIcons.arrowUpRight,
                       color: AppTokens.error(context),
                     ),
                   ),
@@ -444,9 +473,8 @@ class _PredictiveCashflowCard extends StatelessWidget {
               // Sub-panel lipat untuk Proyeksi & Burn-Rate
               Container(
                 decoration: BoxDecoration(
-                  color: AppTokens.canvas(context),
+                  color: AppTokens.surfaceSubtle(context),
                   borderRadius: HubRadius.rSm,
-                  border: Border.all(color: AppTokens.border(context)),
                 ),
                 child: Column(
                   children: [
@@ -458,38 +486,45 @@ class _PredictiveCashflowCard extends StatelessWidget {
                         child: Row(
                           children: [
                             Icon(
-                              Icons.insights_rounded,
+                              LucideIcons.barChart3,
                               size: 16,
                               color: AppTokens.primary(context),
                             ),
-                            const SizedBox(width: 6),
+                            const SizedBox(width: 8),
                             Expanded(
-                              child: Text(
-                                'Prediksi Arus Kas & Burn-Rate',
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: TextStyle(
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w700,
-                                  color: AppTokens.primary(context),
-                                ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Prediksi Arus Kas & Burn-Rate',
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w700,
+                                      color: AppTokens.primary(context),
+                                    ),
+                                  ),
+                                  cashflowAsync.maybeWhen(
+                                    data: (proj) => Text(
+                                      '${proj.daysRemainingInMonth} hari tersisa',
+                                      style: HubTypography.tabular(
+                                        TextStyle(
+                                          fontSize: 11,
+                                          color: AppTokens.textSecondary(context),
+                                        ),
+                                      ),
+                                    ),
+                                    orElse: () => const SizedBox.shrink(),
+                                  ),
+                                ],
                               ),
-                            ),
-                            cashflowAsync.maybeWhen(
-                              data: (proj) => Text(
-                                '${proj.daysRemainingInMonth} hari tersisa',
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  color: AppTokens.textSecondary(context),
-                                ),
-                              ),
-                              orElse: () => const SizedBox.shrink(),
                             ),
                             const SizedBox(width: 4),
                             Icon(
                               isExpanded
-                                  ? Icons.keyboard_arrow_up_rounded
-                                  : Icons.keyboard_arrow_down_rounded,
+                                  ? LucideIcons.chevronUp
+                                  : LucideIcons.chevronDown,
                               size: 18,
                               color: AppTokens.textSecondary(context),
                             ),
@@ -512,8 +547,8 @@ class _PredictiveCashflowCard extends StatelessWidget {
                               ),
                             ),
                           ),
-                          error: (err, _) => Text(
-                            'Prediksi tidak tersedia: $err',
+                          error: (_, _) => Text(
+                            'Prediksi arus kas tidak tersedia.',
                             style: TextStyle(
                               fontSize: 11,
                               color: AppTokens.textSecondary(context),
@@ -562,13 +597,16 @@ class _PredictiveCashflowCard extends StatelessWidget {
                                   mainAxisAlignment:
                                       MainAxisAlignment.spaceBetween,
                                   children: [
-                                    Text(
-                                      'Tingkat Burn-Rate Pengeluaran',
-                                      style: TextStyle(
-                                        fontSize: 11,
-                                        color: AppTokens.textSecondary(context),
+                                    Expanded(
+                                      child: Text(
+                                        'Tingkat Burn-Rate Pengeluaran',
+                                        style: TextStyle(
+                                          fontSize: 11,
+                                          color: AppTokens.textSecondary(context),
+                                        ),
                                       ),
                                     ),
+                                    const SizedBox(width: 8),
                                     Text(
                                       '$burnPercentage%',
                                       style: HubTypography.tabular(
@@ -621,7 +659,7 @@ class _PredictiveCashflowCard extends StatelessWidget {
                           height: 16,
                           child: CircularProgressIndicator(strokeWidth: 2),
                         )
-                      : const Icon(Icons.auto_awesome_rounded, size: 16),
+                      : const Icon(LucideIcons.sparkles, size: 16),
                   label: Text(
                     isAnalyzing
                         ? 'Menganalisa dengan Samudra AI...'
@@ -667,12 +705,16 @@ class _MetricTile extends StatelessWidget {
             children: [
               Icon(icon, size: 15, color: color),
               const SizedBox(width: 4),
-              Text(
-                label,
-                style: TextStyle(
-                  fontSize: 12,
-                  color: AppTokens.textSecondary(context),
-                  fontWeight: FontWeight.w500,
+              Flexible(
+                child: Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: AppTokens.textSecondary(context),
+                    fontWeight: FontWeight.w500,
+                  ),
                 ),
               ),
             ],
@@ -716,7 +758,6 @@ class _ProjectionSubTile extends StatelessWidget {
       decoration: BoxDecoration(
         color: AppTokens.card(context),
         borderRadius: HubRadius.rXs,
-        border: Border.all(color: AppTokens.border(context)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -756,12 +797,16 @@ class _ProjectionSubTile extends StatelessWidget {
 }
 
 class _RecurringBillsCard extends StatelessWidget {
-  const _RecurringBillsCard({required this.recurringBillsAsync});
+  const _RecurringBillsCard({required this.bills});
 
-  final AsyncValue<List<RecurringBill>> recurringBillsAsync;
+  final List<RecurringBill> bills;
 
   @override
   Widget build(BuildContext context) {
+    if (bills.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
     return HubCard(
       padding: const EdgeInsets.all(16),
       child: Column(
@@ -776,7 +821,7 @@ class _RecurringBillsCard extends StatelessWidget {
                   borderRadius: HubRadius.rXs,
                 ),
                 child: Icon(
-                  Icons.receipt_long_rounded,
+                  LucideIcons.receipt,
                   size: 16,
                   color: AppTokens.primary(context),
                 ),
@@ -795,72 +840,17 @@ class _RecurringBillsCard extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 8),
-              recurringBillsAsync.maybeWhen(
-                data: (bills) => HubPill(
-                  label: '${bills.length} Tagihan',
-                  color: AppTokens.primary(context),
-                ),
-                orElse: () => const SizedBox.shrink(),
+              HubStatusBadge(
+                label: '${bills.length} Tagihan',
+                color: AppTokens.primary(context),
               ),
             ],
           ),
           const SizedBox(height: 12),
-          recurringBillsAsync.when(
-            loading: () => const Center(
-              child: Padding(
-                padding: EdgeInsets.symmetric(vertical: 12),
-                child: SizedBox(
-                  width: 20,
-                  height: 20,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                ),
-              ),
-            ),
-            error: (err, _) => Text(
-              'Gagal mendeteksi tagihan: $err',
-              style: TextStyle(fontSize: 12, color: AppTokens.textSecondary(context)),
-            ),
-            data: (bills) {
-              if (bills.isEmpty) {
-                return Container(
-                  padding: const EdgeInsets.all(14),
-                  decoration: BoxDecoration(
-                    color: AppTokens.canvas(context),
-                    borderRadius: HubRadius.rSm,
-                    border: Border.all(color: AppTokens.border(context)),
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(
-                        Icons.info_outline_rounded,
-                        size: 20,
-                        color: AppTokens.textSecondary(context),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Text(
-                          'Belum ada tagihan rutin bulanan yang terdeteksi otomatis. Tagihan berulang (seperti WiFi/listrik) akan muncul setelah tercatat.',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: AppTokens.textSecondary(context),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                );
-              }
-
-              return Column(
-                children: [
-                  for (final bill in bills) ...[
-                    _RecurringBillTile(bill: bill),
-                    if (bill != bills.last) const SizedBox(height: 8),
-                  ],
-                ],
-              );
-            },
-          ),
+          for (final bill in bills) ...[
+            _RecurringBillTile(bill: bill),
+            if (bill != bills.last) const SizedBox(height: 8),
+          ],
         ],
       ),
     );
@@ -879,9 +869,8 @@ class _RecurringBillTile extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
-        color: AppTokens.card(context),
+        color: AppTokens.surfaceSubtle(context),
         borderRadius: HubRadius.rSm,
-        border: Border.all(color: AppTokens.border(context)),
       ),
       child: Row(
         children: [
@@ -889,7 +878,7 @@ class _RecurringBillTile extends StatelessWidget {
             radius: 18,
             backgroundColor: AppTokens.primary(context).withValues(alpha: 0.12),
             foregroundColor: AppTokens.primary(context),
-            child: const Icon(Icons.repeat_rounded, size: 18),
+            child: const Icon(LucideIcons.repeat, size: 18),
           ),
           const SizedBox(width: 10),
           Expanded(
@@ -955,226 +944,55 @@ class _RecurringBillTile extends StatelessWidget {
 
 class _QuickAiCaptureCard extends StatelessWidget {
   const _QuickAiCaptureCard({
-    required this.controller,
     required this.aiState,
-    required this.onParse,
-    required this.onRemoveDraft,
-    required this.onClearDrafts,
-    required this.onSaveAll,
+    required this.onTap,
   });
 
-  final TextEditingController controller;
   final FinanceAiState aiState;
-  final VoidCallback onParse;
-  final void Function(int index) onRemoveDraft;
-  final VoidCallback onClearDrafts;
-  final VoidCallback onSaveAll;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    final isBusy = aiState.isParsing || aiState.isSavingDrafts;
+    final primary = AppTokens.primary(context);
 
     return HubCard(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(
-                Icons.auto_awesome_rounded,
-                size: 18,
-                color: AppTokens.primary(context),
-              ),
-              const SizedBox(width: 6),
-              Text(
-                'Catat Cepat AI',
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w800,
-                  color: AppTokens.textPrimary(context),
-                ),
-              ),
-              const Spacer(),
-              if (aiState.lastParseUsedModel != null)
-                ModelBadgeChip(
-                  didFallback: aiState.lastParseDidFallback,
-                  usedModel: aiState.lastParseUsedModel,
-                ),
-            ],
-          ),
-          const SizedBox(height: 4),
-          Text(
-            'Ketik beberapa pengeluaran/pemasukan sekaligus secara bebas.',
-            style: TextStyle(
-              fontSize: 12,
-              color: AppTokens.textSecondary(context),
-            ),
-          ),
-          const SizedBox(height: 10),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Expanded(
-                child: TextField(
-                  controller: controller,
-                  enabled: !isBusy,
-                  minLines: 1,
-                  maxLines: 3,
-                  textInputAction: TextInputAction.send,
-                  onSubmitted: (_) => onParse(),
-                  decoration: const InputDecoration(
-                    hintText: 'Contoh: makan siang 35rb, bensin 50rb',
-                    isDense: true,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 8),
-              FilledButton(
-                style: FilledButton.styleFrom(
-                  backgroundColor: AppTokens.primary(context),
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: HubRadius.rSm,
-                  ),
-                ),
-                onPressed: isBusy ? null : onParse,
-                child: aiState.isParsing
-                    ? const SizedBox(
-                        width: 18,
-                        height: 18,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: Colors.white,
-                        ),
-                      )
-                    : const Text(
-                        'Proses',
-                        style: TextStyle(fontWeight: FontWeight.w700),
-                      ),
-              ),
-            ],
-          ),
-          if (aiState.drafts.isNotEmpty) ...[
-            const SizedBox(height: 14),
-            Text(
-              'Pratinjau Draf (${aiState.drafts.length})',
-              style: TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w700,
-                color: AppTokens.textPrimary(context),
-              ),
-            ),
-            const SizedBox(height: 8),
-            for (var i = 0; i < aiState.drafts.length; i++) ...[
-              _DraftPreviewTile(
-                draft: aiState.drafts[i],
-                onRemove: isBusy ? null : () => onRemoveDraft(i),
-              ),
-              if (i < aiState.drafts.length - 1) const SizedBox(height: 6),
-            ],
-            const SizedBox(height: 10),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                TextButton(
-                  onPressed: isBusy ? null : onClearDrafts,
-                  child: const Text('Batal'),
-                ),
-                const SizedBox(width: 8),
-                FilledButton.icon(
-                  style: FilledButton.styleFrom(
-                    backgroundColor: AppTokens.success(context),
-                    foregroundColor: Colors.white,
-                  ),
-                  onPressed: isBusy ? null : onSaveAll,
-                  icon: aiState.isSavingDrafts
-                      ? const SizedBox(
-                          width: 16,
-                          height: 16,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: Colors.white,
-                          ),
-                        )
-                      : const Icon(Icons.check_rounded),
-                  label: const Text(
-                    'Simpan Semua',
-                    style: TextStyle(fontWeight: FontWeight.w700),
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-}
-
-class _DraftPreviewTile extends StatelessWidget {
-  const _DraftPreviewTile({required this.draft, required this.onRemove});
-
-  final ParsedFinanceDraft draft;
-  final VoidCallback? onRemove;
-
-  @override
-  Widget build(BuildContext context) {
-    final isIncome = draft.type == TransactionType.income;
-    final color = isIncome ? AppTokens.success(context) : AppTokens.error(context);
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      decoration: BoxDecoration(
-        color: AppTokens.canvas(context),
-        borderRadius: HubRadius.rSm,
-        border: Border.all(color: AppTokens.border(context)),
-      ),
+      onTap: onTap,
+      backgroundColor: primary.withValues(alpha: 0.08),
+      borderColor: primary.withValues(alpha: 0.28),
+      borderRadius: HubRadius.rPill,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       child: Row(
         children: [
           Icon(
-            isIncome ? Icons.south_west_rounded : Icons.north_east_rounded,
-            size: 16,
-            color: color,
+            LucideIcons.sparkles,
+            size: 18,
+            color: primary,
           ),
           const SizedBox(width: 10),
           Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  draft.category,
-                  style: TextStyle(
-                    fontWeight: FontWeight.w600,
-                    color: AppTokens.textPrimary(context),
-                  ),
-                ),
-                if (draft.note.isNotEmpty)
-                  Text(
-                    draft.note,
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: AppTokens.textSecondary(context),
-                    ),
-                  ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 8),
-          Text(
-            formatRupiah(draft.amount),
-            style: HubTypography.tabular(
-              TextStyle(
+            child: Text(
+              'Catat Cepat dengan AI',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 13,
                 fontWeight: FontWeight.w700,
-                color: color,
+                color: primary,
               ),
             ),
           ),
-          IconButton(
-            tooltip: 'Hapus draf',
-            visualDensity: VisualDensity.compact,
-            onPressed: onRemove,
-            icon: const Icon(Icons.close, size: 16),
+          if (aiState.lastParseUsedModel != null) ...[
+            const SizedBox(width: 8),
+            ModelBadgeChip(
+              didFallback: aiState.lastParseDidFallback,
+              usedModel: aiState.lastParseUsedModel,
+            ),
+          ],
+          const SizedBox(width: 6),
+          Icon(
+            LucideIcons.arrowRight,
+            size: 16,
+            color: primary,
           ),
         ],
       ),
@@ -1249,6 +1067,7 @@ class _CategoryProgressRow extends StatelessWidget {
                 ),
               ),
             ),
+            const SizedBox(width: 8),
             Text(
               '${formatRupiah(amount)} ($percentage%)',
               style: HubTypography.tabular(
@@ -1273,29 +1092,22 @@ class _CategoryProgressRow extends StatelessWidget {
 }
 
 class _TransactionSectionHeader extends StatelessWidget {
-  const _TransactionSectionHeader({required this.onExportCsv});
-
-  final VoidCallback onExportCsv;
+  const _TransactionSectionHeader();
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Text(
-          'Riwayat Transaksi',
-          style: TextStyle(
-            fontSize: 15,
-            fontWeight: FontWeight.w800,
-            color: AppTokens.textPrimary(context),
-          ),
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Text(
+        'Riwayat Transaksi',
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: TextStyle(
+          fontSize: 15,
+          fontWeight: FontWeight.w800,
+          color: AppTokens.textPrimary(context),
         ),
-        TextButton.icon(
-          onPressed: onExportCsv,
-          icon: const Icon(Icons.download_rounded, size: 16),
-          label: const Text('Ekspor ke CSV'),
-        ),
-      ],
+      ),
     );
   }
 }
@@ -1333,6 +1145,8 @@ class _GroupedTransactionListView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final onErrorColor = Theme.of(context).colorScheme.onError;
+
     return transactionsAsync.when(
       loading: () => const Center(
         child: Padding(
@@ -1351,7 +1165,7 @@ class _GroupedTransactionListView extends StatelessWidget {
             child: Column(
               children: [
                 Icon(
-                  Icons.account_balance_wallet_outlined,
+                  LucideIcons.wallet,
                   size: 36,
                   color: AppTokens.textSecondary(context),
                 ),
@@ -1412,15 +1226,15 @@ class _GroupedTransactionListView extends StatelessWidget {
                         color: AppTokens.error(context),
                         borderRadius: HubRadius.rSm,
                       ),
-                      child: const Row(
+                      child: Row(
                         mainAxisAlignment: MainAxisAlignment.end,
                         children: [
-                          Icon(Icons.delete_outline_rounded, color: Colors.white),
-                          SizedBox(width: 6),
+                          Icon(LucideIcons.trash2, color: onErrorColor),
+                          const SizedBox(width: 6),
                           Text(
                             'Hapus',
                             style: TextStyle(
-                              color: Colors.white,
+                              color: onErrorColor,
                               fontWeight: FontWeight.w700,
                             ),
                           ),
@@ -1428,10 +1242,7 @@ class _GroupedTransactionListView extends StatelessWidget {
                       ),
                     ),
                     onDismissed: (_) => onDelete(tx),
-                    child: _TransactionTile(
-                      transaction: tx,
-                      onDelete: () => onDelete(tx),
-                    ),
+                    child: _TransactionTile(transaction: tx),
                   ),
                 ),
               ],
@@ -1444,13 +1255,9 @@ class _GroupedTransactionListView extends StatelessWidget {
 }
 
 class _TransactionTile extends StatelessWidget {
-  const _TransactionTile({
-    required this.transaction,
-    required this.onDelete,
-  });
+  const _TransactionTile({required this.transaction});
 
   final FinanceTransaction transaction;
-  final VoidCallback onDelete;
 
   @override
   Widget build(BuildContext context) {
@@ -1459,7 +1266,7 @@ class _TransactionTile extends StatelessWidget {
     final sign = isIncome ? '+' : '-';
 
     return HubCard(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       child: Row(
         children: [
           CircleAvatar(
@@ -1467,11 +1274,11 @@ class _TransactionTile extends StatelessWidget {
             backgroundColor: color.withValues(alpha: 0.12),
             foregroundColor: color,
             child: Icon(
-              isIncome ? Icons.south_west_rounded : Icons.north_east_rounded,
+              isIncome ? LucideIcons.arrowDownLeft : LucideIcons.arrowUpRight,
               size: 16,
             ),
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: 10),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -1479,25 +1286,25 @@ class _TransactionTile extends StatelessWidget {
                 Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 2,
-                      ),
-                      decoration: BoxDecoration(
-                        color: color.withValues(alpha: 0.1),
-                        borderRadius: HubRadius.rXs,
-                        border: Border.all(
-                          color: color.withValues(alpha: 0.3),
-                          width: 0.8,
+                    Flexible(
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 2,
                         ),
-                      ),
-                      child: Text(
-                        transaction.category,
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w700,
-                          color: color,
+                        decoration: BoxDecoration(
+                          color: color.withValues(alpha: 0.1),
+                          borderRadius: HubRadius.rXs,
+                        ),
+                        child: Text(
+                          transaction.category,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                            color: color,
+                          ),
                         ),
                       ),
                     ),
@@ -1519,20 +1326,23 @@ class _TransactionTile extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 8),
-          Text(
-            '$sign${formatRupiah(transaction.amount)}',
-            style: HubTypography.tabular(
-              TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w800,
-                color: color,
+          ConstrainedBox(
+            constraints: BoxConstraints(
+              maxWidth: MediaQuery.sizeOf(context).width * 0.40,
+            ),
+            child: Text(
+              '$sign${formatRupiah(transaction.amount)}',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.end,
+              style: HubTypography.tabular(
+                TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w800,
+                  color: color,
+                ),
               ),
             ),
-          ),
-          IconButton(
-            tooltip: 'Hapus transaksi',
-            icon: const Icon(Icons.delete_outline_rounded, size: 18),
-            onPressed: onDelete,
           ),
         ],
       ),

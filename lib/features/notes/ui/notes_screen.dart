@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
+import 'package:personal_hub/app.dart';
 import 'package:personal_hub/core/theme/app_tokens.dart';
 import 'package:personal_hub/core/theme/hub_widgets.dart';
 import 'package:personal_hub/features/notes/models/note.dart';
@@ -104,7 +105,7 @@ class _NotesScreenState extends ConsumerState<NotesScreen> {
             FilledButton(
               style: FilledButton.styleFrom(
                 backgroundColor: AppTokens.error(context),
-                foregroundColor: Colors.white,
+                foregroundColor: Theme.of(context).colorScheme.onError,
               ),
               onPressed: () => Navigator.of(dialogContext).pop(true),
               child: const Text('Hapus'),
@@ -214,6 +215,16 @@ class _NotesScreenState extends ConsumerState<NotesScreen> {
           ),
         ),
         actions: [
+          IconButton(
+            tooltip: 'Asisten AI',
+            icon: const Icon(LucideIcons.sparkles),
+            onPressed: () => MainNavigationShell.openAiChat(context),
+          ),
+          IconButton(
+            tooltip: 'Pengaturan',
+            icon: const Icon(LucideIcons.settings),
+            onPressed: () => MainNavigationShell.openSettings(context),
+          ),
           PopupMenuButton<String>(
             tooltip: 'Opsi lainnya',
             icon: Icon(
@@ -240,25 +251,20 @@ class _NotesScreenState extends ConsumerState<NotesScreen> {
           ),
         ],
       ),
-      floatingActionButton: Padding(
-        padding: const EdgeInsets.only(bottom: 84), // Clears bottom navigation bar comfortably
-        child: FloatingActionButton.extended(
-          heroTag: 'notes_fab',
-          backgroundColor: AppTokens.primary(context),
-          foregroundColor: theme.brightness == Brightness.dark
-              ? AppTokens.canvasDark
-              : Colors.white,
-          elevation: 2,
-          highlightElevation: 4,
-          onPressed: () => _openEditor(),
-          icon: const Icon(LucideIcons.plus, size: 20),
-          label: const Text(
-            'Catatan Baru',
-            style: TextStyle(
-              fontWeight: FontWeight.w700,
-              fontSize: 15,
-              letterSpacing: -0.2,
-            ),
+      floatingActionButton: FloatingActionButton.extended(
+        heroTag: 'notes_fab',
+        backgroundColor: AppTokens.primary(context),
+        foregroundColor: AppTokens.onPrimary(context),
+        elevation: 2,
+        highlightElevation: 4,
+        onPressed: () => _openEditor(),
+        icon: const Icon(LucideIcons.plus, size: 20),
+        label: const Text(
+          'Catatan Baru',
+          style: TextStyle(
+            fontWeight: FontWeight.w700,
+            fontSize: 15,
+            letterSpacing: -0.2,
           ),
         ),
       ),
@@ -320,7 +326,7 @@ class _NotesScreenState extends ConsumerState<NotesScreen> {
                     decoration: InputDecoration(
                       hintText: 'Cari catatan...',
                       hintStyle: TextStyle(
-                        color: AppTokens.textSecondary(context).withValues(alpha: 0.6),
+                        color: AppTokens.textSecondary(context),
                       ),
                       prefixIcon: Icon(
                         LucideIcons.search,
@@ -370,10 +376,10 @@ class _NotesScreenState extends ConsumerState<NotesScreen> {
                   ),
                 ),
 
-                // Horizontal Tag Filter Strip with HubPill (touch target >= 48dp)
+                // Horizontal Tag Filter Strip with HubPill (touch target >= 44dp)
                 if (availableTags.isNotEmpty)
                   SizedBox(
-                    height: 48,
+                    height: 52,
                     child: ListView(
                       scrollDirection: Axis.horizontal,
                       padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -381,14 +387,17 @@ class _NotesScreenState extends ConsumerState<NotesScreen> {
                         Center(
                           child: Padding(
                             padding: const EdgeInsets.only(right: 8),
-                            child: HubPill(
-                              label: 'Semua',
-                              isSelected: activeTag == null,
-                              onTap: () {
-                                setState(() {
-                                  _selectedTag = null;
-                                });
-                              },
+                            child: ConstrainedBox(
+                              constraints: const BoxConstraints(minHeight: 44),
+                              child: HubPill(
+                                label: 'Semua',
+                                isSelected: activeTag == null,
+                                onTap: () {
+                                  setState(() {
+                                    _selectedTag = null;
+                                  });
+                                },
+                              ),
                             ),
                           ),
                         ),
@@ -396,23 +405,26 @@ class _NotesScreenState extends ConsumerState<NotesScreen> {
                           Center(
                             child: Padding(
                               padding: const EdgeInsets.only(right: 8),
-                              child: HubPill(
-                                icon: tag.toLowerCase() == 'meeting'
-                                    ? LucideIcons.calendar
-                                    : null,
-                                label: tag.toLowerCase() == 'meeting'
-                                    ? 'Notulensi Meeting'
-                                    : '#$tag',
-                                isSelected:
-                                    activeTag?.toLowerCase() == tag.toLowerCase(),
-                                onTap: () {
-                                  setState(() {
-                                    _selectedTag =
-                                        activeTag?.toLowerCase() == tag.toLowerCase()
-                                            ? null
-                                            : tag;
-                                  });
-                                },
+                              child: ConstrainedBox(
+                                constraints: const BoxConstraints(minHeight: 44),
+                                child: HubPill(
+                                  icon: tag.toLowerCase() == 'meeting'
+                                      ? LucideIcons.calendar
+                                      : null,
+                                  label: tag.toLowerCase() == 'meeting'
+                                      ? 'Notulensi Meeting'
+                                      : '#$tag',
+                                  isSelected: activeTag?.toLowerCase() ==
+                                      tag.toLowerCase(),
+                                  onTap: () {
+                                    setState(() {
+                                      _selectedTag = activeTag?.toLowerCase() ==
+                                              tag.toLowerCase()
+                                          ? null
+                                          : tag;
+                                    });
+                                  },
+                                ),
                               ),
                             ),
                           ),
@@ -423,7 +435,7 @@ class _NotesScreenState extends ConsumerState<NotesScreen> {
                 // Notes List
                 Expanded(
                   child: visibleNotes.isEmpty
-                      ? _buildEmptyState(theme)
+                      ? _buildEmptyState()
                       : filteredNotes.isEmpty
                           ? _buildNoMatchState(theme)
                           : ListView(
@@ -495,48 +507,14 @@ class _NotesScreenState extends ConsumerState<NotesScreen> {
     );
   }
 
-  Widget _buildEmptyState(ThemeData theme) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: HubCard(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                width: 56,
-                height: 56,
-                decoration: BoxDecoration(
-                  color: AppTokens.primary(context).withValues(alpha: 0.12),
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(
-                  LucideIcons.notebookPen,
-                  size: 28,
-                  color: AppTokens.primary(context),
-                ),
-              ),
-              const SizedBox(height: 16),
-              Text(
-                'Belum ada catatan',
-                style: theme.textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.w700,
-                  color: AppTokens.textPrimary(context),
-                ),
-              ),
-              const SizedBox(height: 6),
-              Text(
-                'Ketuk tombol "Catatan Baru" untuk mulai mencatat ide, daftar tugas, atau ringkasan penting.',
-                textAlign: TextAlign.center,
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: AppTokens.textSecondary(context),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
+  Widget _buildEmptyState() {
+    return HubEmptyState(
+      icon: LucideIcons.notebookPen,
+      title: 'Belum ada catatan',
+      message:
+          'Ketuk tombol "Buat Catatan" untuk mulai mencatat ide, daftar tugas, atau ringkasan penting.',
+      actionLabel: 'Buat Catatan',
+      onAction: () => _openEditor(),
     );
   }
 
@@ -790,9 +768,6 @@ class _NoteCard extends StatelessWidget {
                           decoration: BoxDecoration(
                             color: AppTokens.primary(context).withValues(alpha: 0.1),
                             borderRadius: HubRadius.rPill,
-                            border: Border.all(
-                              color: AppTokens.primary(context).withValues(alpha: 0.25),
-                            ),
                           ),
                           child: Text(
                             '#$tag',

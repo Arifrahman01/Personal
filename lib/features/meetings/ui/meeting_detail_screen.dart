@@ -3,12 +3,12 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:personal_hub/core/errors/app_exceptions.dart';
-import 'package:personal_hub/core/theme/glass_widgets.dart';
+import 'package:personal_hub/core/theme/app_tokens.dart';
 import 'package:personal_hub/core/theme/hub_widgets.dart';
 import 'package:personal_hub/features/meetings/models/meeting.dart';
 import 'package:personal_hub/features/meetings/providers/calendar_sync_providers.dart';
 import 'package:personal_hub/features/meetings/providers/meetings_providers.dart';
-import 'package:personal_hub/features/meetings/services/meeting_voice_recorder.dart';
+import 'package:personal_hub/features/meetings/ui/live_meeting_recorder_screen.dart';
 import 'package:personal_hub/features/meetings/ui/meeting_form_screen.dart';
 import 'package:personal_hub/features/meetings/ui/meetings_screen.dart';
 import 'package:personal_hub/features/tasks/providers/tasks_providers.dart';
@@ -72,6 +72,10 @@ class _MeetingDetailScreenState extends ConsumerState<MeetingDetailScreen> {
               child: const Text('Batal'),
             ),
             FilledButton(
+              style: FilledButton.styleFrom(
+                backgroundColor: AppTokens.danger(dialogContext),
+                foregroundColor: Theme.of(dialogContext).colorScheme.onError,
+              ),
               onPressed: () => Navigator.of(dialogContext).pop(true),
               child: const Text('Hapus'),
             ),
@@ -174,17 +178,14 @@ class _MeetingDetailScreenState extends ConsumerState<MeetingDetailScreen> {
       );
   }
 
-  Future<void> _openVoiceRecorderSheet(Meeting meeting) async {
-    await showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      useSafeArea: true,
-      builder: (sheetContext) {
-        return _VoiceRecorderSheet(
-          meeting: meeting,
-          onSummarizeWithAi: (updatedMeeting) => _extractWithAi(updatedMeeting),
-        );
-      },
+  Future<void> _openLiveRecorder(Meeting meeting) async {
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => LiveMeetingRecorderScreen(
+          existingMeeting: meeting,
+          onPromoteActionItem: widget.onPromoteActionItem,
+        ),
+      ),
     );
   }
 
@@ -194,11 +195,11 @@ class _MeetingDetailScreenState extends ConsumerState<MeetingDetailScreen> {
     final theme = Theme.of(context);
 
     return meetingsAsync.when(
-      loading: () => const GlassScaffold(
+      loading: () => const HubScaffold(
         body: Center(child: CircularProgressIndicator()),
       ),
-      error: (error, _) => GlassScaffold(
-        appBar: const GlassAppBar(title: Text('Detail Meeting')),
+      error: (error, _) => HubScaffold(
+        appBar: const HubAppBar(title: Text('Detail Meeting')),
         body: Center(
           child: Padding(
             padding: const EdgeInsets.all(24),
@@ -215,18 +216,36 @@ class _MeetingDetailScreenState extends ConsumerState<MeetingDetailScreen> {
         }
         final meeting = found ?? (_isDeleting ? _lastKnownMeeting : null);
         if (meeting == null) {
-          return const GlassScaffold(
-            appBar: GlassAppBar(title: Text('Detail Meeting')),
+          return const HubScaffold(
+            appBar: HubAppBar(title: Text('Detail Meeting')),
             body: Center(child: Text('Meeting tidak ditemukan.')),
           );
         }
 
-        return GlassScaffold(
-          appBar: GlassAppBar(
+        return HubScaffold(
+          appBar: HubAppBar(
             title: const Text('Detail Meeting'),
             actions: [
               IconButton(
+                tooltip: 'Tambah ke Kalender (.ics)',
+                constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
+                icon: const Icon(LucideIcons.calendar),
+                onPressed: () {
+                  final icalService = ref.read(icalGeneratorServiceProvider);
+                  final icsContent = icalService.generateIcs([meeting]);
+                  Clipboard.setData(ClipboardData(text: icsContent));
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Agenda rapat berhasil disalin (.ics)!'),
+                      duration: Duration(seconds: 2),
+                      behavior: SnackBarBehavior.floating,
+                    ),
+                  );
+                },
+              ),
+              IconButton(
                 tooltip: 'Edit meeting',
+                constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
                 icon: const Icon(LucideIcons.pencil),
                 onPressed: () {
                   Navigator.of(context).push(
@@ -238,71 +257,36 @@ class _MeetingDetailScreenState extends ConsumerState<MeetingDetailScreen> {
               ),
               IconButton(
                 tooltip: 'Hapus meeting',
+                constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
                 icon: const Icon(LucideIcons.trash2),
                 onPressed: () => _confirmDelete(meeting),
               ),
             ],
           ),
-          body: SafeArea(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  _buildHeaderCard(theme, meeting),
-                  const SizedBox(height: 12),
-                  _buildActionBar(theme, meeting),
-                  const SizedBox(height: 16),
-                  _buildTextSection(
-                    theme: theme,
-                    title: 'Agenda',
-                    content: meeting.agenda,
-                    emptyFallback: 'Belum ada agenda.',
-                  ),
-                  const SizedBox(height: 16),
-                  _buildNotesSection(theme, meeting),
-                  const SizedBox(height: 16),
-                  _buildAiSection(theme, meeting),
-                  const SizedBox(height: 16),
-                  _buildActionItemsSection(theme, meeting),
-                ],
-              ),
+          body: SingleChildScrollView(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                _buildHeaderCard(theme, meeting),
+                const SizedBox(height: 16),
+                _buildTextSection(
+                  theme: theme,
+                  title: 'Agenda',
+                  content: meeting.agenda,
+                  emptyFallback: 'Belum ada agenda.',
+                ),
+                const SizedBox(height: 16),
+                _buildNotesSection(theme, meeting),
+                const SizedBox(height: 16),
+                _buildAiSection(theme, meeting),
+                const SizedBox(height: 16),
+                _buildActionItemsSection(theme, meeting),
+              ],
             ),
           ),
         );
       },
-    );
-  }
-
-  Widget _buildActionBar(ThemeData theme, Meeting meeting) {
-    return HubCard(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          TextButton.icon(
-            onPressed: () => _openVoiceRecorderSheet(meeting),
-            icon: const Icon(LucideIcons.mic, size: 18),
-            label: const Text('Rekam Percakapan'),
-          ),
-          IconButton(
-            tooltip: 'Salin iCal (.ics)',
-            icon: const Icon(LucideIcons.calendar, size: 20),
-            onPressed: () {
-              final icalService = ref.read(icalGeneratorServiceProvider);
-              final icsContent = icalService.generateIcs([meeting]);
-              Clipboard.setData(ClipboardData(text: icsContent));
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Agenda rapat berhasil disalin (.ics)!'),
-                  duration: Duration(seconds: 2),
-                  behavior: SnackBarBehavior.floating,
-                ),
-              );
-            },
-          ),
-        ],
-      ),
     );
   }
 
@@ -353,11 +337,13 @@ class _MeetingDetailScreenState extends ConsumerState<MeetingDetailScreen> {
             width: double.infinity,
             child: FilledButton.icon(
               key: const Key('start_recording_meeting_button'),
-              onPressed: () => _openVoiceRecorderSheet(meeting),
+              onPressed: () => _openLiveRecorder(meeting),
               icon: const Icon(LucideIcons.mic),
-              label: const Text('🎙️ Mulai Rekam Rapat Ini'),
+              label: const Text('Mulai Rekam Rapat Ini'),
               style: FilledButton.styleFrom(
                 minimumSize: const Size(0, 48),
+                backgroundColor: AppTokens.primary(context),
+                foregroundColor: AppTokens.onPrimary(context),
               ),
             ),
           ),
@@ -395,16 +381,6 @@ class _MeetingDetailScreenState extends ConsumerState<MeetingDetailScreen> {
                   label: const Text('Edit Catatan'),
                 ),
             ],
-          ),
-          const SizedBox(height: 8),
-          SizedBox(
-            width: double.infinity,
-            child: FilledButton.tonalIcon(
-              key: const Key('record_and_compose_ai_button'),
-              onPressed: () => _openVoiceRecorderSheet(meeting),
-              icon: const Icon(LucideIcons.sparkles),
-              label: const Text('🎙️ Rekam & Susun Catatan AI'),
-            ),
           ),
           const SizedBox(height: 10),
           if (_isEditingNotes) ...[
@@ -456,7 +432,7 @@ class _MeetingDetailScreenState extends ConsumerState<MeetingDetailScreen> {
             Text(
               hasContent
                   ? meeting.notes
-                  : 'Belum ada catatan rapat. Ketuk "Edit Catatan" atau gunakan "Rekam Percakapan" untuk menambahkan notulensi.',
+                  : 'Belum ada catatan rapat. Ketuk "Edit Catatan" atau gunakan "Mulai Rekam Rapat Ini" untuk menambahkan notulensi.',
               style: theme.textTheme.bodyMedium?.copyWith(
                 color: hasContent
                     ? theme.colorScheme.onSurface
@@ -722,384 +698,6 @@ class _AiModelBadge extends StatelessWidget {
             fontWeight: FontWeight.w700,
           ),
         ),
-      ),
-    );
-  }
-}
-
-class _VoiceRecorderSheet extends ConsumerStatefulWidget {
-  const _VoiceRecorderSheet({
-    required this.meeting,
-    required this.onSummarizeWithAi,
-  });
-
-  final Meeting meeting;
-  final Future<void> Function(Meeting updatedMeeting) onSummarizeWithAi;
-
-  @override
-  ConsumerState<_VoiceRecorderSheet> createState() =>
-      _VoiceRecorderSheetState();
-}
-
-class _VoiceRecorderSheetState extends ConsumerState<_VoiceRecorderSheet> {
-  bool _isSaving = false;
-  late final MeetingVoiceRecorder _recorder;
-
-  @override
-  void initState() {
-    super.initState();
-    _recorder = ref.read(meetingVoiceRecorderProvider);
-  }
-
-  @override
-  void dispose() {
-    if (_recorder.state.isRecording) {
-      Future.microtask(() => _recorder.cancel());
-    }
-    super.dispose();
-  }
-
-  Future<Meeting> _persistTranscript(String transcript) async {
-    final latestMeeting =
-        ref
-            .read(meetingsListProvider)
-            .asData
-            ?.value
-            .where((m) => m.id == widget.meeting.id)
-            .firstOrNull ??
-        widget.meeting;
-
-    final cleanTranscript = transcript.trim();
-    if (cleanTranscript.isEmpty) {
-      return latestMeeting;
-    }
-
-    final mergedNotes = MeetingVoiceRecorder.mergeTranscriptIntoNotes(
-      latestMeeting.notes,
-      cleanTranscript,
-      timestamp: DateTime.now(),
-    );
-
-    return ref
-        .read(meetingsListProvider.notifier)
-        .updateMeeting(latestMeeting.copyWith(notes: mergedNotes));
-  }
-
-  Future<void> _saveToNotesOnly() async {
-    if (_isSaving) return;
-    setState(() => _isSaving = true);
-
-    try {
-      final transcript = await _recorder.stop();
-      if (transcript.trim().isEmpty) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Belum ada transkrip yang dapat disimpan.'),
-            ),
-          );
-        }
-        return;
-      }
-
-      await _persistTranscript(transcript);
-      _recorder.clearTranscript();
-      if (mounted) {
-        Navigator.of(context).pop();
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Transkrip disimpan ke catatan rapat.'),
-          ),
-        );
-      }
-    } finally {
-      if (mounted) {
-        setState(() => _isSaving = false);
-      }
-    }
-  }
-
-  Future<void> _stopAndSummarizeWithAi() async {
-    if (_isSaving) return;
-    setState(() => _isSaving = true);
-
-    try {
-      final transcript = await _recorder.stop();
-      final savedMeeting = await _persistTranscript(transcript);
-      final hasSummarizableContent =
-          savedMeeting.notes.trim().isNotEmpty ||
-          savedMeeting.agenda.trim().isNotEmpty;
-
-      if (!hasSummarizableContent) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text(
-                'Belum ada suara atau catatan yang terekam untuk diringkas.',
-              ),
-            ),
-          );
-        }
-        return;
-      }
-
-      _recorder.clearTranscript();
-      if (mounted) {
-        Navigator.of(context).pop();
-      }
-      await widget.onSummarizeWithAi(savedMeeting);
-    } finally {
-      if (mounted) {
-        setState(() => _isSaving = false);
-      }
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final recorder = ref.watch(meetingVoiceRecorderProvider);
-    final theme = Theme.of(context);
-
-    return ListenableBuilder(
-      listenable: recorder,
-      builder: (context, _) {
-        final session = recorder.state;
-        final hasTranscript = session.combinedTranscript.trim().isNotEmpty;
-
-        return Padding(
-          padding: EdgeInsets.only(
-            left: 16,
-            right: 16,
-            top: 16,
-            bottom: 16 + MediaQuery.of(context).viewInsets.bottom,
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      'Rekam Percakapan',
-                      style: theme.textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ),
-                  _RecordingStatusBadge(isRecording: session.isRecording),
-                  const SizedBox(width: 4),
-                  IconButton(
-                    tooltip: 'Tutup',
-                    icon: const Icon(Icons.close_rounded),
-                    onPressed: _isSaving
-                        ? null
-                        : () => Navigator.of(context).pop(),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: [
-                  ChoiceChip(
-                    label: const Text('Bahasa Indonesia (id_ID)'),
-                    selected:
-                        session.localeId ==
-                        MeetingVoiceRecorder.defaultLocaleId,
-                    onSelected: session.isRecording || _isSaving
-                        ? null
-                        : (_) => recorder.setLocale(
-                            MeetingVoiceRecorder.defaultLocaleId,
-                          ),
-                  ),
-                  ChoiceChip(
-                    label: const Text('English (en_US)'),
-                    selected:
-                        session.localeId ==
-                        MeetingVoiceRecorder.englishLocaleId,
-                    onSelected: session.isRecording || _isSaving
-                        ? null
-                        : (_) => recorder.setLocale(
-                            MeetingVoiceRecorder.englishLocaleId,
-                          ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              Container(
-                constraints: const BoxConstraints(
-                  minHeight: 120,
-                  maxHeight: 220,
-                ),
-                width: double.infinity,
-                padding: const EdgeInsets.all(14),
-                decoration: BoxDecoration(
-                  color: theme.colorScheme.surfaceContainerHighest.withValues(
-                    alpha: 0.5,
-                  ),
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(
-                    color: session.isRecording
-                        ? theme.colorScheme.error.withValues(alpha: 0.6)
-                        : theme.colorScheme.outlineVariant,
-                  ),
-                ),
-                child: SingleChildScrollView(
-                  child: hasTranscript
-                      ? Text.rich(
-                          TextSpan(
-                            children: [
-                              if (session.finalizedTranscript.trim().isNotEmpty)
-                                TextSpan(
-                                  text: session.finalizedTranscript.trim(),
-                                  style: theme.textTheme.bodyMedium,
-                                ),
-                              if (session.finalizedTranscript
-                                      .trim()
-                                      .isNotEmpty &&
-                                  session.partialTranscript.trim().isNotEmpty)
-                                const TextSpan(text: ' '),
-                              if (session.partialTranscript.trim().isNotEmpty)
-                                TextSpan(
-                                  text: session.partialTranscript.trim(),
-                                  style: theme.textTheme.bodyMedium?.copyWith(
-                                    color: theme.colorScheme.primary,
-                                    fontStyle: FontStyle.italic,
-                                  ),
-                                ),
-                            ],
-                          ),
-                        )
-                      : Text(
-                          session.isRecording
-                              ? 'Mendengarkan percakapan...'
-                              : 'Ketuk "Mulai Rekam" dan mulai berbicara untuk melihat transkrip langsung.',
-                          style: theme.textTheme.bodyMedium?.copyWith(
-                            color: theme.colorScheme.onSurfaceVariant,
-                          ),
-                        ),
-                ),
-              ),
-              if (session.errorMessage != null) ...[
-                const SizedBox(height: 10),
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: theme.colorScheme.errorContainer,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Text(
-                    session.errorMessage!,
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: theme.colorScheme.onErrorContainer,
-                    ),
-                  ),
-                ),
-              ],
-              const SizedBox(height: 14),
-              Row(
-                children: [
-                  Expanded(
-                    child: FilledButton.tonalIcon(
-                      onPressed: _isSaving
-                          ? null
-                          : () {
-                              if (session.isRecording) {
-                                recorder.stop();
-                              } else {
-                                recorder.start();
-                              }
-                            },
-                      icon: Icon(
-                        session.isRecording
-                            ? Icons.stop_rounded
-                            : Icons.mic_rounded,
-                      ),
-                      label: Text(
-                        session.isRecording ? 'Jeda Rekam' : 'Mulai Rekam',
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      onPressed: hasTranscript && !_isSaving
-                          ? _saveToNotesOnly
-                          : null,
-                      icon: const Icon(Icons.save_outlined),
-                      label: const Text('Simpan ke Notulen'),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 10),
-              FilledButton.icon(
-                onPressed: (session.isRecording || hasTranscript) && !_isSaving
-                    ? _stopAndSummarizeWithAi
-                    : null,
-                icon: _isSaving
-                    ? const SizedBox(
-                        width: 18,
-                        height: 18,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Icon(Icons.auto_awesome_rounded),
-                label: Text(
-                  _isSaving
-                      ? 'Menyimpan & Meringkas...'
-                      : 'Hentikan & Simpulkan dengan AI',
-                ),
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
-}
-
-class _RecordingStatusBadge extends StatelessWidget {
-  const _RecordingStatusBadge({required this.isRecording});
-
-  final bool isRecording;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final bgColor = isRecording
-        ? theme.colorScheme.errorContainer
-        : theme.colorScheme.surfaceContainerHighest;
-    final fgColor = isRecording
-        ? theme.colorScheme.onErrorContainer
-        : theme.colorScheme.onSurfaceVariant;
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-      decoration: BoxDecoration(
-        color: bgColor,
-        borderRadius: BorderRadius.circular(999),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(
-            isRecording
-                ? Icons.fiber_manual_record_rounded
-                : Icons.mic_none_rounded,
-            size: 12,
-            color: fgColor,
-          ),
-          const SizedBox(width: 6),
-          Text(
-            isRecording ? 'Merekam...' : 'Siap',
-            style: theme.textTheme.labelSmall?.copyWith(
-              color: fgColor,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-        ],
       ),
     );
   }

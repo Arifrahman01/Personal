@@ -127,12 +127,12 @@ class VaultLockController extends ChangeNotifier {
     return _configStore.hasDuressPin();
   }
 
-  /// Configures a numeric PIN of at least 4 digits, hashing it with a random salt.
+  /// Configures a numeric PIN of 4-8 digits, hashing it with a random salt.
   Future<void> setupPin(String pin) async {
     final normalized = pin.trim();
-    if (!RegExp(r'^\d{4,}$').hasMatch(normalized)) {
+    if (!RegExp(r'^\d{4,8}$').hasMatch(normalized)) {
       throw const ValidationException(
-        'PIN brankas minimal terdiri dari 4 digit angka.',
+        'PIN brankas harus terdiri dari 4-8 digit angka.',
       );
     }
 
@@ -151,12 +151,12 @@ class VaultLockController extends ChangeNotifier {
     await _configStore.setVaultPinHash(hash);
   }
 
-  /// Configures a duress numeric PIN of at least 4 digits, hashing it with a random salt.
+  /// Configures a duress numeric PIN of 4-8 digits, hashing it with a random salt.
   Future<void> setupDuressPin(String pin) async {
     final normalized = pin.trim();
-    if (!RegExp(r'^\d{4,}$').hasMatch(normalized)) {
+    if (!RegExp(r'^\d{4,8}$').hasMatch(normalized)) {
       throw const ValidationException(
-        'Duress PIN brankas minimal terdiri dari 4 digit angka.',
+        'Duress PIN harus terdiri dari 4-8 digit angka.',
       );
     }
 

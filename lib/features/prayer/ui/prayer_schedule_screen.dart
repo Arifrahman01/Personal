@@ -208,70 +208,98 @@ class _PrayerScheduleScreenState extends ConsumerState<PrayerScheduleScreen> {
     final nextAsync = ref.watch(nextPrayerProvider);
     final fcmStatus = ref.watch(firebaseAdzanStatusProvider);
 
+    final tabBar = TabBar(
+      indicatorColor: AppTokens.primary(context),
+      labelColor: AppTokens.primary(context),
+      unselectedLabelColor: AppTokens.textSecondary(context),
+      tabs: const [
+        Tab(
+          icon: Icon(LucideIcons.clock),
+          text: 'Jadwal & Notif',
+        ),
+        Tab(
+          icon: Icon(LucideIcons.compass),
+          text: 'Arah Kiblat',
+        ),
+      ],
+    );
+
+    final settingsAction = prefsAsync.asData?.value != null
+        ? IconButton(
+            icon: const Icon(LucideIcons.settings),
+            tooltip: 'Pengaturan Adzan & Lanjutan',
+            constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
+            onPressed: () => _openAdzanSettingsSheet(
+              context,
+              prefsAsync.asData!.value,
+              fcmStatus,
+            ),
+          )
+        : null;
+
+    final bodyContent = prefsAsync.when(
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error: (error, _) => Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Text('Gagal memuat pengaturan jadwal sholat: $error'),
+        ),
+      ),
+      data: (prefs) {
+        final times = timesAsync.asData?.value;
+        final next = nextAsync.asData?.value;
+        return TabBarView(
+          children: [
+            _ScheduleAndNotifTab(
+              prefs: prefs,
+              times: times,
+              nextPrayer: next,
+              isLocating: _isLocating,
+              onPickCity: () => _showCityPicker(prefs),
+              onDetectGps: _detectGpsLocation,
+            ),
+            _QiblaCompassTab(prefs: prefs),
+          ],
+        );
+      },
+    );
+
     return DefaultTabController(
       length: 2,
       child: Scaffold(
         backgroundColor: AppTokens.canvas(context),
-        appBar: AppBar(
-          backgroundColor: AppTokens.canvas(context),
-          elevation: 0,
-          scrolledUnderElevation: 0,
-          automaticallyImplyLeading: !widget.isEmbedded,
-          title: widget.isEmbedded ? null : const Text('Jadwal Sholat & Kiblat'),
-          actions: [
-            if (prefsAsync.asData?.value != null)
-              IconButton(
-                icon: const Icon(LucideIcons.settings),
-                tooltip: 'Pengaturan Adzan & Lanjutan',
-                onPressed: () => _openAdzanSettingsSheet(
-                  context,
-                  prefsAsync.asData!.value,
-                  fcmStatus,
-                ),
+        appBar: widget.isEmbedded
+            ? null
+            : HubAppBar(
+                titleText: 'Jadwal Sholat & Kiblat',
+                backgroundColor: AppTokens.canvas(context),
+                actions: [?settingsAction],
+                bottom: tabBar,
               ),
-          ],
-          bottom: TabBar(
-            indicatorColor: AppTokens.primary(context),
-            labelColor: AppTokens.primary(context),
-            unselectedLabelColor: AppTokens.textSecondary(context),
-            tabs: const [
-              Tab(
-                icon: Icon(LucideIcons.clock),
-                text: 'Jadwal & Notif',
-              ),
-              Tab(
-                icon: Icon(LucideIcons.compass),
-                text: 'Arah Kiblat',
-              ),
-            ],
-          ),
-        ),
-        body: prefsAsync.when(
-          loading: () => const Center(child: CircularProgressIndicator()),
-          error: (error, _) => Center(
-            child: Padding(
-              padding: const EdgeInsets.all(24),
-              child: Text('Gagal memuat pengaturan jadwal sholat: $error'),
-            ),
-          ),
-          data: (prefs) {
-            final times = timesAsync.asData?.value;
-            final next = nextAsync.asData?.value;
-            return TabBarView(
-              children: [
-                _ScheduleAndNotifTab(
-                  prefs: prefs,
-                  times: times,
-                  nextPrayer: next,
-                  isLocating: _isLocating,
-                  onPickCity: () => _showCityPicker(prefs),
-                  onDetectGps: _detectGpsLocation,
-                ),
-                _QiblaCompassTab(prefs: prefs),
-              ],
-            );
-          },
-        ),
+        body: widget.isEmbedded
+            ? Column(
+                children: [
+                  Container(
+                    decoration: BoxDecoration(
+                      color: AppTokens.canvas(context),
+                      border: Border(
+                        bottom: BorderSide(color: AppTokens.border(context)),
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        Expanded(child: tabBar),
+                        if (settingsAction != null) ...[
+                          settingsAction,
+                          const SizedBox(width: 4),
+                        ],
+                      ],
+                    ),
+                  ),
+                  Expanded(child: bodyContent),
+                ],
+              )
+            : bodyContent,
       ),
     );
   }
@@ -302,7 +330,7 @@ class _ScheduleAndNotifTab extends ConsumerWidget {
     final timeService = ref.watch(prayerTimeServiceProvider);
     final now = DateTime.now();
     final hijriText = timeService.formatHijriDate(now);
-    final gregorianText = DateFormat('EEEE, d MMM yyyy').format(now);
+    final gregorianText = safeFormatIndonesianDate(now, 'EEEE, d MMM yyyy');
     final timeFmt = DateFormat('HH:mm');
     final notifier = ref.read(prayerPrefsProvider.notifier);
 
@@ -330,21 +358,29 @@ class _ScheduleAndNotifTab extends ConsumerWidget {
                         fontWeight: FontWeight.w700,
                         color: AppTokens.textPrimary(context),
                       ),
+                      maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                     ),
                   ),
+                  const SizedBox(width: 8),
                   OutlinedButton.icon(
                     onPressed: onPickCity,
                     icon: const Icon(LucideIcons.mapPin, size: 14),
-                    label: const Text('Ganti'),
+                    label: const Text(
+                      'Ganti',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
                     style: OutlinedButton.styleFrom(
-                      visualDensity: VisualDensity.compact,
+                      minimumSize: const Size(0, 48),
+                      tapTargetSize: MaterialTapTargetSize.padded,
                       padding: const EdgeInsets.symmetric(horizontal: 10),
                     ),
                   ),
-                  const SizedBox(width: 6),
+                  const SizedBox(width: 4),
                   IconButton(
                     tooltip: 'Gunakan GPS',
+                    constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
                     onPressed: isLocating ? null : onDetectGps,
                     icon: isLocating
                         ? const SizedBox(
@@ -369,38 +405,51 @@ class _ScheduleAndNotifTab extends ConsumerWidget {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                   decoration: BoxDecoration(
-                    color: AppTokens.primary(context).withValues(alpha: 0.10),
+                    color: AppTokens.primarySoft(context),
                     borderRadius: HubRadius.rSm,
-                    border: Border.all(
-                      color: AppTokens.primary(context).withValues(alpha: 0.25),
-                    ),
                   ),
                   child: Row(
                     children: [
                       Icon(
                         LucideIcons.bellRing,
-                        color: AppTokens.primary(context),
+                        color: AppTokens.tonalForeground(
+                          context,
+                          AppTokens.primary(context),
+                        ),
                         size: 20,
                       ),
                       const SizedBox(width: 10),
                       Expanded(
-                        child: Text(
-                          'Berikutnya: ${nextPrayer!.name.label} (${timeFmt.format(nextPrayer!.time)})',
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
-                            color: AppTokens.textPrimary(context),
-                          ),
-                        ),
-                      ),
-                      Text(
-                        _formatRemaining(nextPrayer!.remaining),
-                        style: HubTypography.tabular(
-                          TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w800,
-                            color: AppTokens.primary(context),
-                          ),
+                        child: Wrap(
+                          alignment: WrapAlignment.spaceBetween,
+                          crossAxisAlignment: WrapCrossAlignment.center,
+                          spacing: 8,
+                          runSpacing: 4,
+                          children: [
+                            Text(
+                              'Berikutnya: ${nextPrayer!.name.label} (${timeFmt.format(nextPrayer!.time)})',
+                              style: HubTypography.tabular(
+                                TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w600,
+                                  color: AppTokens.textPrimary(context),
+                                ),
+                              ),
+                            ),
+                            Text(
+                              _formatRemaining(nextPrayer!.remaining),
+                              style: HubTypography.tabular(
+                                TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w800,
+                                  color: AppTokens.tonalForeground(
+                                    context,
+                                    AppTokens.primary(context),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     ],
@@ -538,20 +587,21 @@ class _AdzanSettingsSheet extends ConsumerWidget {
           ),
           const SizedBox(height: 8),
           SegmentedButton<AdzanNotificationMode>(
+            showSelectedIcon: false,
             segments: const [
               ButtonSegment(
                 value: AdzanNotificationMode.firebaseFcm,
-                label: Text('FCM'),
+                label: Text('FCM', maxLines: 1, overflow: TextOverflow.ellipsis),
                 icon: Icon(LucideIcons.cloud, size: 16),
               ),
               ButtonSegment(
                 value: AdzanNotificationMode.localOffline,
-                label: Text('Lokal'),
+                label: Text('Lokal', maxLines: 1, overflow: TextOverflow.ellipsis),
                 icon: Icon(LucideIcons.bell, size: 16),
               ),
               ButtonSegment(
                 value: AdzanNotificationMode.both,
-                label: Text('Keduanya'),
+                label: Text('Keduanya', maxLines: 1, overflow: TextOverflow.ellipsis),
                 icon: Icon(LucideIcons.refreshCw, size: 16),
               ),
             ],
@@ -568,9 +618,8 @@ class _AdzanSettingsSheet extends ConsumerWidget {
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: AppTokens.card(context),
+              color: AppTokens.surfaceSubtle(context),
               borderRadius: HubRadius.rSm,
-              border: Border.all(color: AppTokens.border(context)),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -588,30 +637,21 @@ class _AdzanSettingsSheet extends ConsumerWidget {
                   spacing: 8,
                   runSpacing: 6,
                   children: [
-                    Chip(
-                      avatar: Icon(
-                        fcmStatus.isConfigured
-                            ? LucideIcons.checkCircle2
-                            : LucideIcons.info,
-                        size: 16,
-                        color: fcmStatus.isConfigured
-                            ? AppTokens.success(context)
-                            : AppTokens.textSecondary(context),
-                      ),
-                      label: Text(
-                        fcmStatus.isConfigured
-                            ? 'FCM Aktif'
-                            : 'FCM Belum Dikonfigurasi',
-                        style: const TextStyle(fontSize: 12),
-                      ),
+                    HubStatusBadge(
+                      icon: fcmStatus.isConfigured
+                          ? LucideIcons.checkCircle2
+                          : LucideIcons.info,
+                      label: fcmStatus.isConfigured
+                          ? 'FCM Aktif'
+                          : 'FCM Belum Dikonfigurasi',
+                      color: fcmStatus.isConfigured
+                          ? AppTokens.success(context)
+                          : AppTokens.textSecondary(context),
                     ),
-                    Chip(
-                      avatar: const Icon(LucideIcons.hash, size: 14),
-                      label: Text(
-                        topicName,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(fontSize: 12),
-                      ),
+                    HubStatusBadge(
+                      icon: LucideIcons.hash,
+                      label: topicName,
+                      color: AppTokens.primary(context),
                     ),
                   ],
                 ),
@@ -865,7 +905,7 @@ class _CompassDialPainter extends CustomPainter {
   }
 }
 
-/// Tab Kompas Kiblat: dial kustom dengan derajat dan indikator hijau 'Menghadap Kiblat ✓' (±5°).
+/// Tab Kompas Kiblat: dial kustom dengan derajat dan indikator hijau 'Menghadap Kiblat' (±5°).
 class _QiblaCompassTab extends StatelessWidget {
   const _QiblaCompassTab({required this.prefs});
 
@@ -941,7 +981,9 @@ class _QiblaCompassTab extends StatelessWidget {
             // Indicator when aligned within ±5°
             Center(
               child: AnimatedContainer(
-                duration: const Duration(milliseconds: 300),
+                duration: MediaQuery.disableAnimationsOf(context)
+                    ? Duration.zero
+                    : const Duration(milliseconds: 300),
                 height: isAligned ? 44 : 0,
                 child: isAligned
                     ? Container(
@@ -962,14 +1004,20 @@ class _QiblaCompassTab extends StatelessWidget {
                           children: [
                             Icon(
                               LucideIcons.checkCircle2,
-                              color: AppTokens.success(context),
+                              color: AppTokens.tonalForeground(
+                                context,
+                                AppTokens.success(context),
+                              ),
                               size: 18,
                             ),
                             const SizedBox(width: 8),
                             Text(
-                              'Menghadap Kiblat ✓',
+                              'Menghadap Kiblat',
                               style: TextStyle(
-                                color: AppTokens.success(context),
+                                color: AppTokens.tonalForeground(
+                                  context,
+                                  AppTokens.success(context),
+                                ),
                                 fontWeight: FontWeight.w700,
                                 fontSize: 14,
                               ),

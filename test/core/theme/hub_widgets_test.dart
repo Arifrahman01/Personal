@@ -180,6 +180,47 @@ void main() {
     });
   });
 
+  group('Touch Targets & Theme ColorScheme', () {
+    testWidgets('HubPill and HubStatusBadge have >= 48dp interactive targets when onTap is set', (tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: AppTheme.light,
+          home: Scaffold(
+            body: Column(
+              children: [
+                HubStatusBadge(label: 'Tap Badge', onTap: () {}),
+                HubPill(label: 'Tap Pill', onTap: () {}),
+              ],
+            ),
+          ),
+        ),
+      );
+
+      final badgeSize = tester.getSize(find.ancestor(of: find.text('Tap Badge'), matching: find.byType(InkWell)));
+      final pillSize = tester.getSize(find.ancestor(of: find.text('Tap Pill'), matching: find.byType(InkWell)));
+      expect(badgeSize.height, greaterThanOrEqualTo(48));
+      expect(pillSize.height, greaterThanOrEqualTo(48));
+    });
+
+    test('AppTheme light and dark explicitly map ColorScheme fields', () {
+      expect(AppTheme.light.colorScheme.error, AppTokens.errorLight);
+      expect(AppTheme.light.colorScheme.onError, AppTokens.onPrimaryLight);
+      expect(AppTheme.light.colorScheme.primaryContainer, AppTokens.primarySoftLight);
+      expect(AppTheme.light.colorScheme.onPrimaryContainer, AppTokens.primaryLight);
+      expect(AppTheme.light.colorScheme.surfaceContainerHighest, AppTokens.surfaceSubtleLight);
+      expect(AppTheme.light.colorScheme.onSurface, AppTokens.textPrimaryLight);
+      expect(AppTheme.light.colorScheme.onSurfaceVariant, AppTokens.textSecondaryLight);
+
+      expect(AppTheme.dark.colorScheme.error, AppTokens.errorDark);
+      expect(AppTheme.dark.colorScheme.onError, AppTokens.canvasDark);
+      expect(AppTheme.dark.colorScheme.primaryContainer, AppTokens.primarySoftDark);
+      expect(AppTheme.dark.colorScheme.onPrimaryContainer, AppTokens.primaryDark);
+      expect(AppTheme.dark.colorScheme.surfaceContainerHighest, AppTokens.surfaceSubtleDark);
+      expect(AppTheme.dark.colorScheme.onSurface, AppTokens.textPrimaryDark);
+      expect(AppTheme.dark.colorScheme.onSurfaceVariant, AppTokens.textSecondaryDark);
+    });
+  });
+
   group('HubTypography', () {
     test('HubTypography.tabular adds tabular figures font feature', () {
       const baseStyle = TextStyle(fontSize: 14);

@@ -1,3 +1,6 @@
+import 'dart:async';
+
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:personal_hub/features/meetings/models/meeting.dart';
@@ -13,11 +16,52 @@ class MeetingReminderService {
     : _plugin = plugin ?? FlutterLocalNotificationsPlugin();
 
   final FlutterLocalNotificationsPlugin _plugin;
+  final StreamController<String> _tapController =
+      StreamController<String>.broadcast();
   bool _initialized = false;
   bool _tzInitialized = false;
 
+  /// Emits the `meetingId` payload whenever a reminder notification is tapped.
+  Stream<String> get onNotificationTap => _tapController.stream;
+
   static int notificationIdFor(String meetingId) =>
       meetingId.hashCode & 0x7fffffff;
+
+  /// Handles raw notification payload strings and emits non-empty meeting IDs.
+  @visibleForTesting
+  void handleNotificationPayload(String? payload) {
+    final id = payload?.trim();
+    if (id != null && id.isNotEmpty && !_tapController.isClosed) {
+      _tapController.add(id);
+    }
+  }
+
+  /// Releases stream controller resources.
+  void dispose() {
+    if (!_tapController.isClosed) {
+      _tapController.close();
+    }
+  }
+
+  /// Returns the meeting ID if the app was launched from a meeting reminder notification.
+  Future<String?> getInitialNotificationMeetingId() async {
+    try {
+      final details = await _plugin.getNotificationAppLaunchDetails();
+      if (details != null && details.didNotificationLaunchApp) {
+        final id = details.notificationResponse?.payload?.trim();
+        if (id != null && id.isNotEmpty) {
+          return id;
+        }
+      }
+      return null;
+    } on MissingPluginException {
+      return null;
+    } on UnimplementedError {
+      return null;
+    } catch (_) {
+      return null;
+    }
+  }
 
   Future<bool> _ensureInitialized() async {
     if (_initialized) return true;
@@ -41,7 +85,12 @@ class MeetingReminderService {
         ),
       );
 
-      await _plugin.initialize(settings: settings);
+      await _plugin.initialize(
+        settings: settings,
+        onDidReceiveNotificationResponse: (response) {
+          handleNotificationPayload(response.payload);
+        },
+      );
       _initialized = true;
       return true;
     } on MissingPluginException {
