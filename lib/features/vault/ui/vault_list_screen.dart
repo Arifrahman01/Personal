@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:personal_hub/core/errors/app_exceptions.dart';
 import 'package:personal_hub/core/theme/app_tokens.dart';
 import 'package:personal_hub/core/theme/hub_widgets.dart';
@@ -83,27 +82,29 @@ class _VaultListScreenState extends ConsumerState<VaultListScreen> {
   }
 
   static Color getCategoryColor(String category, BuildContext context) {
+    final colors = HubColors.of(context);
     switch (category) {
       case 'Kerja':
-        return AppTokens.info(context);
+        return colors.info;
       case 'Keuangan':
-        return AppTokens.primary(context);
+        return colors.primary;
       case 'Pribadi':
       default:
-        return const Color(0xFF8B5CF6);
+        return Theme.of(context).colorScheme.tertiary;
     }
   }
 
   Future<void> _copyWithGuard(String secret, {required String label}) async {
     await ref.read(clipboardGuardProvider).copySensitive(secret);
     if (!mounted) return;
+    final onInverse = Theme.of(context).colorScheme.onInverseSurface;
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
       ..showSnackBar(
         SnackBar(
           content: Row(
             children: [
-              const Icon(LucideIcons.timer, color: Colors.white, size: 16),
+              Icon(Icons.timer_outlined, color: onInverse, size: 16),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
@@ -123,10 +124,7 @@ class _VaultListScreenState extends ConsumerState<VaultListScreen> {
       context: context,
       isScrollControlled: true,
       useSafeArea: true,
-      backgroundColor: AppTokens.card(context),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(HubRadius.lg)),
-      ),
+      showDragHandle: true,
       builder: (sheetContext) {
         return _VaultEntryFormSheet(existing: existing);
       },
@@ -138,10 +136,7 @@ class _VaultListScreenState extends ConsumerState<VaultListScreen> {
       context: context,
       isScrollControlled: true,
       useSafeArea: true,
-      backgroundColor: AppTokens.card(context),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(HubRadius.lg)),
-      ),
+      showDragHandle: true,
       builder: (sheetContext) {
         return _VaultAccountDetailSheet(
           entry: entry,
@@ -169,6 +164,7 @@ class _VaultListScreenState extends ConsumerState<VaultListScreen> {
   }
 
   Future<void> _confirmDelete(VaultEntry entry) async {
+    final colorScheme = Theme.of(context).colorScheme;
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) {
@@ -184,7 +180,8 @@ class _VaultListScreenState extends ConsumerState<VaultListScreen> {
             ),
             FilledButton(
               style: FilledButton.styleFrom(
-                backgroundColor: AppTokens.error(context),
+                backgroundColor: colorScheme.error,
+                foregroundColor: colorScheme.onError,
               ),
               onPressed: () => Navigator.of(dialogContext).pop(true),
               child: const Text('Hapus'),
@@ -232,12 +229,12 @@ class _VaultListScreenState extends ConsumerState<VaultListScreen> {
         actions: [
           IconButton(
             tooltip: 'Pengaturan Brankas & Duress PIN',
-            icon: const Icon(LucideIcons.shieldCheck),
+            icon: const Icon(Icons.verified_user_outlined),
             onPressed: _openSecuritySettings,
           ),
           IconButton(
             tooltip: 'Kunci brankas sekarang',
-            icon: const Icon(LucideIcons.lock),
+            icon: const Icon(Icons.lock_outline_rounded),
             onPressed: () {
               ref.read(vaultLockControllerProvider).lock();
             },
@@ -245,10 +242,7 @@ class _VaultListScreenState extends ConsumerState<VaultListScreen> {
         ],
       ),
       floatingActionButton: FloatingActionButton.extended(
-        backgroundColor: primary,
-        foregroundColor: Colors.white,
-        shape: RoundedRectangleBorder(borderRadius: HubRadius.rPill),
-        icon: const Icon(LucideIcons.plus, size: 20),
+        icon: const Icon(Icons.add_rounded, size: 20),
         label: const Text(
           'Tambah Akun',
           style: TextStyle(fontWeight: FontWeight.w700),
@@ -273,7 +267,7 @@ class _VaultListScreenState extends ConsumerState<VaultListScreen> {
                 child: Row(
                   children: [
                     Icon(
-                      LucideIcons.shieldAlert,
+                      Icons.gpp_maybe_outlined,
                       size: 20,
                       color: AppTokens.warning(context),
                     ),
@@ -305,46 +299,60 @@ class _VaultListScreenState extends ConsumerState<VaultListScreen> {
                 ),
               ),
 
-            // Search Bar
+            // Material 3 SearchBar
             Padding(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-              child: TextField(
+              padding: const EdgeInsets.fromLTRB(
+                HubSpacing.lg,
+                HubSpacing.sm,
+                HubSpacing.lg,
+                HubSpacing.xs,
+              ),
+              child: SearchBar(
                 controller: _searchController,
                 onChanged: (value) {
                   ref.read(vaultSearchQueryProvider.notifier).setQuery(value);
                 },
-                decoration: InputDecoration(
-                  hintText: 'Cari akun, username, atau URL...',
-                  prefixIcon: const Icon(LucideIcons.search, size: 18),
-                  suffixIcon: query.isNotEmpty
-                      ? IconButton(
+                hintText: 'Cari akun, username, atau URL...',
+                leading: const Icon(Icons.search_rounded, size: 20),
+                trailing: query.isNotEmpty
+                    ? [
+                        IconButton(
                           tooltip: 'Hapus pencarian',
-                          icon: const Icon(LucideIcons.x, size: 18),
+                          icon: const Icon(Icons.close_rounded, size: 18),
                           onPressed: () {
                             _searchController.clear();
                             ref
                                 .read(vaultSearchQueryProvider.notifier)
                                 .setQuery('');
                           },
-                        )
-                      : null,
-                ),
+                        ),
+                      ]
+                    : null,
               ),
             ),
 
             // Category Filter Chips
             SingleChildScrollView(
               scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+              padding: const EdgeInsets.symmetric(
+                horizontal: HubSpacing.lg,
+                vertical: HubSpacing.xs,
+              ),
               child: Row(
                 children: _categories.map((category) {
                   final isSelected = _selectedCategory == category;
                   return Padding(
-                    padding: const EdgeInsets.only(right: 8),
+                    padding: const EdgeInsets.only(right: HubSpacing.sm),
                     child: ChoiceChip(
                       label: Text(category),
                       selected: isSelected,
-                      selectedColor: primary.withValues(alpha: 0.18),
+                      showCheckmark: false,
+                      selectedColor: primary.withValues(alpha: 0.16),
+                      side: BorderSide(
+                        color: isSelected
+                            ? primary
+                            : AppTokens.border(context),
+                      ),
                       labelStyle: TextStyle(
                         fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
                         color: isSelected ? primary : AppTokens.textSecondary(context),
@@ -361,7 +369,7 @@ class _VaultListScreenState extends ConsumerState<VaultListScreen> {
                 }).toList(),
               ),
             ),
-            const SizedBox(height: 4),
+            const SizedBox(height: HubSpacing.xs),
 
             // Entries List
             Expanded(
@@ -374,7 +382,7 @@ class _VaultListScreenState extends ConsumerState<VaultListScreen> {
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Icon(
-                          LucideIcons.alertCircle,
+                          Icons.error_outline_rounded,
                           size: 40,
                           color: AppTokens.error(context),
                         ),
@@ -416,7 +424,7 @@ class _VaultListScreenState extends ConsumerState<VaultListScreen> {
                                 shape: BoxShape.circle,
                               ),
                               child: Icon(
-                                LucideIcons.keyRound,
+                                Icons.vpn_key_outlined,
                                 size: 28,
                                 color: primary,
                               ),
@@ -575,7 +583,7 @@ class _VaultCompactCard extends StatelessWidget {
           IconButton(
             constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
             tooltip: 'Salin kata sandi',
-            icon: const Icon(LucideIcons.copy, size: 20),
+            icon: const Icon(Icons.copy_rounded, size: 20),
             color: AppTokens.primary(context),
             onPressed: onCopyPassword,
           ),
@@ -617,27 +625,23 @@ class _VaultAccountDetailSheetState extends State<_VaultAccountDetailSheet> {
     final entry = widget.entry;
     final category = _VaultListScreenState.resolveEntryCategory(entry);
     final catColor = _VaultListScreenState.getCategoryColor(category, context);
-    final primary = AppTokens.primary(context);
+    final colors = HubColors.of(context);
+    final colorScheme = Theme.of(context).colorScheme;
+    final primary = colors.primary;
 
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          // Drag handle
-          Center(
-            child: Container(
-              width: 38,
-              height: 4,
-              decoration: BoxDecoration(
-                color: AppTokens.border(context),
-                borderRadius: HubRadius.rPill,
-              ),
-            ),
-          ),
-          const SizedBox(height: 16),
-
+    return SafeArea(
+      top: false,
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.fromLTRB(
+          HubSpacing.xl,
+          HubSpacing.xs,
+          HubSpacing.xl,
+          HubSpacing.xxl,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
           // Header
           Row(
             children: [
@@ -678,7 +682,7 @@ class _VaultAccountDetailSheetState extends State<_VaultAccountDetailSheet> {
               ),
               IconButton(
                 tooltip: 'Tutup',
-                icon: const Icon(LucideIcons.x, size: 20),
+                icon: const Icon(Icons.close_rounded, size: 20),
                 onPressed: () => Navigator.of(context).pop(),
               ),
             ],
@@ -715,7 +719,7 @@ class _VaultAccountDetailSheetState extends State<_VaultAccountDetailSheet> {
                     IconButton(
                       tooltip: 'Salin username',
                       constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
-                      icon: const Icon(LucideIcons.copy, size: 18),
+                      icon: const Icon(Icons.copy_rounded, size: 18),
                       onPressed: widget.onCopyUsername,
                     ),
                 ],
@@ -760,7 +764,9 @@ class _VaultAccountDetailSheetState extends State<_VaultAccountDetailSheet> {
                   tooltip: _isPasswordRevealed ? 'Sembunyikan sandi' : 'Tampilkan sandi',
                   constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
                   icon: Icon(
-                    _isPasswordRevealed ? LucideIcons.eyeOff : LucideIcons.eye,
+                    _isPasswordRevealed
+                        ? Icons.visibility_off_outlined
+                        : Icons.visibility_outlined,
                     size: 18,
                   ),
                   onPressed: () {
@@ -772,7 +778,7 @@ class _VaultAccountDetailSheetState extends State<_VaultAccountDetailSheet> {
                 IconButton(
                   tooltip: 'Salin kata sandi',
                   constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
-                  icon: const Icon(LucideIcons.copy, size: 18),
+                  icon: const Icon(Icons.copy_rounded, size: 18),
                   onPressed: widget.onCopyPassword,
                 ),
               ],
@@ -814,7 +820,7 @@ class _VaultAccountDetailSheetState extends State<_VaultAccountDetailSheet> {
                     IconButton(
                       tooltip: 'Salin URL',
                       constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
-                      icon: const Icon(LucideIcons.copy, size: 18),
+                      icon: const Icon(Icons.copy_rounded, size: 18),
                       onPressed: widget.onCopyUrl,
                     ),
                 ],
@@ -859,7 +865,7 @@ class _VaultAccountDetailSheetState extends State<_VaultAccountDetailSheet> {
                     minimumSize: const Size.fromHeight(46),
                     shape: RoundedRectangleBorder(borderRadius: HubRadius.rSm),
                   ),
-                  icon: const Icon(LucideIcons.pencil, size: 16),
+                  icon: const Icon(Icons.edit_rounded, size: 16),
                   label: const Text('Edit Akun'),
                   onPressed: widget.onEdit,
                 ),
@@ -868,12 +874,12 @@ class _VaultAccountDetailSheetState extends State<_VaultAccountDetailSheet> {
               Expanded(
                 child: FilledButton.icon(
                   style: FilledButton.styleFrom(
-                    backgroundColor: AppTokens.error(context),
-                    foregroundColor: Colors.white,
-                    minimumSize: const Size.fromHeight(46),
+                    backgroundColor: colorScheme.error,
+                    foregroundColor: colorScheme.onError,
+                    minimumSize: const Size.fromHeight(48),
                     shape: RoundedRectangleBorder(borderRadius: HubRadius.rSm),
                   ),
-                  icon: const Icon(LucideIcons.trash2, size: 16),
+                  icon: const Icon(Icons.delete_outline_rounded, size: 16),
                   label: const Text('Hapus Akun'),
                   onPressed: widget.onDelete,
                 ),
@@ -881,6 +887,7 @@ class _VaultAccountDetailSheetState extends State<_VaultAccountDetailSheet> {
             ],
           ),
         ],
+      ),
       ),
     );
   }
@@ -1004,37 +1011,31 @@ class _VaultEntryFormSheetState extends ConsumerState<_VaultEntryFormSheet> {
   @override
   Widget build(BuildContext context) {
     final isEditing = widget.existing != null;
+    final colorScheme = Theme.of(context).colorScheme;
     final primary = AppTokens.primary(context);
 
-    return Padding(
-      padding: EdgeInsets.only(
-        bottom: MediaQuery.of(context).viewInsets.bottom,
-        left: 20,
-        right: 20,
-        top: 16,
-      ),
-      child: Form(
-        key: _formKey,
-        child: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Center(
-                child: Container(
-                  width: 38,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: AppTokens.border(context),
-                    borderRadius: HubRadius.rPill,
-                  ),
-                ),
-              ),
-              const SizedBox(height: 16),
+    return SafeArea(
+      top: false,
+      child: Padding(
+        padding: EdgeInsets.only(
+          bottom: MediaQuery.viewInsetsOf(context).bottom,
+          left: HubSpacing.xl,
+          right: HubSpacing.xl,
+          top: HubSpacing.xs,
+        ),
+        child: Form(
+          key: _formKey,
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
               Row(
                 children: [
                   Icon(
-                    isEditing ? LucideIcons.pencil : LucideIcons.plusCircle,
+                    isEditing
+                        ? Icons.edit_rounded
+                        : Icons.add_circle_outline_rounded,
                     size: 22,
                     color: primary,
                   ),
@@ -1054,7 +1055,7 @@ class _VaultEntryFormSheetState extends ConsumerState<_VaultEntryFormSheet> {
                 decoration: const InputDecoration(
                   labelText: 'Judul Akun *',
                   hintText: 'Misal: GitHub, Email Kantor, dsb.',
-                  prefixIcon: Icon(LucideIcons.tag),
+                  prefixIcon: Icon(Icons.label_outline_rounded),
                 ),
                 validator: (val) {
                   if (val == null || val.trim().isEmpty) {
@@ -1069,7 +1070,7 @@ class _VaultEntryFormSheetState extends ConsumerState<_VaultEntryFormSheet> {
                 decoration: const InputDecoration(
                   labelText: 'Username / Email',
                   hintText: 'user@example.com',
-                  prefixIcon: Icon(LucideIcons.user),
+                  prefixIcon: Icon(Icons.person_outline_rounded),
                 ),
               ),
               const SizedBox(height: 12),
@@ -1079,13 +1080,13 @@ class _VaultEntryFormSheetState extends ConsumerState<_VaultEntryFormSheet> {
                 decoration: InputDecoration(
                   labelText: 'Kata Sandi *',
                   hintText: 'Sandi rahasia',
-                  prefixIcon: const Icon(LucideIcons.lock),
+                  prefixIcon: const Icon(Icons.lock_outline_rounded),
                   suffixIcon: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       IconButton(
                         tooltip: 'Buat sandi acak kuat',
-                        icon: const Icon(LucideIcons.sparkles, size: 18),
+                        icon: const Icon(Icons.auto_awesome_rounded, size: 18),
                         onPressed: _generatePassword,
                       ),
                       IconButton(
@@ -1094,8 +1095,8 @@ class _VaultEntryFormSheetState extends ConsumerState<_VaultEntryFormSheet> {
                             : 'Sembunyikan sandi',
                         icon: Icon(
                           _obscurePassword
-                              ? LucideIcons.eye
-                              : LucideIcons.eyeOff,
+                              ? Icons.visibility_outlined
+                              : Icons.visibility_off_outlined,
                           size: 18,
                         ),
                         onPressed: () {
@@ -1121,7 +1122,7 @@ class _VaultEntryFormSheetState extends ConsumerState<_VaultEntryFormSheet> {
                 decoration: const InputDecoration(
                   labelText: 'Alamat Website / URL',
                   hintText: 'https://...',
-                  prefixIcon: Icon(LucideIcons.globe),
+                  prefixIcon: Icon(Icons.language_rounded),
                 ),
               ),
               const SizedBox(height: 12),
@@ -1131,7 +1132,7 @@ class _VaultEntryFormSheetState extends ConsumerState<_VaultEntryFormSheet> {
                 decoration: const InputDecoration(
                   labelText: 'Catatan (Opsional)',
                   hintText: 'Pertanyaan keamanan, nomor pemulihan, dsb.',
-                  prefixIcon: Icon(LucideIcons.fileText),
+                  prefixIcon: Icon(Icons.description_outlined),
                 ),
               ),
               if (_errorMessage != null) ...[
@@ -1148,22 +1149,22 @@ class _VaultEntryFormSheetState extends ConsumerState<_VaultEntryFormSheet> {
               const SizedBox(height: 20),
               FilledButton.icon(
                 style: FilledButton.styleFrom(
-                  backgroundColor: primary,
-                  foregroundColor: Colors.white,
+                  backgroundColor: colorScheme.primary,
+                  foregroundColor: colorScheme.onPrimary,
                   minimumSize: const Size.fromHeight(48),
                   shape: RoundedRectangleBorder(borderRadius: HubRadius.rSm),
                 ),
                 onPressed: _isSaving ? null : _handleSave,
                 icon: _isSaving
-                    ? const SizedBox(
+                    ? SizedBox(
                         width: 18,
                         height: 18,
                         child: CircularProgressIndicator(
                           strokeWidth: 2,
-                          color: Colors.white,
+                          color: colorScheme.onPrimary,
                         ),
                       )
-                    : const Icon(LucideIcons.check, size: 18),
+                    : const Icon(Icons.check_rounded, size: 18),
                 label: Text(
                   isEditing ? 'Simpan Perubahan' : 'Simpan ke Brankas',
                   style: const TextStyle(fontWeight: FontWeight.w700),
@@ -1173,6 +1174,7 @@ class _VaultEntryFormSheetState extends ConsumerState<_VaultEntryFormSheet> {
             ],
           ),
         ),
+      ),
       ),
     );
   }

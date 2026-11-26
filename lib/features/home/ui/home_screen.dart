@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
-import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:personal_hub/core/theme/app_tokens.dart';
 import 'package:personal_hub/core/theme/hub_widgets.dart';
 import 'package:personal_hub/features/agenda/ui/agenda_hub_screen.dart';
@@ -202,6 +201,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           children: [
             Text(
               'Personal Hub',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
               style: TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.w800,
@@ -211,6 +212,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             ),
             Text(
               'Hari Ini',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
               style: TextStyle(
                 fontSize: 12,
                 fontWeight: FontWeight.w500,
@@ -222,17 +225,17 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         actions: [
           IconButton(
             tooltip: 'Cari',
-            icon: const Icon(LucideIcons.search),
+            icon: const Icon(Icons.search_rounded),
             onPressed: _openGlobalSearch,
           ),
           IconButton(
             tooltip: 'AI Copilot',
-            icon: const Icon(LucideIcons.sparkles),
+            icon: const Icon(Icons.auto_awesome_rounded),
             onPressed: _openAiChat,
           ),
           IconButton(
             tooltip: 'Pengaturan',
-            icon: const Icon(LucideIcons.settings),
+            icon: const Icon(Icons.settings_outlined),
             onPressed: _openSettings,
           ),
         ],
@@ -240,13 +243,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       floatingActionButton: FloatingActionButton.extended(
         heroTag: 'home_quick_capture_fab',
         onPressed: () => QuickCaptureSheet.show(context),
-        icon: const Icon(LucideIcons.plus),
+        icon: const Icon(Icons.add_rounded),
         label: const Text(
           'Catat',
           style: TextStyle(fontWeight: FontWeight.w600),
         ),
-        backgroundColor: AppTokens.primary(context),
-        foregroundColor: Colors.white,
       ),
       body: SafeArea(
         top: false,
@@ -272,12 +273,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   children: [
                     // Block 1: Greeting Header + 2 Hero Action Buttons side-by-side (height >= 52dp)
                     Padding(
-                      padding: const EdgeInsets.only(bottom: 14, left: 2),
+                      padding: const EdgeInsets.only(bottom: HubSpacing.lg, left: 2),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
                             _getGreeting(),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                             style: TextStyle(
                               fontSize: 18,
                               fontWeight: FontWeight.w700,
@@ -288,9 +291,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                           const SizedBox(height: 2),
                           Text(
                             '$gregorianDate • $hijriDate',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: AppTokens.textSecondary(context),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: HubTypography.tabular(
+                              TextStyle(
+                                fontSize: 12,
+                                color: AppTokens.textSecondary(context),
+                              ),
                             ),
                           ),
                           const SizedBox(height: 14),
@@ -303,16 +310,16 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                                   key: const Key('home_record_meeting_button'),
                                   style: FilledButton.styleFrom(
                                     minimumSize: const Size.fromHeight(52),
-                                    backgroundColor: AppTokens.primary(context),
-                                    foregroundColor: Colors.white,
                                     shape: RoundedRectangleBorder(
                                       borderRadius: HubRadius.rSm,
                                     ),
                                   ),
                                   onPressed: _openLiveMeetingRecorder,
-                                  icon: const Icon(LucideIcons.mic, size: 20),
+                                  icon: const Icon(Icons.mic_rounded, size: 20),
                                   label: const Text(
                                     'Rekam Meeting',
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
                                     style: TextStyle(
                                       fontSize: 14,
                                       fontWeight: FontWeight.w700,
@@ -320,7 +327,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                                   ),
                                 ),
                               ),
-                              const SizedBox(width: 12),
+                              const SizedBox(width: HubSpacing.md),
                               Expanded(
                                 child: FilledButton.tonalIcon(
                                   key: const Key('home_quick_capture_button'),
@@ -331,9 +338,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                                     ),
                                   ),
                                   onPressed: () => QuickCaptureSheet.show(context),
-                                  icon: const Icon(LucideIcons.plus, size: 20),
+                                  icon: const Icon(Icons.add_rounded, size: 20),
                                   label: const Text(
                                     'Catat Cepat',
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
                                     style: TextStyle(
                                       fontSize: 14,
                                       fontWeight: FontWeight.w700,
@@ -355,7 +364,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                         child: Row(
                           children: [
                             Icon(
-                              LucideIcons.alertCircle,
+                              Icons.error_outline_rounded,
                               color: AppTokens.warning(context),
                               size: 20,
                             ),
@@ -381,7 +390,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                               ),
                             ),
                             IconButton(
-                              icon: const Icon(LucideIcons.x, size: 16),
+                              icon: const Icon(Icons.close_rounded, size: 16),
                               tooltip: 'Buang draft',
                               onPressed: () => ref
                                   .read(activeMeetingDraftProvider.notifier)
@@ -407,7 +416,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                                   child: Row(
                                     children: [
                                       Icon(
-                                        LucideIcons.compass,
+                                        Icons.explore_outlined,
                                         size: 18,
                                         color: AppTokens.primary(context),
                                       ),
@@ -427,7 +436,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                                   ),
                                 ),
                                 IconButton(
-                                  icon: const Icon(LucideIcons.x, size: 16),
+                                  icon: const Icon(Icons.close_rounded, size: 16),
                                   tooltip: 'Tutup panduan',
                                   onPressed: () => setState(
                                     () => _isFirstRunDismissed = true,
@@ -469,7 +478,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                         now: now,
                         onTap: _navigateToPrayer,
                       ),
-                      const SizedBox(height: 12),
+                      const SizedBox(height: HubSpacing.lg),
                     ],
 
                     // Block 3: Today's Focus Card (nearest meeting + max 3 checked in-place)
@@ -486,7 +495,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                           widget.onSwitchTab?.call(1);
                         },
                       ),
-                      const SizedBox(height: 12),
+                      const SizedBox(height: HubSpacing.lg),
                     ],
 
                     // Block 4: 2 Compact KPI Cards (1 row, 2 cols)
@@ -503,7 +512,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                           widget.onSwitchTab?.call(1);
                         },
                       ),
-                      const SizedBox(height: 12),
+                      const SizedBox(height: HubSpacing.lg),
                     ],
 
                     // Block 5: Today AI Briefing Card (compact/collapsible)

@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:personal_hub/core/errors/app_exceptions.dart';
 import 'package:personal_hub/core/theme/app_tokens.dart';
 import 'package:personal_hub/core/theme/hub_widgets.dart';
@@ -61,7 +60,7 @@ class _SecurityVaultSettingsPageState
             return AlertDialog(
               title: Row(
                 children: [
-                  Icon(LucideIcons.keyRound, size: 20, color: AppTokens.primary(context)),
+                  Icon(Icons.vpn_key_outlined, size: 20, color: AppTokens.primary(context)),
                   const SizedBox(width: 8),
                   Text(_hasPin ? 'Ubah PIN Brankas' : 'Atur PIN Brankas'),
                 ],
@@ -77,10 +76,12 @@ class _SecurityVaultSettingsPageState
                       decoration: InputDecoration(
                         labelText: 'PIN Baru',
                         hintText: 'Minimal 4 digit angka',
-                        prefixIcon: const Icon(LucideIcons.pin),
+                        prefixIcon: const Icon(Icons.pin_outlined),
                         suffixIcon: IconButton(
                           icon: Icon(
-                            obscure ? LucideIcons.eye : LucideIcons.eyeOff,
+                            obscure
+                                ? Icons.visibility_outlined
+                                : Icons.visibility_off_outlined,
                           ),
                           onPressed: () =>
                               setDialogState(() => obscure = !obscure),
@@ -95,7 +96,7 @@ class _SecurityVaultSettingsPageState
                       decoration: const InputDecoration(
                         labelText: 'Konfirmasi PIN Baru',
                         hintText: 'Ulangi PIN yang sama',
-                        prefixIcon: Icon(LucideIcons.shieldCheck),
+                        prefixIcon: Icon(Icons.verified_user_outlined),
                       ),
                     ),
                     if (errorText != null) ...[
@@ -178,7 +179,7 @@ class _SecurityVaultSettingsPageState
             return AlertDialog(
               title: Row(
                 children: [
-                  Icon(LucideIcons.shieldAlert, size: 20, color: AppTokens.warning(context)),
+                  Icon(Icons.gpp_maybe_outlined, size: 20, color: AppTokens.warning(context)),
                   const SizedBox(width: 8),
                   const Text('Atur Duress PIN'),
                 ],
@@ -204,10 +205,12 @@ class _SecurityVaultSettingsPageState
                       decoration: InputDecoration(
                         labelText: 'Duress PIN Baru',
                         hintText: 'Minimal 4 digit angka',
-                        prefixIcon: const Icon(LucideIcons.pin),
+                        prefixIcon: const Icon(Icons.pin_outlined),
                         suffixIcon: IconButton(
                           icon: Icon(
-                            obscure ? LucideIcons.eye : LucideIcons.eyeOff,
+                            obscure
+                                ? Icons.visibility_outlined
+                                : Icons.visibility_off_outlined,
                           ),
                           onPressed: () =>
                               setDialogState(() => obscure = !obscure),
@@ -222,7 +225,7 @@ class _SecurityVaultSettingsPageState
                       decoration: const InputDecoration(
                         labelText: 'Konfirmasi Duress PIN',
                         hintText: 'Ulangi PIN umpan',
-                        prefixIcon: Icon(LucideIcons.shieldCheck),
+                        prefixIcon: Icon(Icons.verified_user_outlined),
                       ),
                     ),
                     if (errorText != null) ...[
@@ -314,17 +317,29 @@ class _SecurityVaultSettingsPageState
         backgroundColor: AppTokens.canvas(context),
         elevation: 0,
       ),
-      body: ListView(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-        children: [
-          // PIN Utama
+      body: SafeArea(
+        child: ListView(
+          padding: const EdgeInsets.symmetric(
+            horizontal: HubSpacing.lg,
+            vertical: HubSpacing.lg,
+          ),
+          children: [
+            const HubSectionHeader(
+              title: 'KUNCI & AKSES BRANKAS',
+              padding: EdgeInsets.symmetric(
+                horizontal: HubSpacing.xs,
+                vertical: HubSpacing.xs,
+              ),
+            ),
+            const SizedBox(height: HubSpacing.xs),
+            // PIN Utama
           HubCard(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Row(
                   children: [
-                    Icon(LucideIcons.keyRound, size: 20, color: primary),
+                    Icon(Icons.vpn_key_outlined, size: 20, color: primary),
                     const SizedBox(width: 10),
                     Expanded(
                       child: Text(
@@ -343,7 +358,7 @@ class _SecurityVaultSettingsPageState
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'Melindungi seluruh data kata sandi dengan enkripsi AES-256-GCM zero-knowledge.',
+                  'Melindungi seluruh kata sandi Anda dengan enkripsi lokal yang aman dan terisolasi.',
                   style: theme.textTheme.bodySmall?.copyWith(
                     color: AppTokens.textSecondary(context),
                   ),
@@ -351,7 +366,7 @@ class _SecurityVaultSettingsPageState
                 const SizedBox(height: 12),
                 OutlinedButton.icon(
                   onPressed: _openPinDialog,
-                  icon: const Icon(LucideIcons.pencil, size: 16),
+                  icon: const Icon(Icons.edit_rounded, size: 16),
                   label: Text(_hasPin ? 'Ubah PIN Utama' : 'Atur PIN Utama'),
                 ),
               ],
@@ -366,7 +381,7 @@ class _SecurityVaultSettingsPageState
               children: [
                 Row(
                   children: [
-                    Icon(LucideIcons.shieldAlert, size: 20, color: AppTokens.warning(context)),
+                    Icon(Icons.gpp_maybe_outlined, size: 20, color: AppTokens.warning(context)),
                     const SizedBox(width: 10),
                     Expanded(
                       child: Text(
@@ -395,13 +410,21 @@ class _SecurityVaultSettingsPageState
                 const SizedBox(height: 12),
                 OutlinedButton.icon(
                   onPressed: _openDuressPinDialog,
-                  icon: const Icon(LucideIcons.shield, size: 16),
+                  icon: const Icon(Icons.shield_outlined, size: 16),
                   label: Text(_hasDuressPin ? 'Ubah Duress PIN' : 'Konfigurasi Duress PIN'),
                 ),
               ],
             ),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: HubSpacing.lg),
+          const HubSectionHeader(
+            title: 'PENGUNCIAN OTOMATIS & BIOMETRIK',
+            padding: EdgeInsets.symmetric(
+              horizontal: HubSpacing.xs,
+              vertical: HubSpacing.xs,
+            ),
+          ),
+          const SizedBox(height: HubSpacing.xs),
 
           // Auto-Lock Timeout
           HubCard(
@@ -410,7 +433,7 @@ class _SecurityVaultSettingsPageState
               children: [
                 Row(
                   children: [
-                    Icon(LucideIcons.timer, size: 20, color: primary),
+                    Icon(Icons.timer_outlined, size: 20, color: primary),
                     const SizedBox(width: 10),
                     Expanded(
                       child: Text(
@@ -461,7 +484,7 @@ class _SecurityVaultSettingsPageState
           HubCard(
             child: Row(
               children: [
-                Icon(LucideIcons.fingerprint, size: 22, color: primary),
+                Icon(Icons.fingerprint_rounded, size: 22, color: primary),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Column(
@@ -498,8 +521,8 @@ class _SecurityVaultSettingsPageState
           // Tombol Kunci Brankas Sekarang
           FilledButton.icon(
             style: FilledButton.styleFrom(
-              backgroundColor: AppTokens.error(context),
-              foregroundColor: Colors.white,
+              backgroundColor: theme.colorScheme.error,
+              foregroundColor: theme.colorScheme.onError,
               minimumSize: const Size.fromHeight(48),
               shape: RoundedRectangleBorder(borderRadius: HubRadius.rSm),
             ),
@@ -507,13 +530,14 @@ class _SecurityVaultSettingsPageState
               ref.read(vaultLockControllerProvider).lock();
               Navigator.of(context).pop();
             },
-            icon: const Icon(LucideIcons.lock, size: 18),
+            icon: const Icon(Icons.lock_outline_rounded, size: 18),
             label: const Text(
               'Kunci Brankas Sekarang',
               style: TextStyle(fontWeight: FontWeight.w700),
             ),
           ),
         ],
+        ),
       ),
     );
   }

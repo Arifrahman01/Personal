@@ -1,9 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:personal_hub/core/theme/app_tokens.dart';
-import 'package:personal_hub/core/theme/glass_widgets.dart';
 import 'package:personal_hub/core/theme/hub_widgets.dart';
 import 'package:personal_hub/features/meetings/models/meeting.dart';
 import 'package:personal_hub/features/meetings/providers/calendar_sync_providers.dart';
@@ -25,32 +23,32 @@ enum MeetingCategory {
   healthPersonal(
     label: 'Personal & Sehat',
     stripeColor: Color(0xFFFB7185), // Rose Pink #FB7185
-    icon: LucideIcons.heart,
+    icon: Icons.favorite_rounded,
   ),
   clientWork(
     label: 'Client Call',
     stripeColor: Color(0xFF38BDF8), // Sky Blue #38BDF8
-    icon: LucideIcons.headset,
+    icon: Icons.headset_mic_rounded,
   ),
   teamMeeting(
     label: 'Meeting Tim',
     stripeColor: Color(0xFFA78BFA), // Lavender #A78BFA
-    icon: LucideIcons.users,
+    icon: Icons.groups_rounded,
   ),
   designReview(
     label: 'Review Desain',
     stripeColor: Color(0xFFA78BFA), // Lavender #A78BFA
-    icon: LucideIcons.palette,
+    icon: Icons.palette_rounded,
   ),
   research(
     label: 'Riset & Diskusi',
     stripeColor: Color(0xFFA78BFA), // Lavender #A78BFA
-    icon: LucideIcons.lightbulb,
+    icon: Icons.lightbulb_rounded,
   ),
   general(
     label: 'Agenda Rapat',
     stripeColor: Color(0xFF38BDF8), // Sky Blue #38BDF8
-    icon: LucideIcons.calendar,
+    icon: Icons.calendar_month_rounded,
   );
 
   const MeetingCategory({
@@ -65,6 +63,21 @@ enum MeetingCategory {
 
   /// Alias for backward compatibility with existing tests and theme helpers.
   Color get color => stripeColor;
+
+  /// Resolves a WCAG AA/AAA compliant accent color for both Light and Dark modes.
+  Color accentColor(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return switch (this) {
+      MeetingCategory.healthPersonal =>
+        isDark ? const Color(0xFFFB7185) : const Color(0xFFBE123C),
+      MeetingCategory.clientWork || MeetingCategory.general =>
+        isDark ? const Color(0xFF38BDF8) : const Color(0xFF0369A1),
+      MeetingCategory.teamMeeting ||
+      MeetingCategory.designReview ||
+      MeetingCategory.research =>
+        isDark ? const Color(0xFFA78BFA) : const Color(0xFF6D28D9),
+    };
+  }
 
   /// Detects category based on meeting keywords in title, agenda, and notes.
   static MeetingCategory detect(Meeting meeting) {
@@ -227,31 +240,15 @@ class _MeetingsScreenState extends ConsumerState<MeetingsScreen> {
 
     showModalBottomSheet<void>(
       context: context,
-      backgroundColor: Colors.transparent,
+      showDragHandle: true,
       builder: (sheetContext) {
         final theme = Theme.of(sheetContext);
-        final isDark = theme.brightness == Brightness.dark;
+        final colorScheme = theme.colorScheme;
+        final colors = HubColors.of(sheetContext);
 
         return SafeArea(
-          child: Container(
-            margin: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              color: isDark ? const Color(0xFF13192B) : Colors.white,
-              borderRadius: BorderRadius.circular(24),
-              border: Border.all(
-                color: isDark
-                    ? Colors.white.withValues(alpha: 0.15)
-                    : Colors.black12,
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.3),
-                  blurRadius: 24,
-                  offset: const Offset(0, 8),
-                ),
-              ],
-            ),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 4, 20, 20),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -261,12 +258,12 @@ class _MeetingsScreenState extends ConsumerState<MeetingsScreen> {
                     Container(
                       padding: const EdgeInsets.all(10),
                       decoration: BoxDecoration(
-                        color: const Color(0xFFA78BFA).withValues(alpha: 0.18),
+                        color: colorScheme.primaryContainer,
                         shape: BoxShape.circle,
                       ),
-                      child: const Icon(
+                      child: Icon(
                         Icons.calendar_month_rounded,
-                        color: Color(0xFFA78BFA),
+                        color: colorScheme.onPrimaryContainer,
                         size: 24,
                       ),
                     ),
@@ -279,12 +276,13 @@ class _MeetingsScreenState extends ConsumerState<MeetingsScreen> {
                             'Ekspor Agenda iCal (.ics)',
                             style: theme.textTheme.titleMedium?.copyWith(
                               fontWeight: FontWeight.w700,
+                              color: colors.textPrimary,
                             ),
                           ),
                           Text(
                             'Standar RFC 5545 kompatibel Google, Apple & Outlook',
                             style: theme.textTheme.bodySmall?.copyWith(
-                              color: theme.colorScheme.onSurfaceVariant,
+                              color: colors.textSecondary,
                             ),
                           ),
                         ],
@@ -294,13 +292,12 @@ class _MeetingsScreenState extends ConsumerState<MeetingsScreen> {
                 ),
                 const SizedBox(height: 16),
                 Material(
-                  color: theme.colorScheme.surfaceContainerHighest
-                      .withValues(alpha: 0.4),
+                  color: colorScheme.surfaceContainerHighest,
                   borderRadius: BorderRadius.circular(16),
                   child: ListTile(
-                    leading: const Icon(
+                    leading: Icon(
                       Icons.copy_all_rounded,
-                      color: Color(0xFFA78BFA),
+                      color: colors.primary,
                     ),
                     title: const Text('Salin Format iCal (.ics)'),
                     subtitle: Text(
@@ -330,13 +327,12 @@ class _MeetingsScreenState extends ConsumerState<MeetingsScreen> {
                 ),
                 const SizedBox(height: 10),
                 Material(
-                  color: theme.colorScheme.surfaceContainerHighest
-                      .withValues(alpha: 0.4),
+                  color: colorScheme.surfaceContainerHighest,
                   borderRadius: BorderRadius.circular(16),
                   child: ListTile(
-                    leading: const Icon(
+                    leading: Icon(
                       Icons.share_rounded,
-                      color: Color(0xFF38BDF8),
+                      color: colors.info,
                     ),
                     title: const Text('Bagikan Berkas Kalender (.ics)'),
                     subtitle: const Text(
@@ -419,11 +415,11 @@ class _MeetingsScreenState extends ConsumerState<MeetingsScreen> {
             children: [
               if (widget.isEmbedded)
                 Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+                  padding: const EdgeInsets.fromLTRB(16, 4, 12, 4),
                   child: Row(
                     children: [
                       const Expanded(
-                        child: TabBar(
+                        child: TabBar.secondary(
                           tabs: [
                             Tab(text: 'Mendatang'),
                             Tab(text: 'Selesai'),
@@ -433,7 +429,7 @@ class _MeetingsScreenState extends ConsumerState<MeetingsScreen> {
                       IconButton(
                         key: const Key('export_ical_button'),
                         constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
-                        icon: const Icon(LucideIcons.share2),
+                        icon: const Icon(Icons.share_rounded),
                         tooltip: 'Ekspor iCal (.ics)',
                         onPressed: () {
                           final allMeetings = meetingsAsync.asData?.value ?? const [];
@@ -446,7 +442,12 @@ class _MeetingsScreenState extends ConsumerState<MeetingsScreen> {
 
               // Prominent Action Buttons: Rekam Sekarang & Jadwalkan
               Padding(
-                padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+                padding: EdgeInsets.fromLTRB(
+                  16,
+                  widget.isEmbedded ? 8 : 12,
+                  16,
+                  4,
+                ),
                 child: Row(
                   children: [
                     Expanded(
@@ -459,8 +460,12 @@ class _MeetingsScreenState extends ConsumerState<MeetingsScreen> {
                             ),
                           );
                         },
-                        icon: const Icon(LucideIcons.mic, size: 18),
-                        label: const Text('🎙️ Rekam Sekarang'),
+                        icon: const Icon(Icons.mic_rounded, size: 18),
+                        label: const Text(
+                          'Rekam Sekarang',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
                         style: FilledButton.styleFrom(
                           minimumSize: const Size(0, 48),
                         ),
@@ -476,8 +481,12 @@ class _MeetingsScreenState extends ConsumerState<MeetingsScreen> {
                           ),
                         );
                       },
-                      icon: const Icon(LucideIcons.plus, size: 18),
-                      label: const Text('+ Jadwalkan'),
+                      icon: const Icon(Icons.add_rounded, size: 18),
+                      label: const Text(
+                        'Jadwalkan',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
                       style: OutlinedButton.styleFrom(
                         minimumSize: const Size(0, 48),
                       ),
@@ -555,14 +564,14 @@ class _MeetingsScreenState extends ConsumerState<MeetingsScreen> {
 
     return DefaultTabController(
       length: 2,
-      child: GlassScaffold(
-        appBar: GlassAppBar(
+      child: Scaffold(
+        appBar: AppBar(
           title: const Text('Meeting'),
           actions: [
             IconButton(
               key: const Key('export_ical_button'),
               constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
-              icon: const Icon(LucideIcons.share2),
+              icon: const Icon(Icons.share_rounded),
               tooltip: 'Ekspor iCal (.ics)',
               onPressed: () {
                 final allMeetings = meetingsAsync.asData?.value ?? const [];
@@ -577,19 +586,17 @@ class _MeetingsScreenState extends ConsumerState<MeetingsScreen> {
             ],
           ),
         ),
-        floatingActionButton: GlassFabAnchor(
-          child: FloatingActionButton.extended(
-            heroTag: 'meetings_fab',
-            onPressed: () {
-              Navigator.of(context).push(
-                MaterialPageRoute<void>(
-                  builder: (_) => const MeetingFormScreen(),
-                ),
-              );
-            },
-            icon: const Icon(LucideIcons.plus),
-            label: const Text('Meeting Baru'),
-          ),
+        floatingActionButton: FloatingActionButton.extended(
+          heroTag: 'meetings_fab',
+          onPressed: () {
+            Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                builder: (_) => const MeetingFormScreen(),
+              ),
+            );
+          },
+          icon: const Icon(Icons.add_rounded),
+          label: const Text('Meeting Baru'),
         ),
         body: SafeArea(
           top: false,
@@ -675,7 +682,7 @@ class _HorizontalWeekPicker extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
+    final colors = HubColors.of(context);
     final now = DateTime.now();
 
     final weekDays = List.generate(
@@ -699,9 +706,13 @@ class _HorizontalWeekPicker extends StatelessWidget {
               Expanded(
                 child: Text(
                   '${startMonday.day} ${_monthNames[startMonday.month - 1]} - ${endSunday.day} ${_monthNames[endSunday.month - 1]} ${endSunday.year}',
-                  style: theme.textTheme.titleSmall?.copyWith(
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: -0.2,
+                  style: HubTypography.tabular(
+                    theme.textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: -0.2,
+                          color: colors.textPrimary,
+                        ) ??
+                        const TextStyle(fontWeight: FontWeight.w700),
                   ),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
@@ -720,16 +731,16 @@ class _HorizontalWeekPicker extends StatelessWidget {
                     ),
                     alignment: Alignment.center,
                     decoration: BoxDecoration(
-                      color: const Color(0xFFA78BFA).withValues(alpha: 0.15),
+                      color: colors.primarySoft,
                       borderRadius: BorderRadius.circular(14),
                       border: Border.all(
-                        color: const Color(0xFFA78BFA).withValues(alpha: 0.40),
+                        color: colors.primary.withValues(alpha: 0.40),
                       ),
                     ),
                     child: Text(
                       'Pekan Ini',
                       style: theme.textTheme.labelSmall?.copyWith(
-                        color: const Color(0xFFA78BFA),
+                        color: colors.primary,
                         fontWeight: FontWeight.w700,
                       ),
                     ),
@@ -779,7 +790,6 @@ class _HorizontalWeekPicker extends StatelessWidget {
                         _isSameDay(selectedDate!, weekDays[i]),
                     isToday: _isSameDay(now, weekDays[i]),
                     hasMeetings: _hasMeetingsOnDate(weekDays[i]),
-                    isDark: isDark,
                     onTap: () => onSelectDate(weekDays[i]),
                   ),
                 ],
@@ -802,7 +812,10 @@ class _AllPill extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
+    final colorScheme = theme.colorScheme;
+    final colors = HubColors.of(context);
+
+    final fgColor = isSelected ? colorScheme.onPrimary : colors.textSecondary;
 
     return InkWell(
       key: const Key('all_days_pill'),
@@ -810,43 +823,15 @@ class _AllPill extends StatelessWidget {
       borderRadius: BorderRadius.circular(26),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
-        width: 58,
-        height: 74,
+        constraints: const BoxConstraints(minWidth: 58, minHeight: 74),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(26),
-          gradient: isSelected
-              ? const LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [
-                    Color(0xFF8B5CF6), // Royal Violet
-                    Color(0xFFA78BFA), // Lavender
-                  ],
-                )
-              : null,
-          color: isSelected
-              ? null
-              : (isDark
-                  ? const Color(0xFF13192B).withValues(alpha: 0.65)
-                  : Colors.white.withValues(alpha: 0.65)),
+          color: isSelected ? colorScheme.primary : colors.surfaceCard,
           border: Border.all(
-            color: isSelected
-                ? const Color(0xFFA78BFA)
-                : (isDark
-                    ? Colors.white.withValues(alpha: 0.12)
-                    : Colors.white.withValues(alpha: 0.8)),
-            width: isSelected ? 2.0 : 1.0,
+            color: isSelected ? colorScheme.primary : colors.borderHairline,
+            width: isSelected ? 1.5 : 1.0,
           ),
-          boxShadow: isSelected
-              ? [
-                  BoxShadow(
-                    color: const Color(0xFFA78BFA).withValues(alpha: 0.50),
-                    blurRadius: 14,
-                    spreadRadius: 1,
-                    offset: const Offset(0, 4),
-                  ),
-                ]
-              : null,
         ),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -854,18 +839,16 @@ class _AllPill extends StatelessWidget {
             Icon(
               Icons.calendar_view_week_rounded,
               size: 18,
-              color: isSelected
-                  ? Colors.white
-                  : theme.colorScheme.onSurfaceVariant,
+              color: fgColor,
             ),
             const SizedBox(height: 4),
             Text(
               'Semua',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
               style: theme.textTheme.labelMedium?.copyWith(
                 fontWeight: isSelected ? FontWeight.w700 : FontWeight.w600,
-                color: isSelected
-                    ? Colors.white
-                    : theme.colorScheme.onSurfaceVariant,
+                color: fgColor,
                 fontSize: 12,
               ),
             ),
@@ -877,7 +860,6 @@ class _AllPill extends StatelessWidget {
 }
 
 /// Day capsule pill inside the horizontal weekly calendar strip.
-/// Day name/letter on top, date below; active day illuminated with glowing gradient ring and lavender pill.
 class _DayPill extends StatelessWidget {
   const _DayPill({
     required this.dayName,
@@ -885,7 +867,6 @@ class _DayPill extends StatelessWidget {
     required this.isSelected,
     required this.isToday,
     required this.hasMeetings,
-    required this.isDark,
     required this.onTap,
   });
 
@@ -894,12 +875,23 @@ class _DayPill extends StatelessWidget {
   final bool isSelected;
   final bool isToday;
   final bool hasMeetings;
-  final bool isDark;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final colors = HubColors.of(context);
+
+    final dayLabelColor = isSelected
+        ? colorScheme.onPrimary.withValues(alpha: 0.90)
+        : colors.textSecondary;
+    final dateNumColor = isSelected
+        ? colorScheme.onPrimary
+        : (isToday ? colors.primary : colors.textPrimary);
+    final dotColor = hasMeetings
+        ? (isSelected ? colorScheme.onPrimary : colors.primary)
+        : Colors.transparent;
 
     return InkWell(
       key: Key('day_pill_${date.day}'),
@@ -907,72 +899,46 @@ class _DayPill extends StatelessWidget {
       borderRadius: BorderRadius.circular(26),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
-        width: 52,
-        height: 74,
+        constraints: const BoxConstraints(minWidth: 52, minHeight: 74),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(26),
-          gradient: isSelected
-              ? const LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [
-                    Color(0xFF8B5CF6), // Royal Violet
-                    Color(0xFFA78BFA), // Lavender
-                  ],
-                )
-              : null,
           color: isSelected
-              ? null
-              : (isDark
-                  ? const Color(0xFF13192B).withValues(alpha: 0.65)
-                  : Colors.white.withValues(alpha: 0.65)),
+              ? colorScheme.primary
+              : (isToday ? colors.primarySoft : colors.surfaceCard),
           border: Border.all(
             color: isSelected
-                ? const Color(0xFFA78BFA)
-                : (isToday
-                    ? const Color(0xFFA78BFA).withValues(alpha: 0.6)
-                    : (isDark
-                        ? Colors.white.withValues(alpha: 0.12)
-                        : Colors.white.withValues(alpha: 0.8))),
-            width: isSelected ? 2.0 : (isToday ? 1.5 : 1.0),
+                ? colorScheme.primary
+                : (isToday ? colors.primary : colors.borderHairline),
+            width: isSelected || isToday ? 1.5 : 1.0,
           ),
-          boxShadow: isSelected
-              ? [
-                  BoxShadow(
-                    color: const Color(0xFFA78BFA).withValues(alpha: 0.50),
-                    blurRadius: 14,
-                    spreadRadius: 1,
-                    offset: const Offset(0, 4),
-                  ),
-                ]
-              : null,
         ),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Text(
               dayName,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
               style: theme.textTheme.labelSmall?.copyWith(
                 fontWeight: isSelected ? FontWeight.w700 : FontWeight.w600,
-                color: isSelected
-                    ? Colors.white.withValues(alpha: 0.95)
-                    : theme.colorScheme.onSurfaceVariant,
+                color: dayLabelColor,
                 fontSize: 11,
               ),
             ),
             const SizedBox(height: 3),
             Text(
               '${date.day}',
-              style: theme.textTheme.titleMedium?.copyWith(
-                fontWeight: isSelected || isToday
-                    ? FontWeight.w800
-                    : FontWeight.w600,
-                color: isSelected
-                    ? Colors.white
-                    : (isToday
-                        ? const Color(0xFFA78BFA)
-                        : theme.colorScheme.onSurface),
-                fontSize: 16,
+              maxLines: 1,
+              style: HubTypography.tabular(
+                theme.textTheme.titleMedium?.copyWith(
+                      fontWeight: isSelected || isToday
+                          ? FontWeight.w800
+                          : FontWeight.w600,
+                      color: dateNumColor,
+                      fontSize: 16,
+                    ) ??
+                    const TextStyle(fontSize: 16),
               ),
             ),
             const SizedBox(height: 4),
@@ -982,9 +948,7 @@ class _DayPill extends StatelessWidget {
               height: 5,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: hasMeetings
-                    ? (isSelected ? Colors.white : const Color(0xFFA78BFA))
-                    : Colors.transparent,
+                color: dotColor,
               ),
             ),
           ],
@@ -1101,8 +1065,9 @@ class _MeetingTimelineItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
+    final colors = HubColors.of(context);
     final category = MeetingCategory.detect(meeting);
+    final accent = category.accentColor(context);
     final timeStr = _formatTimelineTime(meeting.scheduledAt);
 
     return IntrinsicHeight(
@@ -1110,8 +1075,8 @@ class _MeetingTimelineItem extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           // Left Timestamp Column (24-hour format: 08:30, 14:15)
-          SizedBox(
-            width: 54,
+          ConstrainedBox(
+            constraints: const BoxConstraints(minWidth: 54),
             child: Padding(
               padding: const EdgeInsets.only(top: 14),
               child: Column(
@@ -1121,13 +1086,12 @@ class _MeetingTimelineItem extends StatelessWidget {
                     timeStr,
                     style: HubTypography.tabular(
                       theme.textTheme.titleSmall?.copyWith(
-                        fontWeight: FontWeight.w700,
-                        fontSize: 13,
-                        letterSpacing: -0.3,
-                        color: isDark
-                            ? const Color(0xFFE2E8F0)
-                            : const Color(0xFF1E293B),
-                      ) ?? const TextStyle(fontWeight: FontWeight.w700),
+                            fontWeight: FontWeight.w700,
+                            fontSize: 13,
+                            letterSpacing: -0.3,
+                            color: colors.textPrimary,
+                          ) ??
+                          const TextStyle(fontWeight: FontWeight.w700),
                     ),
                   ),
                   const SizedBox(height: 1),
@@ -1135,7 +1099,7 @@ class _MeetingTimelineItem extends StatelessWidget {
                     'WIB',
                     style: theme.textTheme.labelSmall?.copyWith(
                       fontWeight: FontWeight.w700,
-                      color: category.stripeColor,
+                      color: accent,
                       fontSize: 10,
                       letterSpacing: 0.5,
                     ),
@@ -1146,7 +1110,7 @@ class _MeetingTimelineItem extends StatelessWidget {
           ),
           const SizedBox(width: 8),
 
-          // Clean Vertical Guideline with glowing node dot
+          // Clean Vertical Guideline with node dot
           SizedBox(
             width: 14,
             child: Column(
@@ -1157,18 +1121,11 @@ class _MeetingTimelineItem extends StatelessWidget {
                   height: 10,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    color: category.stripeColor,
+                    color: accent,
                     border: Border.all(
-                      color: isDark ? const Color(0xFF0C101D) : Colors.white,
+                      color: colors.canvas,
                       width: 2,
                     ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: category.stripeColor.withValues(alpha: 0.60),
-                        blurRadius: 6,
-                        spreadRadius: 1,
-                      ),
-                    ],
                   ),
                 ),
                 Expanded(
@@ -1178,9 +1135,7 @@ class _MeetingTimelineItem extends StatelessWidget {
                     decoration: BoxDecoration(
                       color: isLast
                           ? Colors.transparent
-                          : (isDark
-                              ? Colors.white.withValues(alpha: 0.12)
-                              : Colors.black.withValues(alpha: 0.08)),
+                          : colors.borderHairline,
                       borderRadius: BorderRadius.circular(1),
                     ),
                   ),
@@ -1190,7 +1145,7 @@ class _MeetingTimelineItem extends StatelessWidget {
           ),
           const SizedBox(width: 8),
 
-          // Refleq Color-Stripe Meeting Card
+          // Color-Stripe Meeting Card
           Expanded(
             child: Padding(
               padding: const EdgeInsets.only(bottom: 12),
@@ -1285,7 +1240,8 @@ class _MeetingCard extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
+    final colors = HubColors.of(context);
+    final accent = category.accentColor(context);
     final doneCount = meeting.actionItems.where((i) => i.isDone).length;
     final totalCount = meeting.actionItems.length;
 
@@ -1300,8 +1256,8 @@ class _MeetingCard extends ConsumerWidget {
     return HubCard(
       onTap: onTap,
       borderRadius: HubRadius.rLg,
-      backgroundColor: isDark ? AppTokens.cardDark : AppTokens.cardLight,
-      borderColor: AppTokens.border(context),
+      backgroundColor: colors.surfaceCard,
+      borderColor: colors.borderHairline,
       padding: EdgeInsets.zero,
       child: IntrinsicHeight(
         child: Row(
@@ -1313,14 +1269,8 @@ class _MeetingCard extends ConsumerWidget {
               child: Container(
                 width: 4,
                 decoration: BoxDecoration(
-                  color: category.stripeColor,
+                  color: accent,
                   borderRadius: BorderRadius.circular(2),
-                  boxShadow: [
-                    BoxShadow(
-                      color: category.stripeColor.withValues(alpha: 0.40),
-                      blurRadius: 4,
-                    ),
-                  ],
                 ),
               ),
             ),
@@ -1335,37 +1285,44 @@ class _MeetingCard extends ConsumerWidget {
                     // Top Row: Category Badge + Reminder Badge + 1-Tap iCal Button
                     Row(
                       children: [
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 10,
-                            vertical: 4,
-                          ),
-                          decoration: BoxDecoration(
-                            color: category.stripeColor.withValues(alpha: 0.16),
-                            borderRadius: BorderRadius.circular(999),
-                            border: Border.all(
-                              color: category.stripeColor.withValues(alpha: 0.35),
+                        Flexible(
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 4,
+                            ),
+                            decoration: BoxDecoration(
+                              color: accent.withValues(alpha: 0.12),
+                              borderRadius: BorderRadius.circular(999),
+                              border: Border.all(
+                                color: accent.withValues(alpha: 0.30),
+                              ),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  category.icon,
+                                  size: 13,
+                                  color: accent,
+                                ),
+                                const SizedBox(width: 5),
+                                Flexible(
+                                  child: Text(
+                                    category.label,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: theme.textTheme.labelSmall?.copyWith(
+                                      color: accent,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(
-                                category.icon,
-                                size: 13,
-                                color: category.stripeColor,
-                              ),
-                              const SizedBox(width: 5),
-                              Text(
-                                category.label,
-                                style: theme.textTheme.labelSmall?.copyWith(
-                                  color: category.stripeColor,
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              ),
-                            ],
-                          ),
                         ),
+                        const SizedBox(width: 8),
                         const Spacer(),
                         if (meeting.reminderMinutes > 0) ...[
                           Container(
@@ -1374,8 +1331,7 @@ class _MeetingCard extends ConsumerWidget {
                               vertical: 4,
                             ),
                             decoration: BoxDecoration(
-                              color: theme.colorScheme.secondaryContainer
-                                  .withValues(alpha: 0.8),
+                              color: theme.colorScheme.secondaryContainer,
                               borderRadius: BorderRadius.circular(999),
                             ),
                             child: Row(
@@ -1389,16 +1345,21 @@ class _MeetingCard extends ConsumerWidget {
                                 const SizedBox(width: 4),
                                 Text(
                                   '${meeting.reminderMinutes} mnt',
-                                  style: theme.textTheme.labelSmall?.copyWith(
-                                    color:
-                                        theme.colorScheme.onSecondaryContainer,
-                                    fontWeight: FontWeight.w600,
+                                  style: HubTypography.tabular(
+                                    theme.textTheme.labelSmall?.copyWith(
+                                          color: theme
+                                              .colorScheme.onSecondaryContainer,
+                                          fontWeight: FontWeight.w600,
+                                        ) ??
+                                        const TextStyle(
+                                          fontWeight: FontWeight.w600,
+                                        ),
                                   ),
                                 ),
                               ],
                             ),
                           ),
-                          const SizedBox(width: 6),
+                          const SizedBox(width: 4),
                         ],
                         IconButton(
                           visualDensity: VisualDensity.compact,
@@ -1411,7 +1372,7 @@ class _MeetingCard extends ConsumerWidget {
                           icon: Icon(
                             Icons.ios_share_rounded,
                             size: 18,
-                            color: theme.colorScheme.onSurfaceVariant,
+                            color: colors.textSecondary,
                           ),
                           onPressed: () => _copyMeetingIcs(context, ref),
                         ),
@@ -1422,24 +1383,27 @@ class _MeetingCard extends ConsumerWidget {
                     // Meeting Title
                     Text(
                       meeting.title,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
                       style: theme.textTheme.titleMedium?.copyWith(
                         fontWeight: FontWeight.w700,
+                        color: colors.textPrimary,
                         height: 1.25,
                       ),
                     ),
                     const SizedBox(height: 8),
 
-                    // Refleq Tinted Time Badge
+                    // Tinted Time Badge
                     Container(
                       padding: const EdgeInsets.symmetric(
                         horizontal: 10,
                         vertical: 5,
                       ),
                       decoration: BoxDecoration(
-                        color: category.stripeColor.withValues(alpha: 0.14),
+                        color: accent.withValues(alpha: 0.10),
                         borderRadius: BorderRadius.circular(8),
                         border: Border.all(
-                          color: category.stripeColor.withValues(alpha: 0.28),
+                          color: accent.withValues(alpha: 0.25),
                         ),
                       ),
                       child: Row(
@@ -1448,17 +1412,22 @@ class _MeetingCard extends ConsumerWidget {
                           Icon(
                             Icons.schedule_rounded,
                             size: 14,
-                            color: category.stripeColor,
+                            color: accent,
                           ),
                           const SizedBox(width: 6),
-                          Text(
-                            formatMeetingDateTime(meeting.scheduledAt),
-                            style: theme.textTheme.bodyMedium?.copyWith(
-                              color: isDark
-                                  ? const Color(0xFFF1F5F9)
-                                  : const Color(0xFF0F172A),
-                              fontWeight: FontWeight.w600,
-                              fontSize: 12,
+                          Flexible(
+                            child: Text(
+                              formatMeetingDateTime(meeting.scheduledAt),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: HubTypography.tabular(
+                                theme.textTheme.bodyMedium?.copyWith(
+                                      color: colors.textPrimary,
+                                      fontWeight: FontWeight.w600,
+                                      fontSize: 12,
+                                    ) ??
+                                    const TextStyle(fontSize: 12),
+                              ),
                             ),
                           ),
                         ],
@@ -1473,7 +1442,7 @@ class _MeetingCard extends ConsumerWidget {
                           Icon(
                             Icons.place_outlined,
                             size: 14,
-                            color: theme.colorScheme.onSurfaceVariant,
+                            color: colors.textSecondary,
                           ),
                           const SizedBox(width: 6),
                           Expanded(
@@ -1482,7 +1451,7 @@ class _MeetingCard extends ConsumerWidget {
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                               style: theme.textTheme.bodySmall?.copyWith(
-                                color: theme.colorScheme.onSurfaceVariant,
+                                color: colors.textSecondary,
                               ),
                             ),
                           ),
@@ -1503,35 +1472,39 @@ class _MeetingCard extends ConsumerWidget {
                             vertical: 8,
                           ),
                           decoration: BoxDecoration(
-                            color: const Color(0xFF10B981).withValues(alpha: 0.12),
+                            color: colors.success.withValues(alpha: 0.12),
                             borderRadius: BorderRadius.circular(12),
                             border: Border.all(
-                              color: const Color(0xFF10B981).withValues(alpha: 0.35),
+                              color: colors.success.withValues(alpha: 0.35),
                             ),
                           ),
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              const Icon(
+                              Icon(
                                 Icons.videocam_rounded,
                                 size: 18,
-                                color: Color(0xFF10B981),
+                                color: colors.success,
                               ),
                               const SizedBox(width: 8),
-                              Text(
-                                joinUrl != null
-                                    ? 'Join Meeting Online'
-                                    : 'Online (Meet / Zoom)',
-                                style: theme.textTheme.labelMedium?.copyWith(
-                                  color: const Color(0xFF10B981),
-                                  fontWeight: FontWeight.w700,
+                              Flexible(
+                                child: Text(
+                                  joinUrl != null
+                                      ? 'Join Meeting Online'
+                                      : 'Online (Meet / Zoom)',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: theme.textTheme.labelMedium?.copyWith(
+                                    color: colors.success,
+                                    fontWeight: FontWeight.w700,
+                                  ),
                                 ),
                               ),
                               const SizedBox(width: 6),
-                              const Icon(
+                              Icon(
                                 Icons.open_in_new_rounded,
                                 size: 13,
-                                color: Color(0xFF10B981),
+                                color: colors.success,
                               ),
                             ],
                           ),
@@ -1545,8 +1518,13 @@ class _MeetingCard extends ConsumerWidget {
                       Row(
                         children: [
                           if (meeting.attendees.isNotEmpty)
-                            _AttendeeAvatars(attendees: meeting.attendees),
-                          const Spacer(),
+                            Flexible(
+                              child: _AttendeeAvatars(
+                                attendees: meeting.attendees,
+                              ),
+                            ),
+                          if (meeting.attendees.isNotEmpty && totalCount > 0)
+                            const SizedBox(width: 8),
                           if (totalCount > 0)
                             _MetaPill(
                               icon: Icons.checklist_rounded,
@@ -1572,20 +1550,20 @@ class _AttendeeAvatars extends StatelessWidget {
 
   final List<String> attendees;
 
-  static const List<Color> _palette = [
-    Color(0xFFA78BFA), // Lavender
-    Color(0xFF38BDF8), // Cyan
-    Color(0xFFFB7185), // Rose
-    Color(0xFFFBBF24), // Amber
-    Color(0xFF34D399), // Mint
-  ];
-
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final colors = HubColors.of(context);
     const maxVisible = 3;
     final visible = attendees.take(maxVisible).toList();
     final overflow = attendees.length - maxVisible;
+
+    final tonalPairs = <(Color bg, Color fg)>[
+      (colorScheme.primaryContainer, colorScheme.onPrimaryContainer),
+      (colorScheme.secondaryContainer, colorScheme.onSecondaryContainer),
+      (colorScheme.tertiaryContainer, colorScheme.onTertiaryContainer),
+    ];
 
     return Row(
       mainAxisSize: MainAxisSize.min,
@@ -1602,10 +1580,10 @@ class _AttendeeAvatars extends StatelessWidget {
                     width: 28,
                     height: 28,
                     decoration: BoxDecoration(
-                      color: _palette[i % _palette.length],
+                      color: tonalPairs[i % tonalPairs.length].$1,
                       shape: BoxShape.circle,
                       border: Border.all(
-                        color: theme.scaffoldBackgroundColor,
+                        color: colors.surfaceCard,
                         width: 2,
                       ),
                     ),
@@ -1614,8 +1592,8 @@ class _AttendeeAvatars extends StatelessWidget {
                         visible[i].trim().isNotEmpty
                             ? visible[i].trim()[0].toUpperCase()
                             : '?',
-                        style: const TextStyle(
-                          color: Colors.white,
+                        style: TextStyle(
+                          color: tonalPairs[i % tonalPairs.length].$2,
                           fontSize: 11,
                           fontWeight: FontWeight.w700,
                         ),
@@ -1630,20 +1608,22 @@ class _AttendeeAvatars extends StatelessWidget {
                     width: 28,
                     height: 28,
                     decoration: BoxDecoration(
-                      color: Colors.grey.shade700,
+                      color: colors.surfaceSubtle,
                       shape: BoxShape.circle,
                       border: Border.all(
-                        color: theme.scaffoldBackgroundColor,
+                        color: colors.surfaceCard,
                         width: 2,
                       ),
                     ),
                     child: Center(
                       child: Text(
                         '+$overflow',
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 10,
-                          fontWeight: FontWeight.w700,
+                        style: HubTypography.tabular(
+                          TextStyle(
+                            color: colors.textPrimary,
+                            fontSize: 10,
+                            fontWeight: FontWeight.w700,
+                          ),
                         ),
                       ),
                     ),
@@ -1653,11 +1633,18 @@ class _AttendeeAvatars extends StatelessWidget {
           ),
         ),
         const SizedBox(width: 6),
-        Text(
-          '${attendees.length} peserta',
-          style: theme.textTheme.labelSmall?.copyWith(
-            color: theme.colorScheme.onSurfaceVariant,
-            fontWeight: FontWeight.w600,
+        Flexible(
+          child: Text(
+            '${attendees.length} peserta',
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: HubTypography.tabular(
+              theme.textTheme.labelSmall?.copyWith(
+                    color: colors.textSecondary,
+                    fontWeight: FontWeight.w600,
+                  ) ??
+                  const TextStyle(fontWeight: FontWeight.w600),
+            ),
           ),
         ),
       ],
@@ -1732,8 +1719,8 @@ String formatMeetingDateTime(DateTime dateTime) {
   return '$dayName, ${local.day} $monthName ${local.year} • $hour:$minute';
 }
 
-/// Sleek Glassmorphic alert banner displayed when meetings conflict with prayer times.
-/// Styled as an Amber Peach (#FBBF24) striped banner with 1-tap reschedule.
+/// Alert banner displayed when meetings conflict with prayer times.
+/// Styled using adaptive warning tokens with 1-tap reschedule.
 class _PrayerConflictBanner extends StatelessWidget {
   const _PrayerConflictBanner({
     required this.conflicts,
@@ -1743,41 +1730,37 @@ class _PrayerConflictBanner extends StatelessWidget {
   final List<MeetingPrayerConflict> conflicts;
   final ValueChanged<MeetingPrayerConflict> onTapConflict;
 
-  static const Color _amberPeach = Color(0xFFFBBF24);
-
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final colors = HubColors.of(context);
     final isDark = theme.brightness == Brightness.dark;
+    final warning = colors.warning;
+    final bannerBg = Color.alphaBlend(
+      warning.withValues(alpha: isDark ? 0.14 : 0.08),
+      colors.surfaceCard,
+    );
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
       child: HubCard(
         key: const Key('prayer_conflict_banner'),
         borderRadius: HubRadius.rLg,
-        backgroundColor: isDark
-            ? const Color(0xFF261D0C)
-            : const Color(0xFFFFFBEB),
-        borderColor: _amberPeach.withValues(alpha: 0.5),
+        backgroundColor: bannerBg,
+        borderColor: warning.withValues(alpha: 0.45),
         padding: EdgeInsets.zero,
         child: IntrinsicHeight(
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // Vertical Amber Peach Accent Bar (4dp width, 2dp radius)
+              // Vertical Warning Accent Bar (4dp width, 2dp radius)
               Padding(
                 padding: const EdgeInsets.only(left: 10, top: 12, bottom: 12),
                 child: Container(
                   width: 4,
                   decoration: BoxDecoration(
-                    color: _amberPeach,
+                    color: warning,
                     borderRadius: BorderRadius.circular(2),
-                    boxShadow: [
-                      BoxShadow(
-                        color: _amberPeach.withValues(alpha: 0.50),
-                        blurRadius: 6,
-                      ),
-                    ],
                   ),
                 ),
               ),
@@ -1796,12 +1779,12 @@ class _PrayerConflictBanner extends StatelessWidget {
                           Container(
                             padding: const EdgeInsets.all(7),
                             decoration: BoxDecoration(
-                              color: _amberPeach.withValues(alpha: 0.22),
+                              color: warning.withValues(alpha: 0.16),
                               shape: BoxShape.circle,
                             ),
-                            child: const Icon(
+                            child: Icon(
                               Icons.warning_amber_rounded,
-                              color: _amberPeach,
+                              color: warning,
                               size: 20,
                             ),
                           ),
@@ -1812,43 +1795,48 @@ class _PrayerConflictBanner extends StatelessWidget {
                               children: [
                                 Text(
                                   'Konflik Waktu Sholat Terdeteksi',
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
                                   style: theme.textTheme.titleSmall?.copyWith(
                                     fontWeight: FontWeight.w700,
-                                    color: isDark
-                                        ? const Color(0xFFFDE68A)
-                                        : const Color(0xFF92400E),
+                                    color: colors.textPrimary,
                                   ),
                                 ),
                                 Text(
                                   '${conflicts.length} meeting bentrok dengan jadwal sholat hari ini',
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
                                   style: theme.textTheme.bodySmall?.copyWith(
-                                    color: isDark
-                                        ? const Color(0xFFE5E7EB)
-                                        : const Color(0xFF78350F),
+                                    color: colors.textSecondary,
                                   ),
                                 ),
                               ],
                             ),
                           ),
+                          const SizedBox(width: 8),
                           Container(
                             padding: const EdgeInsets.symmetric(
                               horizontal: 8,
                               vertical: 3,
                             ),
                             decoration: BoxDecoration(
-                              color: _amberPeach.withValues(alpha: 0.25),
+                              color: warning.withValues(alpha: 0.18),
                               borderRadius: BorderRadius.circular(999),
                               border: Border.all(
-                                color: _amberPeach.withValues(alpha: 0.45),
+                                color: warning.withValues(alpha: 0.45),
                               ),
                             ),
                             child: Text(
                               '${conflicts.length} Konflik',
-                              style: theme.textTheme.labelSmall?.copyWith(
-                                fontWeight: FontWeight.w700,
-                                color: isDark
-                                    ? const Color(0xFFFDE68A)
-                                    : const Color(0xFF92400E),
+                              style: HubTypography.tabular(
+                                theme.textTheme.labelSmall?.copyWith(
+                                      fontWeight: FontWeight.w700,
+                                      color: warning,
+                                    ) ??
+                                    TextStyle(
+                                      fontWeight: FontWeight.w700,
+                                      color: warning,
+                                    ),
                               ),
                             ),
                           ),
@@ -1868,12 +1856,12 @@ class _PrayerConflictBanner extends StatelessWidget {
                             child: Row(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                const Padding(
-                                  padding: EdgeInsets.only(top: 3, right: 8),
+                                Padding(
+                                  padding: const EdgeInsets.only(top: 3, right: 8),
                                   child: Icon(
                                     Icons.schedule_rounded,
                                     size: 15,
-                                    color: _amberPeach,
+                                    color: warning,
                                   ),
                                 ),
                                 Expanded(
@@ -1883,9 +1871,12 @@ class _PrayerConflictBanner extends StatelessWidget {
                                     children: [
                                       Text(
                                         conflict.meetingTitle,
+                                        maxLines: 2,
+                                        overflow: TextOverflow.ellipsis,
                                         style: theme.textTheme.bodyMedium
                                             ?.copyWith(
                                               fontWeight: FontWeight.w600,
+                                              color: colors.textPrimary,
                                             ),
                                       ),
                                       const SizedBox(height: 2),
@@ -1893,9 +1884,7 @@ class _PrayerConflictBanner extends StatelessWidget {
                                         conflict.suggestedAdvice,
                                         style: theme.textTheme.bodySmall
                                             ?.copyWith(
-                                              color: isDark
-                                                  ? const Color(0xFFD1D5DB)
-                                                  : const Color(0xFF4B5563),
+                                              color: colors.textSecondary,
                                             ),
                                       ),
                                       const SizedBox(height: 8),
@@ -1960,33 +1949,35 @@ class _PrayerConflictBanner extends StatelessWidget {
                                                     vertical: 8,
                                                   ),
                                               decoration: BoxDecoration(
-                                                color: _amberPeach.withValues(
-                                                  alpha: 0.22,
+                                                color: warning.withValues(
+                                                  alpha: 0.16,
                                                 ),
                                                 borderRadius:
                                                     BorderRadius.circular(10),
                                                 border: Border.all(
-                                                  color: _amberPeach
-                                                      .withValues(alpha: 0.55),
+                                                  color: warning
+                                                      .withValues(alpha: 0.45),
                                                 ),
                                               ),
                                               child: Row(
                                                 mainAxisSize:
                                                     MainAxisSize.min,
                                                 children: [
-                                                  const Icon(
-                                                    LucideIcons.clock,
+                                                  Icon(
+                                                    Icons.schedule_rounded,
                                                     size: 16,
-                                                    color: _amberPeach,
+                                                    color: warning,
                                                   ),
                                                   const SizedBox(width: 6),
                                                   Text(
-                                                    '⚡ Geser ke $timeStr',
-                                                    style: const TextStyle(
-                                                      fontSize: 12,
-                                                      fontWeight:
-                                                          FontWeight.w700,
-                                                      color: _amberPeach,
+                                                    'Geser ke $timeStr',
+                                                    style: HubTypography.tabular(
+                                                      TextStyle(
+                                                        fontSize: 12,
+                                                        fontWeight:
+                                                            FontWeight.w700,
+                                                        color: warning,
+                                                      ),
                                                     ),
                                                   ),
                                                 ],
@@ -2002,7 +1993,7 @@ class _PrayerConflictBanner extends StatelessWidget {
                                 Icon(
                                   Icons.chevron_right_rounded,
                                   size: 20,
-                                  color: theme.colorScheme.onSurfaceVariant,
+                                  color: colors.textSecondary,
                                 ),
                               ],
                             ),

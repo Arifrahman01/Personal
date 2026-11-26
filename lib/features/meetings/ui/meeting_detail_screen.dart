@@ -1,9 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:personal_hub/core/errors/app_exceptions.dart';
-import 'package:personal_hub/core/theme/glass_widgets.dart';
+import 'package:personal_hub/core/theme/app_tokens.dart';
 import 'package:personal_hub/core/theme/hub_widgets.dart';
 import 'package:personal_hub/features/meetings/models/meeting.dart';
 import 'package:personal_hub/features/meetings/providers/calendar_sync_providers.dart';
@@ -194,11 +193,11 @@ class _MeetingDetailScreenState extends ConsumerState<MeetingDetailScreen> {
     final theme = Theme.of(context);
 
     return meetingsAsync.when(
-      loading: () => const GlassScaffold(
+      loading: () => const Scaffold(
         body: Center(child: CircularProgressIndicator()),
       ),
-      error: (error, _) => GlassScaffold(
-        appBar: const GlassAppBar(title: Text('Detail Meeting')),
+      error: (error, _) => Scaffold(
+        appBar: AppBar(title: const Text('Detail Meeting')),
         body: Center(
           child: Padding(
             padding: const EdgeInsets.all(24),
@@ -215,19 +214,19 @@ class _MeetingDetailScreenState extends ConsumerState<MeetingDetailScreen> {
         }
         final meeting = found ?? (_isDeleting ? _lastKnownMeeting : null);
         if (meeting == null) {
-          return const GlassScaffold(
-            appBar: GlassAppBar(title: Text('Detail Meeting')),
-            body: Center(child: Text('Meeting tidak ditemukan.')),
+          return Scaffold(
+            appBar: AppBar(title: const Text('Detail Meeting')),
+            body: const Center(child: Text('Meeting tidak ditemukan.')),
           );
         }
 
-        return GlassScaffold(
-          appBar: GlassAppBar(
+        return Scaffold(
+          appBar: AppBar(
             title: const Text('Detail Meeting'),
             actions: [
               IconButton(
                 tooltip: 'Edit meeting',
-                icon: const Icon(LucideIcons.pencil),
+                icon: const Icon(Icons.edit_rounded),
                 onPressed: () {
                   Navigator.of(context).push(
                     MaterialPageRoute<void>(
@@ -238,7 +237,7 @@ class _MeetingDetailScreenState extends ConsumerState<MeetingDetailScreen> {
               ),
               IconButton(
                 tooltip: 'Hapus meeting',
-                icon: const Icon(LucideIcons.trash2),
+                icon: const Icon(Icons.delete_outline_rounded),
                 onPressed: () => _confirmDelete(meeting),
               ),
             ],
@@ -282,12 +281,12 @@ class _MeetingDetailScreenState extends ConsumerState<MeetingDetailScreen> {
         children: [
           TextButton.icon(
             onPressed: () => _openVoiceRecorderSheet(meeting),
-            icon: const Icon(LucideIcons.mic, size: 18),
+            icon: const Icon(Icons.mic_rounded, size: 18),
             label: const Text('Rekam Percakapan'),
           ),
           IconButton(
             tooltip: 'Salin iCal (.ics)',
-            icon: const Icon(LucideIcons.calendar, size: 20),
+            icon: const Icon(Icons.calendar_month_rounded, size: 20),
             onPressed: () {
               final icalService = ref.read(icalGeneratorServiceProvider);
               final icsContent = icalService.generateIcs([meeting]);
@@ -319,19 +318,21 @@ class _MeetingDetailScreenState extends ConsumerState<MeetingDetailScreen> {
           ),
           const SizedBox(height: 12),
           _InfoRow(
-            icon: LucideIcons.clock,
+            icon: Icons.schedule_rounded,
             text: formatMeetingDateTime(meeting.scheduledAt),
+            tabular: true,
           ),
           if (meeting.location.isNotEmpty) ...[
             const SizedBox(height: 6),
-            _InfoRow(icon: LucideIcons.mapPin, text: meeting.location),
+            _InfoRow(icon: Icons.place_outlined, text: meeting.location),
           ],
           const SizedBox(height: 6),
           _InfoRow(
-            icon: LucideIcons.bell,
+            icon: Icons.notifications_outlined,
             text: meeting.reminderMinutes > 0
                 ? 'Pengingat ${meeting.reminderMinutes} menit sebelum'
                 : 'Tanpa pengingat',
+            tabular: true,
           ),
           if (meeting.attendees.isNotEmpty) ...[
             const SizedBox(height: 12),
@@ -341,21 +342,25 @@ class _MeetingDetailScreenState extends ConsumerState<MeetingDetailScreen> {
               children: [
                 for (final attendee in meeting.attendees)
                   Chip(
-                    avatar: const Icon(LucideIcons.user, size: 16),
+                    avatar: const Icon(Icons.person_outline_rounded, size: 16),
                     label: Text(attendee),
                     visualDensity: VisualDensity.compact,
                   ),
               ],
             ),
           ],
-          const SizedBox(height: 12),
+          const SizedBox(height: 14),
           SizedBox(
             width: double.infinity,
             child: FilledButton.icon(
               key: const Key('start_recording_meeting_button'),
               onPressed: () => _openVoiceRecorderSheet(meeting),
-              icon: const Icon(LucideIcons.mic),
-              label: const Text('🎙️ Mulai Rekam Rapat Ini'),
+              icon: const Icon(Icons.mic_rounded),
+              label: const Text(
+                'Mulai Rekam Rapat Ini',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
               style: FilledButton.styleFrom(
                 minimumSize: const Size(0, 48),
               ),
@@ -391,7 +396,7 @@ class _MeetingDetailScreenState extends ConsumerState<MeetingDetailScreen> {
                       _isEditingNotes = true;
                     });
                   },
-                  icon: const Icon(LucideIcons.pencil, size: 16),
+                  icon: const Icon(Icons.edit_rounded, size: 16),
                   label: const Text('Edit Catatan'),
                 ),
             ],
@@ -402,8 +407,15 @@ class _MeetingDetailScreenState extends ConsumerState<MeetingDetailScreen> {
             child: FilledButton.tonalIcon(
               key: const Key('record_and_compose_ai_button'),
               onPressed: () => _openVoiceRecorderSheet(meeting),
-              icon: const Icon(LucideIcons.sparkles),
-              label: const Text('🎙️ Rekam & Susun Catatan AI'),
+              icon: const Icon(Icons.auto_awesome_rounded),
+              label: const Text(
+                'Rekam & Susun Catatan AI',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+              style: FilledButton.styleFrom(
+                minimumSize: const Size(0, 48),
+              ),
             ),
           ),
           const SizedBox(height: 10),
@@ -447,7 +459,7 @@ class _MeetingDetailScreenState extends ConsumerState<MeetingDetailScreen> {
                       );
                     }
                   },
-                  icon: const Icon(LucideIcons.check, size: 16),
+                  icon: const Icon(Icons.check_rounded, size: 16),
                   label: const Text('Simpan'),
                 ),
               ],
@@ -533,7 +545,7 @@ class _MeetingDetailScreenState extends ConsumerState<MeetingDetailScreen> {
                         height: 18,
                         child: CircularProgressIndicator(strokeWidth: 2),
                       )
-                    : const Icon(LucideIcons.sparkles),
+                    : const Icon(Icons.auto_awesome_rounded),
                 label: Text(
                   _isExtracting
                       ? 'Menganalisis Notulensi...'
@@ -587,8 +599,11 @@ class _MeetingDetailScreenState extends ConsumerState<MeetingDetailScreen> {
         children: [
           Text(
             'Action Item (${meeting.actionItems.where((i) => i.isDone).length}/${meeting.actionItems.length})',
-            style: theme.textTheme.titleMedium?.copyWith(
-              fontWeight: FontWeight.w700,
+            style: HubTypography.tabular(
+              theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ) ??
+                  const TextStyle(fontWeight: FontWeight.w700),
             ),
           ),
           const SizedBox(height: 10),
@@ -607,9 +622,10 @@ class _MeetingDetailScreenState extends ConsumerState<MeetingDetailScreen> {
               ),
               const SizedBox(width: 8),
               IconButton.filledTonal(
+                constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
                 tooltip: 'Tambah action item',
                 onPressed: () => _addManualActionItem(meeting),
-                icon: const Icon(LucideIcons.plus),
+                icon: const Icon(Icons.add_rounded),
               ),
             ],
           ),
@@ -658,7 +674,7 @@ class _MeetingDetailScreenState extends ConsumerState<MeetingDetailScreen> {
                   ),
                   IconButton(
                     tooltip: 'Jadikan Tugas',
-                    icon: const Icon(LucideIcons.listPlus, size: 20),
+                    icon: const Icon(Icons.playlist_add_rounded, size: 20),
                     onPressed: () => _promoteActionItem(meeting, item),
                   ),
                 ],
@@ -670,20 +686,28 @@ class _MeetingDetailScreenState extends ConsumerState<MeetingDetailScreen> {
 }
 
 class _InfoRow extends StatelessWidget {
-  const _InfoRow({required this.icon, required this.text});
+  const _InfoRow({
+    required this.icon,
+    required this.text,
+    this.tabular = false,
+  });
 
   final IconData icon;
   final String text;
+  final bool tabular;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final style = tabular
+        ? HubTypography.tabular(theme.textTheme.bodyMedium ?? const TextStyle())
+        : theme.textTheme.bodyMedium;
     return Row(
       children: [
         Icon(icon, size: 18, color: theme.colorScheme.primary),
         const SizedBox(width: 8),
         Expanded(
-          child: Text(text, style: theme.textTheme.bodyMedium),
+          child: Text(text, style: style),
         ),
       ],
     );
@@ -866,17 +890,19 @@ class _VoiceRecorderSheetState extends ConsumerState<_VoiceRecorderSheet> {
         final session = recorder.state;
         final hasTranscript = session.combinedTranscript.trim().isNotEmpty;
 
-        return Padding(
-          padding: EdgeInsets.only(
-            left: 16,
-            right: 16,
-            top: 16,
-            bottom: 16 + MediaQuery.of(context).viewInsets.bottom,
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
+        return SafeArea(
+          top: false,
+          child: SingleChildScrollView(
+            padding: EdgeInsets.only(
+              left: 16,
+              right: 16,
+              top: 16,
+              bottom: 16 + MediaQuery.viewInsetsOf(context).bottom,
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
               Row(
                 children: [
                   Expanded(
@@ -1012,6 +1038,9 @@ class _VoiceRecorderSheetState extends ConsumerState<_VoiceRecorderSheet> {
                                 recorder.start();
                               }
                             },
+                      style: FilledButton.styleFrom(
+                        minimumSize: const Size(0, 48),
+                      ),
                       icon: Icon(
                         session.isRecording
                             ? Icons.stop_rounded
@@ -1019,6 +1048,8 @@ class _VoiceRecorderSheetState extends ConsumerState<_VoiceRecorderSheet> {
                       ),
                       label: Text(
                         session.isRecording ? 'Jeda Rekam' : 'Mulai Rekam',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ),
                   ),
@@ -1028,8 +1059,15 @@ class _VoiceRecorderSheetState extends ConsumerState<_VoiceRecorderSheet> {
                       onPressed: hasTranscript && !_isSaving
                           ? _saveToNotesOnly
                           : null,
+                      style: OutlinedButton.styleFrom(
+                        minimumSize: const Size(0, 48),
+                      ),
                       icon: const Icon(Icons.save_outlined),
-                      label: const Text('Simpan ke Notulen'),
+                      label: const Text(
+                        'Simpan ke Notulen',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
                     ),
                   ),
                 ],
@@ -1039,20 +1077,29 @@ class _VoiceRecorderSheetState extends ConsumerState<_VoiceRecorderSheet> {
                 onPressed: (session.isRecording || hasTranscript) && !_isSaving
                     ? _stopAndSummarizeWithAi
                     : null,
+                style: FilledButton.styleFrom(
+                  minimumSize: const Size(0, 48),
+                ),
                 icon: _isSaving
-                    ? const SizedBox(
+                    ? SizedBox(
                         width: 18,
                         height: 18,
-                        child: CircularProgressIndicator(strokeWidth: 2),
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: theme.colorScheme.onPrimary,
+                        ),
                       )
                     : const Icon(Icons.auto_awesome_rounded),
                 label: Text(
                   _isSaving
                       ? 'Menyimpan & Meringkas...'
                       : 'Hentikan & Simpulkan dengan AI',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
             ],
+          ),
           ),
         );
       },

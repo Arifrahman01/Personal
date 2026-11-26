@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:personal_hub/core/theme/app_tokens.dart';
 import 'package:personal_hub/core/theme/hub_widgets.dart';
 import 'package:personal_hub/features/meetings/models/meeting.dart';
@@ -75,7 +74,7 @@ class TodayFocusCard extends StatelessWidget {
                       ),
                       const SizedBox(width: 4),
                       Icon(
-                        LucideIcons.arrowRight,
+                        Icons.arrow_forward_rounded,
                         size: 14,
                         color: AppTokens.primary(context),
                       ),
@@ -95,7 +94,7 @@ class TodayFocusCard extends StatelessWidget {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Icon(
-                      LucideIcons.checkCircle2,
+                      Icons.check_circle_outline_rounded,
                       size: 28,
                       color: AppTokens.textSecondary(context).withValues(alpha: 0.5),
                     ),
@@ -134,7 +133,7 @@ class TodayFocusCard extends StatelessWidget {
                         borderRadius: HubRadius.rXs,
                       ),
                       child: Icon(
-                        LucideIcons.calendar,
+                        Icons.calendar_month_rounded,
                         size: 16,
                         color: AppTokens.info(context),
                       ),
@@ -164,7 +163,7 @@ class TodayFocusCard extends StatelessWidget {
                       ),
                     ),
                     Icon(
-                      LucideIcons.chevronRight,
+                      Icons.chevron_right_rounded,
                       size: 16,
                       color: AppTokens.textSecondary(context),
                     ),
@@ -179,58 +178,66 @@ class TodayFocusCard extends StatelessWidget {
 
           // Active to-dos (max 3 priority active tasks)
           for (final task in displayTasks) ...[
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 3),
-              child: Row(
-                children: [
-                  SizedBox(
-                    width: 28,
-                    height: 28,
-                    child: Checkbox(
-                      value: task.isDone,
-                      onChanged: (_) => onToggleTask(task.id),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      task.title,
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w500,
-                        color: task.isDone
-                            ? AppTokens.textSecondary(context)
-                            : AppTokens.textPrimary(context),
-                        decoration: task.isDone
-                            ? TextDecoration.lineThrough
-                            : TextDecoration.none,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                  if (task.priority == TaskPriority.high) ...[
-                    const SizedBox(width: 6),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: AppTokens.error(context).withValues(alpha: 0.12),
-                        borderRadius: HubRadius.rXs,
-                      ),
-                      child: Text(
-                        'Tinggi',
-                        style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w600,
-                          color: AppTokens.error(context),
+            InkWell(
+              onTap: () => onToggleTask(task.id),
+              borderRadius: HubRadius.rXs,
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(minHeight: 40),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 4),
+                  child: Row(
+                    children: [
+                      SizedBox(
+                        width: 28,
+                        height: 28,
+                        child: Checkbox(
+                          value: task.isDone,
+                          onChanged: (_) => onToggleTask(task.id),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(4),
+                          ),
                         ),
                       ),
-                    ),
-                  ],
-                ],
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          task.title,
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w500,
+                            color: task.isDone
+                                ? AppTokens.textSecondary(context)
+                                : AppTokens.textPrimary(context),
+                            decoration: task.isDone
+                                ? TextDecoration.lineThrough
+                                : TextDecoration.none,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      if (task.priority == TaskPriority.high) ...[
+                        const SizedBox(width: 6),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: AppTokens.error(context).withValues(alpha: 0.12),
+                            borderRadius: HubRadius.rXs,
+                          ),
+                          child: Text(
+                            'Tinggi',
+                            maxLines: 1,
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                              color: AppTokens.error(context),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
               ),
             ),
           ],

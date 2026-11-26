@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:personal_hub/core/errors/app_exceptions.dart';
 import 'package:personal_hub/core/theme/app_tokens.dart';
 import 'package:personal_hub/core/theme/hub_widgets.dart';
@@ -185,7 +184,6 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
       isScrollControlled: true,
       useSafeArea: true,
       showDragHandle: true,
-      backgroundColor: Colors.transparent,
       builder: (sheetContext) {
         return UnifiedAiAssistantSheet(
           noteTitle: _titleController.text.trim(),
@@ -262,7 +260,7 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
         elevation: 0,
         scrolledUnderElevation: 0,
         leading: IconButton(
-          icon: const Icon(LucideIcons.arrowLeft),
+          icon: const Icon(Icons.arrow_back_rounded),
           tooltip: 'Kembali',
           onPressed: () => Navigator.of(context).pop(),
         ),
@@ -277,13 +275,13 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
           if (_isEditing)
             IconButton(
               tooltip: 'Ekspor ke Markdown',
-              icon: const Icon(LucideIcons.download),
+              icon: const Icon(Icons.download_rounded),
               onPressed: _exportCurrentNote,
             ),
           IconButton(
             tooltip: _isPinned ? 'Lepas sematan' : 'Sematkan catatan',
             icon: Icon(
-              _isPinned ? LucideIcons.pin : LucideIcons.pinOff,
+              _isPinned ? Icons.push_pin_rounded : Icons.push_pin_outlined,
               color: _isPinned ? AppTokens.primary(context) : null,
             ),
             onPressed: () {
@@ -296,20 +294,16 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             child: FilledButton(
               style: FilledButton.styleFrom(
-                backgroundColor: AppTokens.primary(context),
-                foregroundColor: theme.brightness == Brightness.dark
-                    ? AppTokens.canvasDark
-                    : Colors.white,
                 shape: RoundedRectangleBorder(borderRadius: HubRadius.rPill),
               ),
               onPressed: _isSaving ? null : _saveNote,
               child: _isSaving
-                  ? const SizedBox(
+                  ? SizedBox(
                       width: 16,
                       height: 16,
                       child: CircularProgressIndicator(
                         strokeWidth: 2,
-                        color: Colors.white,
+                        color: theme.colorScheme.onPrimary,
                       ),
                     )
                   : const Text('Simpan'),
@@ -327,8 +321,8 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
                   parent: BouncingScrollPhysics(),
                 ),
                 padding: const EdgeInsets.symmetric(
-                  horizontal: HubSpacing.md,
-                  vertical: HubSpacing.sm,
+                  horizontal: HubSpacing.lg,
+                  vertical: HubSpacing.md,
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -454,7 +448,7 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
                 ),
               ),
               padding: const EdgeInsets.symmetric(
-                horizontal: HubSpacing.md,
+                horizontal: HubSpacing.lg,
                 vertical: HubSpacing.sm,
               ),
               child: Row(
@@ -474,7 +468,7 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
                       ),
                     ),
                     onPressed: () => _openUnifiedAiSheet(),
-                    icon: const Icon(LucideIcons.sparkles, size: 18),
+                    icon: const Icon(Icons.auto_awesome_rounded, size: 18),
                     label: const Text(
                       '✨ Asisten AI',
                       style: TextStyle(
@@ -486,9 +480,15 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
                   const Spacer(),
                   Text(
                     '$wordCount kata',
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: AppTokens.textSecondary(context),
-                      fontWeight: FontWeight.w500,
+                    style: HubTypography.tabular(
+                      theme.textTheme.bodySmall?.copyWith(
+                            color: AppTokens.textSecondary(context),
+                            fontWeight: FontWeight.w500,
+                          ) ??
+                          TextStyle(
+                            color: AppTokens.textSecondary(context),
+                            fontWeight: FontWeight.w500,
+                          ),
                     ),
                   ),
                 ],
@@ -539,7 +539,7 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
                       child: Padding(
                         padding: const EdgeInsets.all(2),
                         child: Icon(
-                          LucideIcons.x,
+                          Icons.close_rounded,
                           size: 14,
                           color: AppTokens.primary(context),
                         ),
@@ -551,7 +551,7 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
 
             // "+ Tambah Tag" pill
             HubPill(
-              icon: LucideIcons.plus,
+              icon: Icons.add_rounded,
               label: 'Tambah Tag',
               onTap: () {
                 setState(() {
@@ -573,7 +573,7 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
           decoration: InputDecoration(
             labelText: 'Tag',
             hintText: 'Pisahkan dengan koma (misal: kerja, ide)',
-            prefixIcon: const Icon(LucideIcons.tag, size: 16),
+            prefixIcon: const Icon(Icons.label_outline_rounded, size: 16),
             isDense: true,
             border: OutlineInputBorder(
               borderRadius: HubRadius.rSm,
@@ -672,7 +672,7 @@ class _SemanticCrossLinkPanel extends ConsumerWidget {
           Row(
             children: [
               Icon(
-                LucideIcons.sparkles,
+                Icons.auto_awesome_rounded,
                 size: 15,
                 color: AppTokens.primary(context),
               ),
@@ -726,8 +726,8 @@ class _SemanticCrossLinkPanel extends ConsumerWidget {
     final isTask = link.targetEntityType == 'task';
 
     final icon = isMeeting
-        ? LucideIcons.calendar
-        : (isTask ? LucideIcons.checkCheck : LucideIcons.fileText);
+        ? Icons.calendar_month_rounded
+        : (isTask ? Icons.done_all_rounded : Icons.description_outlined);
 
     final color = isMeeting
         ? AppTokens.info(context)
@@ -761,11 +761,17 @@ class _SemanticCrossLinkPanel extends ConsumerWidget {
       context: context,
       useSafeArea: true,
       showDragHandle: true,
-      backgroundColor: AppTokens.card(context),
       builder: (sheetContext) {
-        return Padding(
-          padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
-          child: Column(
+        return SafeArea(
+          top: false,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(
+              HubSpacing.xl,
+              0,
+              HubSpacing.xl,
+              HubSpacing.xxl,
+            ),
+            child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -773,8 +779,8 @@ class _SemanticCrossLinkPanel extends ConsumerWidget {
                 children: [
                   Icon(
                     link.targetEntityType == 'meeting'
-                        ? LucideIcons.calendar
-                        : LucideIcons.fileText,
+                        ? Icons.calendar_month_rounded
+                        : Icons.description_outlined,
                     color: AppTokens.primary(context),
                   ),
                   const SizedBox(width: 8),
@@ -835,10 +841,6 @@ class _SemanticCrossLinkPanel extends ConsumerWidget {
                 width: double.infinity,
                 child: FilledButton.icon(
                   style: FilledButton.styleFrom(
-                    backgroundColor: AppTokens.primary(context),
-                    foregroundColor: theme.brightness == Brightness.dark
-                        ? AppTokens.canvasDark
-                        : Colors.white,
                     shape: RoundedRectangleBorder(borderRadius: HubRadius.rPill),
                   ),
                   onPressed: () {
@@ -847,11 +849,12 @@ class _SemanticCrossLinkPanel extends ConsumerWidget {
                     onInsertReference(refText);
                     Navigator.of(sheetContext).pop();
                   },
-                  icon: const Icon(LucideIcons.link, size: 16),
+                  icon: const Icon(Icons.link_rounded, size: 16),
                   label: const Text('Sisipkan Tautan ke Catatan'),
                 ),
               ),
             ],
+          ),
           ),
         );
       },

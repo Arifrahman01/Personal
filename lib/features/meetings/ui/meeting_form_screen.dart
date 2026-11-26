@@ -1,9 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:personal_hub/core/errors/app_exceptions.dart';
 import 'package:personal_hub/core/theme/app_tokens.dart';
-import 'package:personal_hub/core/theme/glass_widgets.dart';
 import 'package:personal_hub/core/theme/hub_widgets.dart';
 import 'package:personal_hub/features/meetings/models/meeting.dart';
 import 'package:personal_hub/features/meetings/providers/meetings_providers.dart';
@@ -198,8 +196,8 @@ class _MeetingFormScreenState extends ConsumerState<MeetingFormScreen> {
     final isToday = _isSameDay(_scheduledAt, today);
     final isTomorrow = _isSameDay(_scheduledAt, tomorrow);
 
-    return GlassScaffold(
-      appBar: GlassAppBar(
+    return Scaffold(
+      appBar: AppBar(
         title: Text(_isEditing ? 'Edit Meeting' : 'Meeting Baru'),
       ),
       body: SafeArea(
@@ -216,7 +214,7 @@ class _MeetingFormScreenState extends ConsumerState<MeetingFormScreen> {
                 decoration: const InputDecoration(
                   labelText: 'Judul Meeting *',
                   hintText: 'Contoh: Sinkronisasi Mingguan Tim',
-                  prefixIcon: Icon(LucideIcons.calendar),
+                  prefixIcon: Icon(Icons.calendar_month_rounded),
                 ),
                 validator: (value) {
                   if (value == null || value.trim().isEmpty) {
@@ -240,17 +238,19 @@ class _MeetingFormScreenState extends ConsumerState<MeetingFormScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      alignment: WrapAlignment.spaceBetween,
                       children: [
-                        Expanded(
-                          child: Text(
-                            formatMeetingDateTime(_scheduledAt),
-                            style: HubTypography.tabular(
-                              theme.textTheme.titleSmall?.copyWith(
-                                fontWeight: FontWeight.w700,
-                              ) ?? const TextStyle(fontWeight: FontWeight.w700),
-                            ),
+                        Text(
+                          formatMeetingDateTime(_scheduledAt),
+                          style: HubTypography.tabular(
+                            theme.textTheme.titleSmall?.copyWith(
+                                  fontWeight: FontWeight.w700,
+                                ) ??
+                                const TextStyle(fontWeight: FontWeight.w700),
                           ),
                         ),
                         // Quick chips Hari Ini / Besok
@@ -278,16 +278,30 @@ class _MeetingFormScreenState extends ConsumerState<MeetingFormScreen> {
                         Expanded(
                           child: OutlinedButton.icon(
                             onPressed: _pickDate,
-                            icon: const Icon(LucideIcons.calendar, size: 16),
-                            label: const Text('Pilih Tanggal'),
+                            style: OutlinedButton.styleFrom(
+                              minimumSize: const Size(0, 48),
+                            ),
+                            icon: const Icon(Icons.calendar_month_rounded, size: 16),
+                            label: const Text(
+                              'Pilih Tanggal',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
                           ),
                         ),
                         const SizedBox(width: 8),
                         Expanded(
                           child: OutlinedButton.icon(
                             onPressed: _pickTime,
-                            icon: const Icon(LucideIcons.clock, size: 16),
-                            label: const Text('Pilih Jam'),
+                            style: OutlinedButton.styleFrom(
+                              minimumSize: const Size(0, 48),
+                            ),
+                            icon: const Icon(Icons.schedule_rounded, size: 16),
+                            label: const Text(
+                              'Pilih Jam',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
                           ),
                         ),
                       ],
@@ -304,7 +318,7 @@ class _MeetingFormScreenState extends ConsumerState<MeetingFormScreen> {
                 decoration: const InputDecoration(
                   labelText: 'Lokasi / Tautan',
                   hintText: 'Contoh: Ruang Anggrek atau Google Meet',
-                  prefixIcon: Icon(LucideIcons.mapPin),
+                  prefixIcon: Icon(Icons.place_outlined),
                 ),
               ),
               const SizedBox(height: 16),
@@ -319,7 +333,7 @@ class _MeetingFormScreenState extends ConsumerState<MeetingFormScreen> {
                         _attendeesController.text.isNotEmpty ||
                         _agendaController.text.isNotEmpty ||
                         _notesController.text.isNotEmpty,
-                    leading: Icon(LucideIcons.slidersHorizontal, color: AppTokens.primary(context)),
+                    leading: Icon(Icons.tune_rounded, color: AppTokens.primary(context)),
                     title: Text(
                       'Detail Tambahan',
                       style: theme.textTheme.titleSmall?.copyWith(
@@ -346,24 +360,23 @@ class _MeetingFormScreenState extends ConsumerState<MeetingFormScreen> {
                               decoration: const InputDecoration(
                                 labelText: 'Peserta',
                                 hintText: 'Pisahkan dengan koma, misal: Budi, Sari, Andi',
-                                prefixIcon: Icon(LucideIcons.users),
+                                prefixIcon: Icon(Icons.groups_rounded),
                               ),
                             ),
                             const SizedBox(height: 16),
-                            DropdownButtonFormField<int>(
-                              initialValue: _reminderMinutes,
-                              decoration: const InputDecoration(
-                                labelText: 'Pengingat',
-                                prefixIcon: Icon(LucideIcons.bell),
-                              ),
-                              items: [
+                            DropdownMenu<int>(
+                              initialSelection: _reminderMinutes,
+                              expandedInsets: EdgeInsets.zero,
+                              label: const Text('Pengingat'),
+                              leadingIcon: const Icon(Icons.notifications_outlined),
+                              dropdownMenuEntries: [
                                 for (final minutes in _reminderOptions)
-                                  DropdownMenuItem<int>(
+                                  DropdownMenuEntry<int>(
                                     value: minutes,
-                                    child: Text(_reminderLabel(minutes)),
+                                    label: _reminderLabel(minutes),
                                   ),
                               ],
-                              onChanged: (value) {
+                              onSelected: (value) {
                                 if (value != null) {
                                   setState(() {
                                     _reminderMinutes = value;
@@ -405,13 +418,19 @@ class _MeetingFormScreenState extends ConsumerState<MeetingFormScreen> {
               // 5. Tombol Simpan
               FilledButton.icon(
                 onPressed: _isSaving ? null : _handleSave,
+                style: FilledButton.styleFrom(
+                  minimumSize: const Size.fromHeight(50),
+                ),
                 icon: _isSaving
-                    ? const SizedBox(
+                    ? SizedBox(
                         width: 18,
                         height: 18,
-                        child: CircularProgressIndicator(strokeWidth: 2),
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: theme.colorScheme.onPrimary,
+                        ),
                       )
-                    : const Icon(LucideIcons.save),
+                    : const Icon(Icons.save_rounded),
                 label: Text(_isEditing ? 'Simpan Perubahan' : 'Simpan Meeting'),
               ),
             ],

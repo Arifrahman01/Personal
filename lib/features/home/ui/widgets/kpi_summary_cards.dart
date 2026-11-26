@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:personal_hub/core/theme/app_tokens.dart';
 import 'package:personal_hub/core/theme/hub_widgets.dart';
 import 'package:personal_hub/features/finance/models/finance_models.dart';
@@ -58,8 +57,10 @@ class KpiSummaryCards extends StatelessWidget {
       }
     }
 
-    return Row(
-      children: [
+    return IntrinsicHeight(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
         // Left KPI: Saldo Bulan Ini
         Expanded(
           child: HubCard(
@@ -84,7 +85,7 @@ class KpiSummaryCards extends StatelessWidget {
                     ),
                     const SizedBox(width: 4),
                     Icon(
-                      LucideIcons.walletCards,
+                      Icons.account_balance_wallet_outlined,
                       size: 16,
                       color: AppTokens.primary(context),
                     ),
@@ -108,7 +109,7 @@ class KpiSummaryCards extends StatelessWidget {
                 Row(
                   children: [
                     Icon(
-                      isPositive ? LucideIcons.trendingUp : LucideIcons.trendingDown,
+                      isPositive ? Icons.trending_up_rounded : Icons.trending_down_rounded,
                       size: 12,
                       color: isPositive
                           ? AppTokens.success(context)
@@ -161,7 +162,7 @@ class KpiSummaryCards extends StatelessWidget {
                     ),
                     const SizedBox(width: 4),
                     Icon(
-                      LucideIcons.flame,
+                      Icons.local_fire_department_rounded,
                       size: 16,
                       color: AppTokens.warning(context),
                     ),
@@ -187,10 +188,12 @@ class KpiSummaryCards extends StatelessWidget {
                     Expanded(
                       child: Text(
                         maxStreak > 0 ? '🔥 $maxStreak hr streak' : 'Mulai streak baru',
-                        style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w500,
-                          color: AppTokens.textSecondary(context),
+                        style: HubTypography.tabular(
+                          TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w500,
+                            color: AppTokens.textSecondary(context),
+                          ),
                         ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
@@ -203,6 +206,7 @@ class KpiSummaryCards extends StatelessWidget {
           ),
         ),
       ],
+    ),
     );
   }
 }

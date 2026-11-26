@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
-import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:personal_hub/core/config/secure_config_store.dart';
 import 'package:personal_hub/core/theme/app_tokens.dart';
 import 'package:personal_hub/core/theme/hub_widgets.dart';
@@ -152,14 +151,35 @@ class _BackupSyncSettingsPageState
         backgroundColor: AppTokens.canvas(context),
         elevation: 0,
       ),
-      body: ListView(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-        children: [
-          // 1. Manual Backup & Restore Section (.phub)
-          const BackupSection(),
-          const SizedBox(height: 16),
+      body: SafeArea(
+        child: ListView(
+          padding: const EdgeInsets.symmetric(
+            horizontal: HubSpacing.lg,
+            vertical: HubSpacing.lg,
+          ),
+          children: [
+            const HubSectionHeader(
+              title: 'CADANGKAN & PULIHKAN',
+              padding: EdgeInsets.symmetric(
+                horizontal: HubSpacing.xs,
+                vertical: HubSpacing.xs,
+              ),
+            ),
+            const SizedBox(height: HubSpacing.xs),
+            // 1. Manual Backup & Restore Section (.phub)
+            const BackupSection(),
+            const SizedBox(height: HubSpacing.lg),
 
-          // 2. Automated GFS Backup (Human Language: 7 Harian • 4 Mingguan • 3 Bulanan)
+            const HubSectionHeader(
+              title: 'PENYIMPANAN OTOMATIS',
+              padding: EdgeInsets.symmetric(
+                horizontal: HubSpacing.xs,
+                vertical: HubSpacing.xs,
+              ),
+            ),
+            const SizedBox(height: HubSpacing.xs),
+
+            // 2. Automated GFS Backup (Human Language: 7 Harian • 4 Mingguan • 3 Bulanan)
           HubCard(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -170,7 +190,7 @@ class _BackupSyncSettingsPageState
                       radius: 20,
                       backgroundColor: primary.withValues(alpha: 0.15),
                       foregroundColor: primary,
-                      child: const Icon(LucideIcons.history, size: 20),
+                      child: const Icon(Icons.history_rounded, size: 20),
                     ),
                     const SizedBox(width: 12),
                     Expanded(
@@ -236,7 +256,7 @@ class _BackupSyncSettingsPageState
                         count: summary.keptMonthlyCount,
                         max: policy.maxMonthly,
                         subtitle: '3 Bulan Terakhir',
-                        color: const Color(0xFF8B5CF6),
+                        color: theme.colorScheme.tertiary,
                       ),
                     ),
                   ],
@@ -248,13 +268,21 @@ class _BackupSyncSettingsPageState
                     shape: RoundedRectangleBorder(borderRadius: HubRadius.rSm),
                   ),
                   onPressed: _createGfsBackupNow,
-                  icon: const Icon(LucideIcons.camera, size: 16),
+                  icon: const Icon(Icons.photo_camera_outlined, size: 16),
                   label: const Text('Buat Snapshot Baru Sekarang'),
                 ),
               ],
             ),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: HubSpacing.lg),
+          const HubSectionHeader(
+            title: 'SINKRONISASI CLOUD',
+            padding: EdgeInsets.symmetric(
+              horizontal: HubSpacing.xs,
+              vertical: HubSpacing.xs,
+            ),
+          ),
+          const SizedBox(height: HubSpacing.xs),
 
           // 3. Panel Lanjutan: Sinkronisasi Cloud E2EE (Clean Collapsible)
           HubCard(
@@ -266,7 +294,7 @@ class _BackupSyncSettingsPageState
                 radius: 20,
                 backgroundColor: AppTokens.info(context).withValues(alpha: 0.15),
                 foregroundColor: AppTokens.info(context),
-                child: const Icon(LucideIcons.cloud, size: 20),
+                child: const Icon(Icons.cloud_outlined, size: 20),
               ),
               title: const Text(
                 'Sinkronisasi Cloud E2EE (Lanjutan)',
@@ -288,17 +316,17 @@ class _BackupSyncSettingsPageState
                       ButtonSegment(
                         value: 'WebDAV',
                         label: Text('WebDAV'),
-                        icon: Icon(LucideIcons.folderSync, size: 14),
+                        icon: Icon(Icons.folder_copy_outlined, size: 14),
                       ),
                       ButtonSegment(
                         value: 'Nextcloud',
                         label: Text('Nextcloud'),
-                        icon: Icon(LucideIcons.cloudRain, size: 14),
+                        icon: Icon(Icons.cloud_queue_rounded, size: 14),
                       ),
                       ButtonSegment(
                         value: 'Google Drive AppData',
                         label: Text('Google Drive'),
-                        icon: Icon(LucideIcons.hardDrive, size: 14),
+                        icon: Icon(Icons.storage_rounded, size: 14),
                       ),
                     ],
                     selected: {_syncProvider},
@@ -317,7 +345,7 @@ class _BackupSyncSettingsPageState
                     hintText: _syncProvider == 'Nextcloud'
                         ? 'https://cloud.example.com/remote.php/dav/files/user/'
                         : 'https://dav.example.com/remote.php/webdav/',
-                    prefixIcon: const Icon(LucideIcons.globe, size: 18),
+                    prefixIcon: const Icon(Icons.language_rounded, size: 18),
                   ),
                 ),
                 const SizedBox(height: 10),
@@ -327,7 +355,7 @@ class _BackupSyncSettingsPageState
                   decoration: const InputDecoration(
                     labelText: 'Username',
                     hintText: 'Nama pengguna akun cloud',
-                    prefixIcon: Icon(LucideIcons.user, size: 18),
+                    prefixIcon: Icon(Icons.person_outline_rounded, size: 18),
                   ),
                 ),
                 const SizedBox(height: 10),
@@ -338,12 +366,12 @@ class _BackupSyncSettingsPageState
                   decoration: InputDecoration(
                     labelText: 'Password / App Token',
                     hintText: 'Kata sandi atau token aplikasi cloud',
-                    prefixIcon: const Icon(LucideIcons.lock, size: 18),
+                    prefixIcon: const Icon(Icons.lock_outline_rounded, size: 18),
                     suffixIcon: IconButton(
                       icon: Icon(
                         _obscureSyncPassword
-                            ? LucideIcons.eye
-                            : LucideIcons.eyeOff,
+                            ? Icons.visibility_outlined
+                            : Icons.visibility_off_outlined,
                         size: 18,
                       ),
                       onPressed: () => setState(
@@ -362,12 +390,12 @@ class _BackupSyncSettingsPageState
                     hintText: 'Passphrase enkripsi end-to-end',
                     helperText:
                         'Kunci enkripsi zero-knowledge (server cloud tidak dapat membaca data).',
-                    prefixIcon: const Icon(LucideIcons.keyRound, size: 18),
+                    prefixIcon: const Icon(Icons.vpn_key_outlined, size: 18),
                     suffixIcon: IconButton(
                       icon: Icon(
                         _obscureSyncPassphrase
-                            ? LucideIcons.eye
-                            : LucideIcons.eyeOff,
+                            ? Icons.visibility_outlined
+                            : Icons.visibility_off_outlined,
                         size: 18,
                       ),
                       onPressed: () => setState(
@@ -393,7 +421,7 @@ class _BackupSyncSettingsPageState
                       children: [
                         Row(
                           children: [
-                            Icon(LucideIcons.clock, size: 16, color: primary),
+                            Icon(Icons.schedule_rounded, size: 16, color: primary),
                             const SizedBox(width: 8),
                             Expanded(
                               child: Text(
@@ -446,23 +474,23 @@ class _BackupSyncSettingsPageState
                     Expanded(
                       child: FilledButton.icon(
                         style: FilledButton.styleFrom(
-                          backgroundColor: primary,
-                          foregroundColor: Colors.white,
+                          backgroundColor: theme.colorScheme.primary,
+                          foregroundColor: theme.colorScheme.onPrimary,
                           shape: RoundedRectangleBorder(borderRadius: HubRadius.rSm),
                         ),
                         onPressed: syncStateAsync.asData?.value.isSyncing == true
                             ? null
                             : _handleSyncNow,
                         icon: syncStateAsync.asData?.value.isSyncing == true
-                            ? const SizedBox(
+                            ? SizedBox(
                                 width: 14,
                                 height: 14,
                                 child: CircularProgressIndicator(
                                   strokeWidth: 2,
-                                  color: Colors.white,
+                                  color: theme.colorScheme.onPrimary,
                                 ),
                               )
-                            : const Icon(LucideIcons.refreshCw, size: 16),
+                            : const Icon(Icons.sync_rounded, size: 16),
                         label: const Text('Sinkronkan'),
                       ),
                     ),
@@ -473,7 +501,7 @@ class _BackupSyncSettingsPageState
                           shape: RoundedRectangleBorder(borderRadius: HubRadius.rSm),
                         ),
                         onPressed: _saveCloudSyncConfig,
-                        icon: const Icon(LucideIcons.save, size: 16),
+                        icon: const Icon(Icons.save_rounded, size: 16),
                         label: const Text('Simpan'),
                       ),
                     ),
@@ -483,6 +511,7 @@ class _BackupSyncSettingsPageState
             ),
           ),
         ],
+        ),
       ),
     );
   }
@@ -515,10 +544,12 @@ class _BackupSyncSettingsPageState
           const SizedBox(height: 4),
           Text(
             '$count / $max',
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.w800,
-              color: color,
+            style: HubTypography.tabular(
+              TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w800,
+                color: color,
+              ),
             ),
           ),
           const SizedBox(height: 2),

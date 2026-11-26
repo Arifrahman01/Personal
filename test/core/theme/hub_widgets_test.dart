@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:personal_hub/core/theme/app_theme.dart';
 
 void main() {
@@ -137,7 +136,7 @@ void main() {
           home: Scaffold(
             body: HubStatusBadge(
               label: 'Aktif',
-              icon: LucideIcons.check,
+              icon: Icons.check_rounded,
               onTap: () => tapped = true,
             ),
           ),
@@ -145,7 +144,7 @@ void main() {
       );
 
       expect(find.text('Aktif'), findsOneWidget);
-      expect(find.byIcon(LucideIcons.check), findsOneWidget);
+      expect(find.byIcon(Icons.check_rounded), findsOneWidget);
 
       await tester.tap(find.text('Aktif'));
       expect(tapped, isTrue);
@@ -161,7 +160,7 @@ void main() {
           theme: AppTheme.light,
           home: Scaffold(
             body: HubEmptyState(
-              icon: LucideIcons.inbox,
+              icon: Icons.inbox_outlined,
               title: 'Belum ada data',
               message: 'Mulai dengan menambahkan catatan baru.',
               actionLabel: 'Tambah Data',

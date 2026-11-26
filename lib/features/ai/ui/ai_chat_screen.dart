@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:personal_hub/core/theme/app_tokens.dart';
 import 'package:personal_hub/core/theme/hub_widgets.dart';
 import 'package:personal_hub/features/ai/models/ai_models.dart';
@@ -24,10 +23,10 @@ class _AiChatScreenState extends ConsumerState<AiChatScreen> {
   final ScrollController _scrollController = ScrollController();
 
   static const List<(String prompt, IconData icon)> _starterPrompts = [
-    ('Ringkas agenda hari ini', LucideIcons.calendarCheck),
-    ('Cek anomali keuangan', LucideIcons.trendingDown),
-    ('Ide catatan baru', LucideIcons.filePlus),
-    ('Tugas prioritas', LucideIcons.listTodo),
+    ('Ringkas agenda hari ini', Icons.event_available_rounded),
+    ('Cek anomali keuangan', Icons.trending_down_rounded),
+    ('Ide catatan baru', Icons.note_add_outlined),
+    ('Tugas prioritas', Icons.checklist_rounded),
   ];
 
   @override
@@ -58,6 +57,7 @@ class _AiChatScreenState extends ConsumerState<AiChatScreen> {
   }
 
   Future<void> _confirmClearChat() async {
+    final colorScheme = Theme.of(context).colorScheme;
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) {
@@ -73,7 +73,8 @@ class _AiChatScreenState extends ConsumerState<AiChatScreen> {
             ),
             FilledButton(
               style: FilledButton.styleFrom(
-                backgroundColor: AppTokens.error(context),
+                backgroundColor: colorScheme.error,
+                foregroundColor: colorScheme.onError,
               ),
               onPressed: () => Navigator.of(dialogContext).pop(true),
               child: const Text('Hapus'),
@@ -95,36 +96,31 @@ class _AiChatScreenState extends ConsumerState<AiChatScreen> {
     await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
-      backgroundColor: AppTokens.card(context),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(HubRadius.lg)),
-      ),
+      useSafeArea: true,
+      showDragHandle: true,
       builder: (sheetContext) {
         final notesAsync = ref.watch(notesListProvider);
         final meetingsAsync = ref.watch(meetingsListProvider);
         final financeAsync = ref.watch(monthlySummaryProvider);
         final primary = AppTokens.primary(sheetContext);
+        final tertiary = Theme.of(sheetContext).colorScheme.tertiary;
 
-        return SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-                Center(
-                  child: Container(
-                    width: 38,
-                    height: 4,
-                    decoration: BoxDecoration(
-                      color: AppTokens.border(context),
-                      borderRadius: HubRadius.rPill,
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 16),
+        return SafeArea(
+          top: false,
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.fromLTRB(
+              HubSpacing.xl,
+              HubSpacing.xs,
+              HubSpacing.xl,
+              HubSpacing.xxl,
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
                 Row(
                   children: [
-                    Icon(LucideIcons.paperclip, size: 20, color: primary),
+                    Icon(Icons.attach_file_rounded, size: 20, color: primary),
                     const SizedBox(width: 10),
                     const Text(
                       'Lampirkan Konteks ke AI',
@@ -157,7 +153,7 @@ class _AiChatScreenState extends ConsumerState<AiChatScreen> {
                   ),
                   child: Row(
                     children: [
-                      Icon(LucideIcons.shieldCheck, size: 16, color: AppTokens.success(context)),
+                      Icon(Icons.verified_user_outlined, size: 16, color: AppTokens.success(context)),
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
@@ -172,7 +168,11 @@ class _AiChatScreenState extends ConsumerState<AiChatScreen> {
                     ],
                   ),
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: HubSpacing.lg),
+                const HubSectionHeader(
+                  title: 'SUMBER KONTEKS TERSEDIA',
+                  padding: EdgeInsets.only(bottom: HubSpacing.sm),
+                ),
 
                 // Option 1: Ringkasan Keuangan
                 HubCard(
@@ -197,7 +197,7 @@ class _AiChatScreenState extends ConsumerState<AiChatScreen> {
                         radius: 18,
                         backgroundColor: primary.withValues(alpha: 0.15),
                         foregroundColor: primary,
-                        child: const Icon(LucideIcons.wallet, size: 18),
+                        child: const Icon(Icons.account_balance_wallet_outlined, size: 18),
                       ),
                       const SizedBox(width: 12),
                       Expanded(
@@ -224,7 +224,7 @@ class _AiChatScreenState extends ConsumerState<AiChatScreen> {
                           ],
                         ),
                       ),
-                      const Icon(LucideIcons.chevronRight, size: 16),
+                      const Icon(Icons.chevron_right_rounded, size: 16),
                     ],
                   ),
                 ),
@@ -256,7 +256,7 @@ class _AiChatScreenState extends ConsumerState<AiChatScreen> {
                         radius: 18,
                         backgroundColor: AppTokens.info(context).withValues(alpha: 0.15),
                         foregroundColor: AppTokens.info(context),
-                        child: const Icon(LucideIcons.calendar, size: 18),
+                        child: const Icon(Icons.calendar_month_rounded, size: 18),
                       ),
                       const SizedBox(width: 12),
                       Expanded(
@@ -282,7 +282,7 @@ class _AiChatScreenState extends ConsumerState<AiChatScreen> {
                           ],
                         ),
                       ),
-                      const Icon(LucideIcons.chevronRight, size: 16),
+                      const Icon(Icons.chevron_right_rounded, size: 16),
                     ],
                   ),
                 ),
@@ -311,9 +311,9 @@ class _AiChatScreenState extends ConsumerState<AiChatScreen> {
                     children: [
                       CircleAvatar(
                         radius: 18,
-                        backgroundColor: const Color(0xFF8B5CF6).withValues(alpha: 0.15),
-                        foregroundColor: const Color(0xFF8B5CF6),
-                        child: const Icon(LucideIcons.fileText, size: 18),
+                        backgroundColor: tertiary.withValues(alpha: 0.15),
+                        foregroundColor: tertiary,
+                        child: const Icon(Icons.description_outlined, size: 18),
                       ),
                       const SizedBox(width: 12),
                       Expanded(
@@ -341,13 +341,14 @@ class _AiChatScreenState extends ConsumerState<AiChatScreen> {
                           ],
                         ),
                       ),
-                      const Icon(LucideIcons.chevronRight, size: 16),
+                      const Icon(Icons.chevron_right_rounded, size: 16),
                     ],
                   ),
                 ),
               ],
             ),
-          );
+          ),
+        );
       },
     );
   }
@@ -370,7 +371,7 @@ class _AiChatScreenState extends ConsumerState<AiChatScreen> {
       appBar: AppBar(
         title: Row(
           children: [
-            Icon(LucideIcons.bot, size: 20, color: primary),
+            Icon(Icons.smart_toy_outlined, size: 20, color: primary),
             const SizedBox(width: 8),
             const Text('Asisten AI'),
           ],
@@ -381,12 +382,12 @@ class _AiChatScreenState extends ConsumerState<AiChatScreen> {
         actions: [
           IconButton(
             tooltip: 'Lampirkan Konteks',
-            icon: const Icon(LucideIcons.paperclip),
+            icon: const Icon(Icons.attach_file_rounded),
             onPressed: _openContextAttachmentSheet,
           ),
           IconButton(
             tooltip: 'Hapus riwayat chat',
-            icon: const Icon(LucideIcons.trash2),
+            icon: const Icon(Icons.delete_outline_rounded),
             onPressed: chatAsync.asData?.value.messages.isNotEmpty == true
                 ? _confirmClearChat
                 : null,
@@ -470,7 +471,7 @@ class _AiChatScreenState extends ConsumerState<AiChatScreen> {
                 color: primary.withValues(alpha: 0.12),
                 shape: BoxShape.circle,
               ),
-              child: Icon(LucideIcons.sparkles, size: 28, color: primary),
+              child: Icon(Icons.auto_awesome_rounded, size: 28, color: primary),
             ),
             const SizedBox(height: 14),
             const Text(
@@ -492,7 +493,7 @@ class _AiChatScreenState extends ConsumerState<AiChatScreen> {
             ),
             const SizedBox(height: 24),
 
-            // 4 Starter Prompts in 2x2 grid
+            // 4 Starter Prompts in 2-column responsive Wrap
             Text(
               'Mulai Percakapan Cepat:',
               style: TextStyle(
@@ -502,39 +503,46 @@ class _AiChatScreenState extends ConsumerState<AiChatScreen> {
                 letterSpacing: 0.5,
               ),
             ),
-            const SizedBox(height: 12),
-            GridView.builder(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 2,
-                childAspectRatio: 2.2,
-                crossAxisSpacing: 10,
-                mainAxisSpacing: 10,
-              ),
-              itemCount: _starterPrompts.length,
-              itemBuilder: (context, index) {
-                final item = _starterPrompts[index];
-                return HubCard(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                  onTap: () => _handleSend(item.$1),
-                  child: Row(
-                    children: [
-                      Icon(item.$2, size: 18, color: primary),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          item.$1,
-                          style: const TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
+            const SizedBox(height: HubSpacing.md),
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final cardWidth = (constraints.maxWidth - 10) / 2;
+                return Wrap(
+                  spacing: 10,
+                  runSpacing: 10,
+                  children: [
+                    for (final item in _starterPrompts)
+                      SizedBox(
+                        width: cardWidth,
+                        child: ConstrainedBox(
+                          constraints: const BoxConstraints(minHeight: 58),
+                          child: HubCard(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: HubSpacing.md,
+                              vertical: HubSpacing.md,
+                            ),
+                            onTap: () => _handleSend(item.$1),
+                            child: Row(
+                              children: [
+                                Icon(item.$2, size: 18, color: primary),
+                                const SizedBox(width: HubSpacing.sm),
+                                Expanded(
+                                  child: Text(
+                                    item.$1,
+                                    style: const TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
                         ),
                       ),
-                    ],
-                  ),
+                  ],
                 );
               },
             ),
@@ -559,7 +567,7 @@ class _AiChatScreenState extends ConsumerState<AiChatScreen> {
       child: Row(
         children: [
           Icon(
-            LucideIcons.paperclip,
+            Icons.attach_file_rounded,
             size: 16,
             color: AppTokens.primary(context),
           ),
@@ -579,7 +587,7 @@ class _AiChatScreenState extends ConsumerState<AiChatScreen> {
           IconButton(
             visualDensity: VisualDensity.compact,
             tooltip: 'Hapus konteks',
-            icon: const Icon(LucideIcons.x, size: 16),
+            icon: const Icon(Icons.close_rounded, size: 16),
             onPressed: () {
               ref
                   .read(aiChatControllerProvider.notifier)
@@ -599,7 +607,7 @@ class _AiChatScreenState extends ConsumerState<AiChatScreen> {
       child: Row(
         children: [
           Icon(
-            LucideIcons.alertCircle,
+            Icons.error_outline_rounded,
             size: 18,
             color: AppTokens.error(context),
           ),
@@ -617,7 +625,7 @@ class _AiChatScreenState extends ConsumerState<AiChatScreen> {
           IconButton(
             visualDensity: VisualDensity.compact,
             icon: Icon(
-              LucideIcons.x,
+              Icons.close_rounded,
               size: 16,
               color: AppTokens.error(context),
             ),
@@ -665,10 +673,16 @@ class _AiChatScreenState extends ConsumerState<AiChatScreen> {
   }
 
   Widget _buildInputBar(bool isSending) {
+    final colorScheme = Theme.of(context).colorScheme;
     final primary = AppTokens.primary(context);
 
     return Container(
-      padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
+      padding: const EdgeInsets.fromLTRB(
+        HubSpacing.md,
+        HubSpacing.sm,
+        HubSpacing.md,
+        HubSpacing.md,
+      ),
       decoration: BoxDecoration(
         color: AppTokens.card(context),
         border: Border(
@@ -682,26 +696,27 @@ class _AiChatScreenState extends ConsumerState<AiChatScreen> {
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
           // Lampirkan Konteks (+ Konteks) Button
-          IconButton(
-            tooltip: 'Lampirkan Konteks',
-            icon: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(LucideIcons.paperclip, size: 16, color: primary),
-                const SizedBox(width: 4),
-                Text(
-                  '+ Konteks',
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w700,
-                    color: primary,
-                  ),
+          Tooltip(
+            message: 'Lampirkan Konteks',
+            child: TextButton.icon(
+              style: TextButton.styleFrom(
+                foregroundColor: primary,
+                minimumSize: const Size(0, 48),
+                padding: const EdgeInsets.symmetric(horizontal: 10),
+                shape: RoundedRectangleBorder(borderRadius: HubRadius.rSm),
+              ),
+              onPressed: isSending ? null : _openContextAttachmentSheet,
+              icon: const Icon(Icons.attach_file_rounded, size: 16),
+              label: const Text(
+                'Konteks',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
                 ),
-              ],
+              ),
             ),
-            onPressed: isSending ? null : _openContextAttachmentSheet,
           ),
-          const SizedBox(width: 4),
+          const SizedBox(width: HubSpacing.xs),
 
           // Message Input Field
           Expanded(
@@ -717,6 +732,10 @@ class _AiChatScreenState extends ConsumerState<AiChatScreen> {
                 isDense: true,
                 filled: true,
                 fillColor: AppTokens.canvas(context),
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 12,
+                ),
                 border: OutlineInputBorder(
                   borderRadius: HubRadius.rSm,
                   borderSide: BorderSide(color: AppTokens.border(context)),
@@ -732,17 +751,18 @@ class _AiChatScreenState extends ConsumerState<AiChatScreen> {
               ),
             ),
           ),
-          const SizedBox(width: 8),
+          const SizedBox(width: HubSpacing.sm),
 
           // Send Button
           IconButton.filled(
             style: IconButton.styleFrom(
-              backgroundColor: primary,
-              foregroundColor: Colors.white,
+              backgroundColor: colorScheme.primary,
+              foregroundColor: colorScheme.onPrimary,
+              minimumSize: const Size(48, 48),
             ),
             tooltip: 'Kirim',
             onPressed: isSending ? null : () => _handleSend(),
-            icon: const Icon(LucideIcons.send, size: 18),
+            icon: const Icon(Icons.send_rounded, size: 18),
           ),
         ],
       ),
@@ -758,15 +778,16 @@ class _ChatBubble extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isUser = message.role == 'user';
-    final primary = AppTokens.primary(context);
+    final colorScheme = Theme.of(context).colorScheme;
+    final colors = HubColors.of(context);
 
-    final bubbleBg = isUser
-        ? primary.withValues(alpha: 0.15)
-        : AppTokens.card(context);
+    final bubbleBg =
+        isUser ? colorScheme.primaryContainer : colors.surfaceCard;
     final borderColor = isUser
-        ? primary.withValues(alpha: 0.40)
-        : AppTokens.border(context);
-    final textColor = AppTokens.textPrimary(context);
+        ? colorScheme.primary.withValues(alpha: 0.25)
+        : colors.borderHairline;
+    final textColor =
+        isUser ? colorScheme.onPrimaryContainer : colors.textPrimary;
 
     return Align(
       alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
@@ -775,7 +796,7 @@ class _ChatBubble extends StatelessWidget {
           maxWidth: MediaQuery.sizeOf(context).width * 0.82,
         ),
         child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
           decoration: BoxDecoration(
             color: bubbleBg,
             borderRadius: BorderRadius.only(

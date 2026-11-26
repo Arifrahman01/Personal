@@ -4,7 +4,6 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
-import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:personal_hub/core/errors/app_exceptions.dart';
 import 'package:personal_hub/core/theme/app_tokens.dart';
 import 'package:personal_hub/core/theme/hub_widgets.dart';
@@ -43,6 +42,7 @@ class _BackupSectionState extends ConsumerState<BackupSection> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
     final primary = AppTokens.primary(context);
 
     return HubCard(
@@ -55,7 +55,7 @@ class _BackupSectionState extends ConsumerState<BackupSection> {
                 radius: 20,
                 backgroundColor: primary.withValues(alpha: 0.15),
                 foregroundColor: primary,
-                child: const Icon(LucideIcons.shieldCheck, size: 20),
+                child: const Icon(Icons.verified_user_outlined, size: 20),
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -70,7 +70,7 @@ class _BackupSectionState extends ConsumerState<BackupSection> {
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      'Enkripsi AES-256-GCM dengan passphrase pribadi Anda.',
+                      'Simpan cadangan terenkripsi dengan passphrase pribadi Anda.',
                       style: theme.textTheme.bodySmall?.copyWith(
                         color: AppTokens.textSecondary(context),
                       ),
@@ -99,7 +99,7 @@ class _BackupSectionState extends ConsumerState<BackupSection> {
             ),
             child: Row(
               children: [
-                Icon(LucideIcons.history, size: 16, color: primary),
+                Icon(Icons.history_rounded, size: 16, color: primary),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
@@ -125,12 +125,12 @@ class _BackupSectionState extends ConsumerState<BackupSection> {
             children: [
               FilledButton.icon(
                 style: FilledButton.styleFrom(
-                  backgroundColor: primary,
-                  foregroundColor: Colors.white,
+                  backgroundColor: colorScheme.primary,
+                  foregroundColor: colorScheme.onPrimary,
                   shape: RoundedRectangleBorder(borderRadius: HubRadius.rSm),
                 ),
                 onPressed: _isBusy ? null : _handleExport,
-                icon: const Icon(LucideIcons.upload, size: 16),
+                icon: const Icon(Icons.upload_rounded, size: 16),
                 label: const Text('Ekspor Backup (.phub)'),
               ),
               OutlinedButton.icon(
@@ -138,7 +138,7 @@ class _BackupSectionState extends ConsumerState<BackupSection> {
                   shape: RoundedRectangleBorder(borderRadius: HubRadius.rSm),
                 ),
                 onPressed: _isBusy ? null : _handleImport,
-                icon: const Icon(LucideIcons.download, size: 16),
+                icon: const Icon(Icons.download_rounded, size: 16),
                 label: const Text('Impor Backup (.phub)'),
               ),
             ],
@@ -363,8 +363,8 @@ class _PassphraseDialogState extends State<_PassphraseDialog> {
                   },
                   icon: Icon(
                     _obscurePassphrase
-                        ? LucideIcons.eye
-                        : LucideIcons.eyeOff,
+                        ? Icons.visibility_outlined
+                        : Icons.visibility_off_outlined,
                   ),
                 ),
               ),

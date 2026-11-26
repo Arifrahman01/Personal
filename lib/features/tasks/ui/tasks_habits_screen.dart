@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
-import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:personal_hub/core/errors/app_exceptions.dart';
 import 'package:personal_hub/core/theme/app_tokens.dart';
 import 'package:personal_hub/core/theme/hub_widgets.dart';
@@ -40,25 +39,25 @@ class _TasksHabitsScreenState extends ConsumerState<TasksHabitsScreen> {
       title: 'Sholat Tepat Waktu',
       category: 'Ibadah',
       targetPerDay: 5,
-      icon: LucideIcons.compass,
+      icon: Icons.explore_outlined,
     ),
     _StarterHabitPreset(
       title: 'Baca Al-Quran',
       category: 'Ibadah',
       targetPerDay: 1,
-      icon: LucideIcons.bookOpen,
+      icon: Icons.menu_book_rounded,
     ),
     _StarterHabitPreset(
       title: 'Olahraga',
       category: 'Kesehatan',
       targetPerDay: 1,
-      icon: LucideIcons.dumbbell,
+      icon: Icons.fitness_center_rounded,
     ),
     _StarterHabitPreset(
       title: 'Baca Buku',
       category: 'Belajar',
       targetPerDay: 1,
-      icon: LucideIcons.bookMarked,
+      icon: Icons.bookmark_border_rounded,
     ),
   ];
 
@@ -131,13 +130,15 @@ class _TasksHabitsScreenState extends ConsumerState<TasksHabitsScreen> {
       builder: (sheetContext) {
         return StatefulBuilder(
           builder: (context, setSheetState) {
-            final bottomInset = MediaQuery.of(context).viewInsets.bottom;
-            return Padding(
-              padding: EdgeInsets.fromLTRB(20, 20, 20, 20 + bottomInset),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
+            final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
+            return SafeArea(
+              top: false,
+              child: SingleChildScrollView(
+                padding: EdgeInsets.fromLTRB(20, 12, 20, 20 + bottomInset),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
@@ -148,7 +149,7 @@ class _TasksHabitsScreenState extends ConsumerState<TasksHabitsScreen> {
                             ),
                       ),
                       IconButton(
-                        icon: const Icon(LucideIcons.x),
+                        icon: const Icon(Icons.close_rounded),
                         onPressed: () => Navigator.of(sheetContext).pop(false),
                       ),
                     ],
@@ -162,7 +163,7 @@ class _TasksHabitsScreenState extends ConsumerState<TasksHabitsScreen> {
                     decoration: InputDecoration(
                       labelText: 'Judul tugas',
                       errorText: errorText,
-                      prefixIcon: const Icon(LucideIcons.checkSquare),
+                      prefixIcon: const Icon(Icons.check_box_outlined),
                     ),
                   ),
                   const SizedBox(height: 16),
@@ -172,11 +173,16 @@ class _TasksHabitsScreenState extends ConsumerState<TasksHabitsScreen> {
                   ),
                   const SizedBox(height: 8),
                   SegmentedButton<TaskPriority>(
+                    showSelectedIcon: false,
                     segments: [
                       for (final priority in TaskPriority.values)
                         ButtonSegment<TaskPriority>(
                           value: priority,
-                          label: Text(priority.label),
+                          label: Text(
+                            priority.label,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
                         ),
                     ],
                     selected: {selectedPriority},
@@ -191,7 +197,7 @@ class _TasksHabitsScreenState extends ConsumerState<TasksHabitsScreen> {
                     children: [
                       Expanded(
                         child: OutlinedButton.icon(
-                          icon: const Icon(LucideIcons.calendar),
+                          icon: const Icon(Icons.calendar_month_rounded),
                           label: Text(
                             selectedDueDate == null
                                 ? 'Pilih tenggat (opsional)'
@@ -223,7 +229,7 @@ class _TasksHabitsScreenState extends ConsumerState<TasksHabitsScreen> {
                               selectedDueDate = null;
                             });
                           },
-                          icon: const Icon(LucideIcons.x),
+                          icon: const Icon(Icons.close_rounded),
                         ),
                       ],
                     ],
@@ -263,6 +269,7 @@ class _TasksHabitsScreenState extends ConsumerState<TasksHabitsScreen> {
                   ),
                 ],
               ),
+              ),
             );
           },
         );
@@ -288,13 +295,15 @@ class _TasksHabitsScreenState extends ConsumerState<TasksHabitsScreen> {
       builder: (sheetContext) {
         return StatefulBuilder(
           builder: (context, setSheetState) {
-            final bottomInset = MediaQuery.of(context).viewInsets.bottom;
-            return Padding(
-              padding: EdgeInsets.fromLTRB(20, 20, 20, 20 + bottomInset),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
+            final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
+            return SafeArea(
+              top: false,
+              child: SingleChildScrollView(
+                padding: EdgeInsets.fromLTRB(20, 12, 20, 20 + bottomInset),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
                   Text(
                     'Tambah Tugas Baru',
                     style: Theme.of(context).textTheme.titleLarge?.copyWith(
@@ -319,11 +328,16 @@ class _TasksHabitsScreenState extends ConsumerState<TasksHabitsScreen> {
                   ),
                   const SizedBox(height: 8),
                   SegmentedButton<TaskPriority>(
+                    showSelectedIcon: false,
                     segments: [
                       for (final priority in TaskPriority.values)
                         ButtonSegment<TaskPriority>(
                           value: priority,
-                          label: Text(priority.label),
+                          label: Text(
+                            priority.label,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
                         ),
                     ],
                     selected: {selectedPriority},
@@ -338,7 +352,7 @@ class _TasksHabitsScreenState extends ConsumerState<TasksHabitsScreen> {
                     children: [
                       Expanded(
                         child: OutlinedButton.icon(
-                          icon: const Icon(LucideIcons.calendar),
+                          icon: const Icon(Icons.calendar_month_rounded),
                           label: Text(
                             selectedDueDate == null
                                 ? 'Pilih tenggat (opsional)'
@@ -370,7 +384,7 @@ class _TasksHabitsScreenState extends ConsumerState<TasksHabitsScreen> {
                               selectedDueDate = null;
                             });
                           },
-                          icon: const Icon(LucideIcons.x),
+                          icon: const Icon(Icons.close_rounded),
                         ),
                       ],
                     ],
@@ -396,6 +410,7 @@ class _TasksHabitsScreenState extends ConsumerState<TasksHabitsScreen> {
                     child: const Text('Simpan Tugas'),
                   ),
                 ],
+              ),
               ),
             );
           },
@@ -423,13 +438,15 @@ class _TasksHabitsScreenState extends ConsumerState<TasksHabitsScreen> {
       builder: (sheetContext) {
         return StatefulBuilder(
           builder: (context, setSheetState) {
-            final bottomInset = MediaQuery.of(context).viewInsets.bottom;
-            return Padding(
-              padding: EdgeInsets.fromLTRB(20, 20, 20, 20 + bottomInset),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
+            final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
+            return SafeArea(
+              top: false,
+              child: SingleChildScrollView(
+                padding: EdgeInsets.fromLTRB(20, 12, 20, 20 + bottomInset),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
                   Text(
                     'Tambah Habit & Ibadah',
                     style: Theme.of(context).textTheme.titleLarge?.copyWith(
@@ -484,16 +501,18 @@ class _TasksHabitsScreenState extends ConsumerState<TasksHabitsScreen> {
                             onPressed: targetPerDay > 1
                                 ? () => setSheetState(() => targetPerDay--)
                                 : null,
-                            icon: const Icon(LucideIcons.minus),
+                            icon: const Icon(Icons.remove_rounded),
                           ),
                           Padding(
                             padding: const EdgeInsets.symmetric(horizontal: 14),
                             child: Text(
                               '$targetPerDay',
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .titleMedium
-                                  ?.copyWith(fontWeight: FontWeight.w700),
+                              style: HubTypography.tabular(
+                                Theme.of(context).textTheme.titleMedium?.copyWith(
+                                      fontWeight: FontWeight.w700,
+                                    ) ??
+                                    const TextStyle(fontWeight: FontWeight.w700),
+                              ),
                             ),
                           ),
                           IconButton.outlined(
@@ -501,7 +520,7 @@ class _TasksHabitsScreenState extends ConsumerState<TasksHabitsScreen> {
                             onPressed: targetPerDay < 20
                                 ? () => setSheetState(() => targetPerDay++)
                                 : null,
-                            icon: const Icon(LucideIcons.plus),
+                            icon: const Icon(Icons.add_rounded),
                           ),
                         ],
                       ),
@@ -528,6 +547,7 @@ class _TasksHabitsScreenState extends ConsumerState<TasksHabitsScreen> {
                     child: const Text('Simpan Habit'),
                   ),
                 ],
+              ),
               ),
             );
           },
@@ -564,23 +584,42 @@ class _TasksHabitsScreenState extends ConsumerState<TasksHabitsScreen> {
     final theme = Theme.of(context);
 
     final bodyContent = SafeArea(
+      top: !widget.isEmbedded,
+      bottom: !widget.isEmbedded,
       child: Column(
         children: [
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
+            padding: EdgeInsets.fromLTRB(
+              16,
+              widget.isEmbedded ? 4 : 8,
+              16,
+              10,
+            ),
             child: SizedBox(
               width: double.infinity,
               child: SegmentedButton<_TasksSection>(
+                showSelectedIcon: false,
+                style: SegmentedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                ),
                 segments: const [
                   ButtonSegment<_TasksSection>(
                     value: _TasksSection.tasks,
-                    label: Text('Tugas'),
-                    icon: Icon(LucideIcons.checkSquare),
+                    label: Text(
+                      'Tugas',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    icon: Icon(Icons.check_box_outlined, size: 18),
                   ),
                   ButtonSegment<_TasksSection>(
                     value: _TasksSection.habits,
-                    label: Text('Habit & Ibadah'),
-                    icon: Icon(LucideIcons.flame),
+                    label: Text(
+                      'Habit & Ibadah',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    icon: Icon(Icons.local_fire_department_rounded, size: 18),
                   ),
                 ],
                 selected: {_section},
@@ -617,7 +656,7 @@ class _TasksHabitsScreenState extends ConsumerState<TasksHabitsScreen> {
         onPressed: _section == _TasksSection.tasks
             ? _openCreateTaskSheet
             : _openCreateHabitSheet,
-        icon: const Icon(LucideIcons.plus),
+        icon: const Icon(Icons.add_rounded),
         label: Text(
           _section == _TasksSection.tasks ? 'Tambah Tugas' : 'Tambah Habit',
         ),
@@ -653,7 +692,7 @@ class _TasksHabitsScreenState extends ConsumerState<TasksHabitsScreen> {
                 child: Row(
                   children: [
                     Icon(
-                      LucideIcons.plusCircle,
+                      Icons.add_circle_outline_rounded,
                       color: AppTokens.primary(context),
                       size: 20,
                     ),
@@ -673,7 +712,7 @@ class _TasksHabitsScreenState extends ConsumerState<TasksHabitsScreen> {
                     ),
                     IconButton(
                       key: const Key('quick_task_submit_button'),
-                      icon: const Icon(LucideIcons.arrowUp, size: 20),
+                      icon: const Icon(Icons.arrow_upward_rounded, size: 20),
                       tooltip: 'Tambah tugas',
                       onPressed: () => _handleQuickTaskSubmit(_quickTaskController.text),
                     ),
@@ -713,7 +752,7 @@ class _TasksHabitsScreenState extends ConsumerState<TasksHabitsScreen> {
             Expanded(
               child: visibleTasks.isEmpty
                   ? _EmptyStateView(
-                      icon: LucideIcons.checkSquare,
+                      icon: Icons.check_box_outlined,
                       title: 'Belum ada tugas',
                       subtitle: _showCompletedTasks
                           ? 'Catat tugas harian agar pekerjaan tetap terarah.'
@@ -795,7 +834,7 @@ class _TasksHabitsScreenState extends ConsumerState<TasksHabitsScreen> {
                                   leading: Icon(preset.icon, color: AppTokens.primary(context)),
                                   title: Text(preset.title),
                                   subtitle: Text('${preset.category} • Target ${preset.targetPerDay}x/hari'),
-                                  trailing: const Icon(LucideIcons.plus),
+                                  trailing: const Icon(Icons.add_rounded),
                                   onTap: () {
                                     Navigator.of(sheetContext).pop();
                                     _addStarterPreset(preset);
@@ -807,7 +846,7 @@ class _TasksHabitsScreenState extends ConsumerState<TasksHabitsScreen> {
                       ),
                     );
                   },
-                  icon: const Icon(LucideIcons.plus, size: 16),
+                  icon: const Icon(Icons.add_rounded, size: 16),
                   label: const Text('+ Preset'),
                 ),
               ],
@@ -831,7 +870,7 @@ class _TasksHabitsScreenState extends ConsumerState<TasksHabitsScreen> {
             const SizedBox(height: 16),
             if (habits.isEmpty)
               _EmptyStateView(
-                icon: LucideIcons.flame,
+                icon: Icons.local_fire_department_rounded,
                 title: 'Belum ada habit atau ibadah',
                 subtitle:
                     'Pilih preset cepat di atas atau tambahkan rutinitas harian Anda sendiri.',
@@ -918,7 +957,7 @@ class _TaskCard extends StatelessWidget {
                       ),
                       if (task.dueDate != null)
                         _BadgePill(
-                          icon: LucideIcons.calendar,
+                          icon: Icons.calendar_month_rounded,
                           label: _formatDueLabel(task.dueDate!),
                           backgroundColor:
                               theme.colorScheme.surfaceContainerHighest,
@@ -926,7 +965,7 @@ class _TaskCard extends StatelessWidget {
                         ),
                       if (task.sourceMeetingId != null)
                         _BadgePill(
-                          icon: LucideIcons.users,
+                          icon: Icons.groups_rounded,
                           label: 'Dari Meeting',
                           backgroundColor: theme.colorScheme.primaryContainer,
                           foregroundColor:
@@ -941,12 +980,12 @@ class _TaskCard extends StatelessWidget {
           IconButton(
             tooltip: 'Edit tugas',
             onPressed: onEdit,
-            icon: const Icon(LucideIcons.pencil, size: 18),
+            icon: const Icon(Icons.edit_rounded, size: 18),
           ),
           IconButton(
             tooltip: 'Hapus tugas',
             onPressed: onDelete,
-            icon: const Icon(LucideIcons.trash2, size: 18),
+            icon: const Icon(Icons.delete_outline_rounded, size: 18),
           ),
         ],
       ),
@@ -1037,8 +1076,9 @@ class _HabitCard extends StatelessWidget {
                               theme.colorScheme.onSecondaryContainer,
                         ),
                         _BadgePill(
-                          icon: LucideIcons.flame,
+                          icon: Icons.local_fire_department_rounded,
                           label: '${stats.streak} hari streak',
+                          tabular: true,
                           backgroundColor: stats.streak > 0
                               ? theme.colorScheme.tertiaryContainer
                               : theme.colorScheme.surfaceContainerHighest,
@@ -1048,7 +1088,7 @@ class _HabitCard extends StatelessWidget {
                         ),
                         if (isGoalReached)
                           _BadgePill(
-                            icon: LucideIcons.checkCircle2,
+                            icon: Icons.check_circle_outline_rounded,
                             label: 'Tercapai',
                             backgroundColor:
                                 theme.colorScheme.primaryContainer,
@@ -1063,7 +1103,7 @@ class _HabitCard extends StatelessWidget {
               IconButton(
                 tooltip: 'Hapus habit',
                 onPressed: onDelete,
-                icon: const Icon(LucideIcons.trash2, size: 18),
+                icon: const Icon(Icons.delete_outline_rounded, size: 18),
               ),
             ],
           ),
@@ -1093,12 +1133,15 @@ class _HabitCard extends StatelessWidget {
                   IconButton.outlined(
                     tooltip: 'Kurangi hitungan',
                     onPressed: stats.todayCount > 0 ? onDecrement : null,
-                    icon: const Icon(LucideIcons.minus, size: 16),
+                    icon: const Icon(Icons.remove_rounded, size: 16),
                   ),
                   const SizedBox(width: 8),
                   FilledButton.tonalIcon(
                     onPressed: onIncrement,
-                    icon: const Icon(LucideIcons.plus, size: 16),
+                    style: FilledButton.styleFrom(
+                      minimumSize: const Size(0, 48),
+                    ),
+                    icon: const Icon(Icons.add_rounded, size: 16),
                     label: const Text('Catat'),
                   ),
                 ],
@@ -1117,15 +1160,21 @@ class _BadgePill extends StatelessWidget {
     required this.label,
     required this.backgroundColor,
     required this.foregroundColor,
+    this.tabular = false,
   });
 
   final IconData? icon;
   final String label;
   final Color backgroundColor;
   final Color foregroundColor;
+  final bool tabular;
 
   @override
   Widget build(BuildContext context) {
+    final baseStyle = Theme.of(context).textTheme.labelMedium?.copyWith(
+          color: foregroundColor,
+          fontWeight: FontWeight.w600,
+        );
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
@@ -1141,10 +1190,9 @@ class _BadgePill extends StatelessWidget {
           ],
           Text(
             label,
-            style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                  color: foregroundColor,
-                  fontWeight: FontWeight.w600,
-                ),
+            style: tabular && baseStyle != null
+                ? HubTypography.tabular(baseStyle)
+                : baseStyle,
           ),
         ],
       ),
@@ -1201,7 +1249,7 @@ class _EmptyStateView extends StatelessWidget {
             const SizedBox(height: 20),
             FilledButton.icon(
               onPressed: onAction,
-              icon: const Icon(LucideIcons.plus),
+              icon: const Icon(Icons.add_rounded),
               label: Text(actionLabel),
             ),
           ],

@@ -176,6 +176,7 @@ class _AddTransactionSheetState extends ConsumerState<AddTransactionSheet> {
 
   Widget _buildManualSegment() {
     final isExpense = _type == TransactionType.expense;
+    final colorScheme = Theme.of(context).colorScheme;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -215,19 +216,23 @@ class _AddTransactionSheetState extends ConsumerState<AddTransactionSheet> {
             FilteringTextInputFormatter.digitsOnly,
             RupiahTextInputFormatter(),
           ],
-          style: TextStyle(
-            fontSize: 22,
-            fontWeight: FontWeight.w800,
-            color: isExpense ? AppTokens.error(context) : AppTokens.success(context),
+          style: HubTypography.tabular(
+            TextStyle(
+              fontSize: 22,
+              fontWeight: FontWeight.w800,
+              color: isExpense ? AppTokens.error(context) : AppTokens.success(context),
+            ),
           ),
           decoration: InputDecoration(
             labelText: 'Nominal Transaksi (Rp)',
             prefixText: 'Rp ',
             hintText: '0',
-            prefixStyle: TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.w700,
-              color: isExpense ? AppTokens.error(context) : AppTokens.success(context),
+            prefixStyle: HubTypography.tabular(
+              TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.w700,
+                color: isExpense ? AppTokens.error(context) : AppTokens.success(context),
+              ),
             ),
           ),
         ),
@@ -331,19 +336,19 @@ class _AddTransactionSheetState extends ConsumerState<AddTransactionSheet> {
         // Submit Button
         FilledButton(
           style: FilledButton.styleFrom(
-            backgroundColor: AppTokens.primary(context),
-            foregroundColor: Colors.white,
+            backgroundColor: colorScheme.primary,
+            foregroundColor: colorScheme.onPrimary,
             padding: const EdgeInsets.symmetric(vertical: 14),
             shape: RoundedRectangleBorder(borderRadius: HubRadius.rSm),
           ),
           onPressed: _isSaving ? null : _submitManual,
           child: _isSaving
-              ? const SizedBox(
+              ? SizedBox(
                   width: 18,
                   height: 18,
                   child: CircularProgressIndicator(
                     strokeWidth: 2,
-                    color: Colors.white,
+                    color: colorScheme.onPrimary,
                   ),
                 )
               : const Text(
@@ -382,6 +387,7 @@ class _AddTransactionSheetState extends ConsumerState<AddTransactionSheet> {
 
   Widget _buildAiSegment(FinanceAiState aiState) {
     final isBusy = aiState.isParsing || aiState.isSavingDrafts;
+    final colorScheme = Theme.of(context).colorScheme;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -435,18 +441,18 @@ class _AddTransactionSheetState extends ConsumerState<AddTransactionSheet> {
 
         FilledButton.icon(
           style: FilledButton.styleFrom(
-            backgroundColor: AppTokens.primary(context),
-            foregroundColor: Colors.white,
+            backgroundColor: colorScheme.primary,
+            foregroundColor: colorScheme.onPrimary,
             padding: const EdgeInsets.symmetric(vertical: 12),
           ),
           onPressed: isBusy ? null : _handleQuickAiParse,
           icon: aiState.isParsing
-              ? const SizedBox(
+              ? SizedBox(
                   width: 16,
                   height: 16,
                   child: CircularProgressIndicator(
                     strokeWidth: 2,
-                    color: Colors.white,
+                    color: colorScheme.onPrimary,
                   ),
                 )
               : const Icon(Icons.auto_awesome_rounded, size: 16),
@@ -487,16 +493,16 @@ class _AddTransactionSheetState extends ConsumerState<AddTransactionSheet> {
               FilledButton.icon(
                 style: FilledButton.styleFrom(
                   backgroundColor: AppTokens.success(context),
-                  foregroundColor: Colors.white,
+                  foregroundColor: colorScheme.onPrimary,
                 ),
                 onPressed: isBusy ? null : _handleSaveAiDrafts,
                 icon: aiState.isSavingDrafts
-                    ? const SizedBox(
+                    ? SizedBox(
                         width: 16,
                         height: 16,
                         child: CircularProgressIndicator(
                           strokeWidth: 2,
-                          color: Colors.white,
+                          color: colorScheme.onPrimary,
                         ),
                       )
                     : const Icon(Icons.check_rounded),
@@ -553,9 +559,11 @@ class _AddTransactionSheetState extends ConsumerState<AddTransactionSheet> {
           const SizedBox(width: 8),
           Text(
             formatRupiah(draft.amount),
-            style: TextStyle(
-              fontWeight: FontWeight.w800,
-              color: color,
+            style: HubTypography.tabular(
+              TextStyle(
+                fontWeight: FontWeight.w800,
+                color: color,
+              ),
             ),
           ),
           IconButton(
@@ -578,26 +586,20 @@ class _AddTransactionSheetState extends ConsumerState<AddTransactionSheet> {
     final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
     final aiState = ref.watch(financeAiControllerProvider);
 
-    return Padding(
-      padding: EdgeInsets.fromLTRB(20, 16, 20, 20 + bottomInset),
-      child: SingleChildScrollView(
+    return SafeArea(
+      top: false,
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(
+          HubSpacing.xl,
+          HubSpacing.xs,
+          HubSpacing.xl,
+          HubSpacing.xl + bottomInset,
+        ),
+        child: SingleChildScrollView(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // Header Handle
-            Center(
-              child: Container(
-                width: 36,
-                height: 4,
-                margin: const EdgeInsets.only(bottom: 12),
-                decoration: BoxDecoration(
-                  color: AppTokens.border(context),
-                  borderRadius: HubRadius.rPill,
-                ),
-              ),
-            ),
-
             // Top Segment Switcher: Manual vs AI
             SegmentedButton<int>(
               segments: const [
@@ -627,6 +629,7 @@ class _AddTransactionSheetState extends ConsumerState<AddTransactionSheet> {
               _buildAiSegment(aiState),
           ],
         ),
+      ),
       ),
     );
   }

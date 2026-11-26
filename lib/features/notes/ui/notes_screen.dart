@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:personal_hub/core/theme/app_tokens.dart';
 import 'package:personal_hub/core/theme/hub_widgets.dart';
 import 'package:personal_hub/features/notes/models/note.dart';
@@ -83,18 +82,14 @@ class _NotesScreenState extends ConsumerState<NotesScreen> {
   }
 
   Future<bool> _confirmDelete(Note note) async {
+    final colorScheme = Theme.of(context).colorScheme;
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) {
         return AlertDialog(
-          backgroundColor: AppTokens.card(context),
-          title: Text(
-            'Hapus Catatan?',
-            style: TextStyle(color: AppTokens.textPrimary(context)),
-          ),
+          title: const Text('Hapus Catatan?'),
           content: Text(
             'Catatan "${note.title}" akan dihapus secara permanen.',
-            style: TextStyle(color: AppTokens.textSecondary(context)),
           ),
           actions: [
             TextButton(
@@ -103,8 +98,8 @@ class _NotesScreenState extends ConsumerState<NotesScreen> {
             ),
             FilledButton(
               style: FilledButton.styleFrom(
-                backgroundColor: AppTokens.error(context),
-                foregroundColor: Colors.white,
+                backgroundColor: colorScheme.error,
+                foregroundColor: colorScheme.onError,
               ),
               onPressed: () => Navigator.of(dialogContext).pop(true),
               child: const Text('Hapus'),
@@ -214,51 +209,43 @@ class _NotesScreenState extends ConsumerState<NotesScreen> {
           ),
         ),
         actions: [
-          PopupMenuButton<String>(
-            tooltip: 'Opsi lainnya',
-            icon: Icon(
-              LucideIcons.ellipsisVertical,
-              color: AppTokens.textPrimary(context),
-            ),
-            onSelected: (value) {
-              if (value == 'export_all') {
-                _exportAllNotes();
-              }
-            },
-            itemBuilder: (_) => const [
-              PopupMenuItem<String>(
-                value: 'export_all',
-                child: Row(
-                  children: [
-                    Icon(LucideIcons.downloadCloud, size: 18),
-                    SizedBox(width: 8),
-                    Text('Ekspor Semua (.md)'),
-                  ],
+          MenuAnchor(
+            builder: (context, controller, child) {
+              return IconButton(
+                tooltip: 'Opsi lainnya',
+                icon: Icon(
+                  Icons.more_vert_rounded,
+                  color: AppTokens.textPrimary(context),
                 ),
+                onPressed: () {
+                  if (controller.isOpen) {
+                    controller.close();
+                  } else {
+                    controller.open();
+                  }
+                },
+              );
+            },
+            menuChildren: [
+              MenuItemButton(
+                leadingIcon: const Icon(Icons.cloud_download_outlined, size: 18),
+                onPressed: _exportAllNotes,
+                child: const Text('Ekspor Semua (.md)'),
               ),
             ],
           ),
         ],
       ),
-      floatingActionButton: Padding(
-        padding: const EdgeInsets.only(bottom: 84), // Clears bottom navigation bar comfortably
-        child: FloatingActionButton.extended(
-          heroTag: 'notes_fab',
-          backgroundColor: AppTokens.primary(context),
-          foregroundColor: theme.brightness == Brightness.dark
-              ? AppTokens.canvasDark
-              : Colors.white,
-          elevation: 2,
-          highlightElevation: 4,
-          onPressed: () => _openEditor(),
-          icon: const Icon(LucideIcons.plus, size: 20),
-          label: const Text(
-            'Catatan Baru',
-            style: TextStyle(
-              fontWeight: FontWeight.w700,
-              fontSize: 15,
-              letterSpacing: -0.2,
-            ),
+      floatingActionButton: FloatingActionButton.extended(
+        heroTag: 'notes_fab',
+        onPressed: () => _openEditor(),
+        icon: const Icon(Icons.add_rounded, size: 20),
+        label: const Text(
+          'Catatan Baru',
+          style: TextStyle(
+            fontWeight: FontWeight.w700,
+            fontSize: 15,
+            letterSpacing: -0.2,
           ),
         ),
       ),
@@ -311,57 +298,36 @@ class _NotesScreenState extends ConsumerState<NotesScreen> {
 
             return Column(
               children: [
-                // Search Input with hairline tactile borders
+                // Material 3 SearchBar
                 Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-                  child: TextField(
+                  padding: const EdgeInsets.fromLTRB(
+                    HubSpacing.lg,
+                    HubSpacing.sm,
+                    HubSpacing.lg,
+                    HubSpacing.xs,
+                  ),
+                  child: SearchBar(
                     controller: _searchController,
-                    style: TextStyle(color: AppTokens.textPrimary(context)),
-                    decoration: InputDecoration(
-                      hintText: 'Cari catatan...',
-                      hintStyle: TextStyle(
-                        color: AppTokens.textSecondary(context).withValues(alpha: 0.6),
-                      ),
-                      prefixIcon: Icon(
-                        LucideIcons.search,
-                        size: 18,
-                        color: AppTokens.textSecondary(context),
-                      ),
-                      suffixIcon: _searchQuery.isNotEmpty
-                          ? IconButton(
+                    hintText: 'Cari catatan...',
+                    leading: Icon(
+                      Icons.search_rounded,
+                      size: 20,
+                      color: AppTokens.textSecondary(context),
+                    ),
+                    trailing: _searchQuery.isNotEmpty
+                        ? [
+                            IconButton(
                               tooltip: 'Bersihkan pencarian',
-                              icon: const Icon(LucideIcons.x, size: 18),
+                              icon: const Icon(Icons.close_rounded, size: 18),
                               onPressed: () {
                                 _searchController.clear();
                                 setState(() {
                                   _searchQuery = '';
                                 });
                               },
-                            )
-                          : null,
-                      isDense: true,
-                      contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 14,
-                        vertical: 12,
-                      ),
-                      filled: true,
-                      fillColor: AppTokens.card(context),
-                      border: OutlineInputBorder(
-                        borderRadius: HubRadius.rSm,
-                        borderSide: BorderSide(color: AppTokens.border(context)),
-                      ),
-                      enabledBorder: OutlineInputBorder(
-                        borderRadius: HubRadius.rSm,
-                        borderSide: BorderSide(color: AppTokens.border(context)),
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: HubRadius.rSm,
-                        borderSide: BorderSide(
-                          color: AppTokens.primary(context),
-                          width: 1.5,
-                        ),
-                      ),
-                    ),
+                            ),
+                          ]
+                        : null,
                     onChanged: (value) {
                       setState(() {
                         _searchQuery = value;
@@ -371,16 +337,18 @@ class _NotesScreenState extends ConsumerState<NotesScreen> {
                 ),
 
                 // Horizontal Tag Filter Strip with HubPill (touch target >= 48dp)
-                if (availableTags.isNotEmpty)
+                if (availableTags.isNotEmpty) ...[
                   SizedBox(
                     height: 48,
                     child: ListView(
                       scrollDirection: Axis.horizontal,
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: HubSpacing.lg,
+                      ),
                       children: [
                         Center(
                           child: Padding(
-                            padding: const EdgeInsets.only(right: 8),
+                            padding: const EdgeInsets.only(right: HubSpacing.sm),
                             child: HubPill(
                               label: 'Semua',
                               isSelected: activeTag == null,
@@ -395,10 +363,12 @@ class _NotesScreenState extends ConsumerState<NotesScreen> {
                         for (final tag in availableTags)
                           Center(
                             child: Padding(
-                              padding: const EdgeInsets.only(right: 8),
+                              padding: const EdgeInsets.only(
+                                right: HubSpacing.sm,
+                              ),
                               child: HubPill(
                                 icon: tag.toLowerCase() == 'meeting'
-                                    ? LucideIcons.calendar
+                                    ? Icons.calendar_month_rounded
                                     : null,
                                 label: tag.toLowerCase() == 'meeting'
                                     ? 'Notulensi Meeting'
@@ -419,6 +389,7 @@ class _NotesScreenState extends ConsumerState<NotesScreen> {
                       ],
                     ),
                   ),
+                ],
 
                 // Notes List
                 Expanded(
@@ -427,30 +398,46 @@ class _NotesScreenState extends ConsumerState<NotesScreen> {
                       : filteredNotes.isEmpty
                           ? _buildNoMatchState(theme)
                           : ListView(
-                              padding: const EdgeInsets.fromLTRB(16, 8, 16, 120),
+                              padding: const EdgeInsets.fromLTRB(
+                                HubSpacing.lg,
+                                HubSpacing.sm,
+                                HubSpacing.lg,
+                                96,
+                              ),
                               children: [
                                 if (pinnedNotes.isNotEmpty) ...[
-                                  _SectionHeader(
-                                    icon: LucideIcons.pin,
-                                    label: 'Disematkan',
+                                  HubSectionHeader(
+                                    title: 'Disematkan',
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: HubSpacing.xs,
+                                      vertical: HubSpacing.xs,
+                                    ),
+                                    trailing: Icon(
+                                      Icons.push_pin_rounded,
+                                      size: 16,
+                                      color: AppTokens.primary(context),
+                                    ),
                                   ),
-                                  const SizedBox(height: 8),
+                                  const SizedBox(height: HubSpacing.xs),
                                   for (final note in pinnedNotes) ...[
                                     _buildDismissibleNoteCard(note),
-                                    const SizedBox(height: 10),
+                                    const SizedBox(height: HubSpacing.md),
                                   ],
                                   if (otherNotes.isNotEmpty) ...[
-                                    const SizedBox(height: 8),
-                                    _SectionHeader(
-                                      icon: LucideIcons.fileText,
-                                      label: 'Catatan Lainnya',
+                                    const SizedBox(height: HubSpacing.sm),
+                                    HubSectionHeader(
+                                      title: 'Catatan Lainnya',
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: HubSpacing.xs,
+                                        vertical: HubSpacing.xs,
+                                      ),
                                     ),
-                                    const SizedBox(height: 8),
+                                    const SizedBox(height: HubSpacing.xs),
                                   ],
                                 ],
                                 for (final note in otherNotes) ...[
                                   _buildDismissibleNoteCard(note),
-                                  const SizedBox(height: 10),
+                                  const SizedBox(height: HubSpacing.md),
                                 ],
                               ],
                             ),
@@ -477,7 +464,7 @@ class _NotesScreenState extends ConsumerState<NotesScreen> {
           borderRadius: HubRadius.rMd,
         ),
         child: Icon(
-          LucideIcons.trash2,
+          Icons.delete_outline_rounded,
           color: AppTokens.error(context),
         ),
       ),
@@ -496,109 +483,29 @@ class _NotesScreenState extends ConsumerState<NotesScreen> {
   }
 
   Widget _buildEmptyState(ThemeData theme) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: HubCard(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                width: 56,
-                height: 56,
-                decoration: BoxDecoration(
-                  color: AppTokens.primary(context).withValues(alpha: 0.12),
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(
-                  LucideIcons.notebookPen,
-                  size: 28,
-                  color: AppTokens.primary(context),
-                ),
-              ),
-              const SizedBox(height: 16),
-              Text(
-                'Belum ada catatan',
-                style: theme.textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.w700,
-                  color: AppTokens.textPrimary(context),
-                ),
-              ),
-              const SizedBox(height: 6),
-              Text(
-                'Ketuk tombol "Catatan Baru" untuk mulai mencatat ide, daftar tugas, atau ringkasan penting.',
-                textAlign: TextAlign.center,
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: AppTokens.textSecondary(context),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
+    return const HubEmptyState(
+      icon: Icons.edit_note_rounded,
+      title: 'Belum ada catatan',
+      message:
+          'Ketuk tombol "Catatan Baru" untuk mulai mencatat ide, daftar tugas, atau ringkasan penting.',
     );
   }
 
   Widget _buildNoMatchState(ThemeData theme) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              LucideIcons.searchX,
-              size: 40,
-              color: AppTokens.textSecondary(context),
-            ),
-            const SizedBox(height: 12),
-            Text(
-              'Tidak ada catatan yang cocok',
-              style: theme.textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.w600,
-                color: AppTokens.textPrimary(context),
-              ),
-            ),
-            const SizedBox(height: 10),
-            TextButton(
-              onPressed: () {
-                _searchController.clear();
-                setState(() {
-                  _searchQuery = '';
-                  _selectedTag = null;
-                });
-              },
-              child: const Text('Reset Filter'),
-            ),
-          ],
-        ),
+    return HubEmptyState(
+      icon: Icons.search_off_rounded,
+      title: 'Tidak ada catatan yang cocok',
+      message: 'Coba ubah kata kunci pencarian atau pilih filter tag lain.',
+      action: TextButton(
+        onPressed: () {
+          _searchController.clear();
+          setState(() {
+            _searchQuery = '';
+            _selectedTag = null;
+          });
+        },
+        child: const Text('Reset Filter'),
       ),
-    );
-  }
-}
-
-class _SectionHeader extends StatelessWidget {
-  const _SectionHeader({required this.icon, required this.label});
-
-  final IconData icon;
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Row(
-      children: [
-        Icon(icon, size: 16, color: AppTokens.primary(context)),
-        const SizedBox(width: 6),
-        Text(
-          label,
-          style: theme.textTheme.labelLarge?.copyWith(
-            fontWeight: FontWeight.w700,
-            color: AppTokens.primary(context),
-          ),
-        ),
-      ],
     );
   }
 }
@@ -654,101 +561,92 @@ class _NoteCard extends StatelessWidget {
       onTap: onTap,
       borderRadius: HubRadius.rMd,
       borderColor: note.isPinned
-          ? AppTokens.primary(context).withValues(alpha: 0.5)
+          ? AppTokens.primary(context).withValues(alpha: 0.45)
           : AppTokens.border(context),
       borderWidth: 1.0,
-      padding: const EdgeInsets.all(HubSpacing.md),
+      padding: const EdgeInsets.fromLTRB(
+        HubSpacing.lg,
+        HubSpacing.md,
+        HubSpacing.sm,
+        HubSpacing.md,
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Header Row: Title & Single 3-dot Action Popup
           Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               if (note.isPinned) ...[
                 Padding(
-                  padding: const EdgeInsets.only(top: 2, right: 6),
+                  padding: const EdgeInsets.only(right: 6),
                   child: Icon(
-                    LucideIcons.pin,
+                    Icons.push_pin_rounded,
                     size: 16,
                     color: AppTokens.primary(context),
                   ),
                 ),
               ],
               Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.only(top: 2),
-                  child: Text(
-                    note.title,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: theme.textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w700,
-                      color: AppTokens.textPrimary(context),
-                      letterSpacing: -0.2,
-                    ),
+                child: Text(
+                  note.title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w700,
+                    color: AppTokens.textPrimary(context),
+                    letterSpacing: -0.2,
                   ),
                 ),
               ),
-              // Single 3-dot Popup Action Menu (>= 48x48dp touch target)
+              // Single 3-dot MenuAnchor Action Menu (>= 48x48dp touch target)
               SizedBox(
                 width: 48,
                 height: 48,
-                child: PopupMenuButton<String>(
-                  tooltip: 'Aksi catatan',
-                  icon: Icon(
-                    LucideIcons.ellipsisVertical,
-                    size: 20,
-                    color: AppTokens.textSecondary(context),
-                  ),
-                  onSelected: (value) {
-                    if (value == 'pin') {
-                      onTogglePin();
-                    } else if (value == 'export') {
-                      onExport();
-                    } else if (value == 'delete') {
-                      onDelete();
-                    }
+                child: MenuAnchor(
+                  builder: (context, controller, child) {
+                    return IconButton(
+                      tooltip: 'Aksi catatan',
+                      icon: Icon(
+                        Icons.more_vert_rounded,
+                        size: 20,
+                        color: AppTokens.textSecondary(context),
+                      ),
+                      onPressed: () {
+                        if (controller.isOpen) {
+                          controller.close();
+                        } else {
+                          controller.open();
+                        }
+                      },
+                    );
                   },
-                  itemBuilder: (_) => [
-                    PopupMenuItem<String>(
-                      value: 'pin',
-                      child: Row(
-                        children: [
-                          Icon(
-                            note.isPinned ? LucideIcons.pinOff : LucideIcons.pin,
-                            size: 18,
-                          ),
-                          const SizedBox(width: 8),
-                          Text(note.isPinned ? 'Lepas Sematan' : 'Sematkan'),
-                        ],
+                  menuChildren: [
+                    MenuItemButton(
+                      leadingIcon: Icon(
+                        note.isPinned
+                            ? Icons.push_pin_outlined
+                            : Icons.push_pin_rounded,
+                        size: 18,
                       ),
+                      onPressed: onTogglePin,
+                      child: Text(note.isPinned ? 'Lepas Sematan' : 'Sematkan'),
                     ),
-                    const PopupMenuItem<String>(
-                      value: 'export',
-                      child: Row(
-                        children: [
-                          Icon(LucideIcons.download, size: 18),
-                          SizedBox(width: 8),
-                          Text('Ekspor .md'),
-                        ],
+                    MenuItemButton(
+                      leadingIcon: const Icon(Icons.download_rounded, size: 18),
+                      onPressed: onExport,
+                      child: const Text('Ekspor .md'),
+                    ),
+                    MenuItemButton(
+                      leadingIcon: Icon(
+                        Icons.delete_outline_rounded,
+                        size: 18,
+                        color: AppTokens.error(context),
                       ),
-                    ),
-                    PopupMenuItem<String>(
-                      value: 'delete',
-                      child: Row(
-                        children: [
-                          Icon(
-                            LucideIcons.trash2,
-                            size: 18,
-                            color: AppTokens.error(context),
-                          ),
-                          const SizedBox(width: 8),
-                          Text(
-                            'Hapus',
-                            style: TextStyle(color: AppTokens.error(context)),
-                          ),
-                        ],
+                      onPressed: onDelete,
+                      child: Text(
+                        'Hapus',
+                        style: TextStyle(color: AppTokens.error(context)),
                       ),
                     ),
                   ],
@@ -758,65 +656,73 @@ class _NoteCard extends StatelessWidget {
           ),
 
           if (snippet.isNotEmpty) ...[
-            const SizedBox(height: 4),
-            Text(
-              snippet,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: AppTokens.textSecondary(context),
-                height: 1.35,
+            const SizedBox(height: HubSpacing.xs),
+            Padding(
+              padding: const EdgeInsets.only(right: HubSpacing.sm),
+              child: Text(
+                snippet,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: AppTokens.textSecondary(context),
+                  height: 1.4,
+                ),
               ),
             ),
           ],
 
-          const SizedBox(height: 10),
+          const SizedBox(height: HubSpacing.md),
 
           // Bottom Row: Tags & Tabular Date
-          Row(
-            children: [
-              if (note.tags.isNotEmpty)
-                Expanded(
-                  child: Wrap(
-                    spacing: 6,
-                    runSpacing: 4,
-                    children: [
-                      for (final tag in note.tags.take(3))
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 3,
-                          ),
-                          decoration: BoxDecoration(
-                            color: AppTokens.primary(context).withValues(alpha: 0.1),
-                            borderRadius: HubRadius.rPill,
-                            border: Border.all(
-                              color: AppTokens.primary(context).withValues(alpha: 0.25),
+          Padding(
+            padding: const EdgeInsets.only(right: HubSpacing.sm),
+            child: Row(
+              children: [
+                if (note.tags.isNotEmpty)
+                  Expanded(
+                    child: Wrap(
+                      spacing: 6,
+                      runSpacing: 4,
+                      children: [
+                        for (final tag in note.tags.take(3))
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 3,
+                            ),
+                            decoration: BoxDecoration(
+                              color: AppTokens.primary(context)
+                                  .withValues(alpha: 0.1),
+                              borderRadius: HubRadius.rPill,
+                              border: Border.all(
+                                color: AppTokens.primary(context)
+                                    .withValues(alpha: 0.25),
+                              ),
+                            ),
+                            child: Text(
+                              '#$tag',
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                                color: AppTokens.primary(context),
+                              ),
                             ),
                           ),
-                          child: Text(
-                            '#$tag',
-                            style: TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.w600,
-                              color: AppTokens.primary(context),
-                            ),
-                          ),
-                        ),
-                    ],
-                  ),
-                )
-              else
-                const Spacer(),
-              Text(
-                _formatUpdatedAt(note.updatedAt),
-                style: HubTypography.tabular(
-                  theme.textTheme.labelSmall!.copyWith(
-                    color: AppTokens.textSecondary(context),
+                      ],
+                    ),
+                  )
+                else
+                  const Spacer(),
+                Text(
+                  _formatUpdatedAt(note.updatedAt),
+                  style: HubTypography.tabular(
+                    theme.textTheme.labelSmall!.copyWith(
+                      color: AppTokens.textSecondary(context),
+                    ),
                   ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ],
       ),

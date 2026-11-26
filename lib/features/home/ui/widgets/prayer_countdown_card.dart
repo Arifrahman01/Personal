@@ -1,13 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:personal_hub/core/theme/app_tokens.dart';
 import 'package:personal_hub/core/theme/hub_widgets.dart';
 import 'package:personal_hub/features/prayer/models/prayer_models.dart';
 
 /// Card displaying the upcoming prayer countdown with accurate interval ratio:
 /// `(now - prevPrayer) / (nextPrayer - prevPrayer)`.
-/// Built with LucideIcons and tactile hairline border.
+/// Built with Material 3 Icons and tactile hairline border.
 class PrayerCountdownCard extends StatelessWidget {
   const PrayerCountdownCard({
     super.key,
@@ -77,7 +76,7 @@ class PrayerCountdownCard extends StatelessWidget {
           Row(
             children: [
               Icon(
-                LucideIcons.mapPin,
+                Icons.place_outlined,
                 size: 14,
                 color: AppTokens.textSecondary(context),
               ),
@@ -94,19 +93,24 @@ class PrayerCountdownCard extends StatelessWidget {
                 ),
               ),
               if (nextPrayer != null)
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                  decoration: BoxDecoration(
-                    color: AppTokens.primary(context).withValues(alpha: 0.12),
-                    borderRadius: HubRadius.rPill,
-                  ),
-                  child: Text(
-                    _formatRemaining(nextPrayer!.remaining),
-                    style: HubTypography.tabular(
-                      TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        color: AppTokens.primary(context),
+                Flexible(
+                  flex: 0,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: AppTokens.primary(context).withValues(alpha: 0.12),
+                      borderRadius: HubRadius.rPill,
+                    ),
+                    child: Text(
+                      _formatRemaining(nextPrayer!.remaining),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: HubTypography.tabular(
+                        TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: AppTokens.primary(context),
+                        ),
                       ),
                     ),
                   ),
@@ -125,7 +129,7 @@ class PrayerCountdownCard extends StatelessWidget {
                 child: Row(
                   children: [
                     Icon(
-                      LucideIcons.sunMedium,
+                      Icons.wb_sunny_outlined,
                       size: 22,
                       color: AppTokens.primary(context),
                     ),
@@ -211,6 +215,8 @@ class _PrayerMiniPill extends StatelessWidget {
       children: [
         Text(
           name,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
           style: TextStyle(
             fontSize: 11,
             fontWeight: isNext ? FontWeight.w700 : FontWeight.w500,
@@ -222,6 +228,8 @@ class _PrayerMiniPill extends StatelessWidget {
         const SizedBox(height: 2),
         Text(
           time,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
           style: HubTypography.tabular(
             TextStyle(
               fontSize: 11,

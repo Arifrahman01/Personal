@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:personal_hub/core/theme/app_tokens.dart';
 import 'package:personal_hub/core/theme/hub_widgets.dart';
 import 'package:personal_hub/features/home/providers/home_providers.dart';
@@ -42,7 +41,7 @@ class _AiDailyBriefingCardState extends State<AiDailyBriefingCard> {
                 child: Row(
                   children: [
                     Icon(
-                      LucideIcons.sparkles,
+                      Icons.auto_awesome_rounded,
                       size: 18,
                       color: AppTokens.primary(context),
                     ),
@@ -74,9 +73,12 @@ class _AiDailyBriefingCardState extends State<AiDailyBriefingCard> {
                 )
               else if (hasBriefing)
                 IconButton(
+                  tooltip: _isExpanded ? 'Ciutkan ringkasan' : 'Perluas ringkasan',
                   visualDensity: VisualDensity.compact,
                   icon: Icon(
-                    _isExpanded ? LucideIcons.chevronUp : LucideIcons.chevronDown,
+                    _isExpanded
+                        ? Icons.keyboard_arrow_up_rounded
+                        : Icons.keyboard_arrow_down_rounded,
                     size: 18,
                     color: AppTokens.textSecondary(context),
                   ),
@@ -124,7 +126,7 @@ class _AiDailyBriefingCardState extends State<AiDailyBriefingCard> {
               alignment: Alignment.centerLeft,
               child: TextButton.icon(
                 onPressed: widget.onGenerate,
-                icon: const Icon(LucideIcons.refreshCw, size: 14),
+                icon: const Icon(Icons.refresh_rounded, size: 14),
                 label: const Text('Coba Lagi', style: TextStyle(fontSize: 12)),
               ),
             ),
@@ -145,13 +147,20 @@ class _AiDailyBriefingCardState extends State<AiDailyBriefingCard> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text(
-                    'Dibuat jam ${timeFmt.format(state.generatedAt!)} via ${state.response!.usedModel}',
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: AppTokens.textSecondary(context).withValues(alpha: 0.7),
+                  Expanded(
+                    child: Text(
+                      'Dibuat jam ${timeFmt.format(state.generatedAt!)} via ${state.response!.usedModel}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: HubTypography.tabular(
+                        TextStyle(
+                          fontSize: 11,
+                          color: AppTokens.textSecondary(context),
+                        ),
+                      ),
                     ),
                   ),
+                  const SizedBox(width: 8),
                   InkWell(
                     onTap: widget.onGenerate,
                     borderRadius: HubRadius.rXs,
@@ -161,7 +170,7 @@ class _AiDailyBriefingCardState extends State<AiDailyBriefingCard> {
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           Icon(
-                            LucideIcons.refreshCw,
+                            Icons.refresh_rounded,
                             size: 11,
                             color: AppTokens.primary(context),
                           ),

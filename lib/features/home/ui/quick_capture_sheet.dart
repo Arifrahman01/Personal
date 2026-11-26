@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
-import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:personal_hub/core/theme/app_tokens.dart';
 import 'package:personal_hub/features/finance/models/finance_models.dart';
 import 'package:personal_hub/features/finance/ui/finance_screen.dart';
@@ -22,7 +21,8 @@ class QuickCaptureSheet extends ConsumerStatefulWidget {
     return showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
-      backgroundColor: Colors.transparent,
+      useSafeArea: true,
+      showDragHandle: true,
       builder: (_) => const QuickCaptureSheet(),
     );
   }
@@ -148,104 +148,89 @@ class _QuickCaptureSheetState extends ConsumerState<QuickCaptureSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     final captureState = ref.watch(quickCaptureControllerProvider);
     final batch = captureState.batch;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final bottomInset = MediaQuery.of(context).viewInsets.bottom;
+    final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
     final currencyFmt = NumberFormat.currency(
       locale: 'id_ID',
       symbol: 'Rp ',
       decimalDigits: 0,
     );
 
-    return Container(
+    return ConstrainedBox(
       constraints: BoxConstraints(
-        maxHeight: MediaQuery.of(context).size.height * 0.90,
+        maxHeight: MediaQuery.sizeOf(context).height * 0.90,
       ),
-      margin: EdgeInsets.only(bottom: bottomInset),
-      decoration: BoxDecoration(
-        color: AppTokens.card(context),
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(HubRadius.lg)),
-        border: Border(
-          top: BorderSide(color: AppTokens.border(context), width: 1),
-        ),
-      ),
-      child: SafeArea(
-        top: false,
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 20),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              // Drag handle
-              Center(
-                child: Container(
-                  width: 36,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: isDark ? Colors.white24 : Colors.black12,
-                    borderRadius: HubRadius.rPill,
-                  ),
+      child: Padding(
+        padding: EdgeInsets.only(bottom: bottomInset),
+        child: SafeArea(
+          top: false,
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.fromLTRB(16, 4, 16, 20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                // Title and Mic row
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: AppTokens.primary(context).withValues(alpha: 0.12),
+                        borderRadius: HubRadius.rSm,
+                      ),
+                      child: Icon(
+                        Icons.auto_awesome_rounded,
+                        size: 20,
+                        color: AppTokens.primary(context),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Catat Cepat Serbaguna',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w700,
+                              color: AppTokens.textPrimary(context),
+                            ),
+                          ),
+                          Text(
+                            'Tulis alami atau gunakan suara untuk multi-catatan',
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: AppTokens.textSecondary(context),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    IconButton(
+                      onPressed: _toggleListening,
+                      tooltip: _isListening ? 'Hentikan Rekam' : 'Bicara Sekarang',
+                      style: IconButton.styleFrom(
+                        backgroundColor: _isListening
+                            ? AppTokens.error(context).withValues(alpha: 0.15)
+                            : AppTokens.primary(context).withValues(alpha: 0.12),
+                      ),
+                      icon: Icon(
+                        _isListening ? Icons.mic_off_rounded : Icons.mic_rounded,
+                        color: _isListening
+                            ? AppTokens.error(context)
+                            : AppTokens.primary(context),
+                      ),
+                    ),
+                  ],
                 ),
-              ),
-              const SizedBox(height: 12),
-
-              // Title and Mic row
-              Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: AppTokens.primary(context).withValues(alpha: 0.12),
-                      borderRadius: HubRadius.rSm,
-                    ),
-                    child: Icon(
-                      LucideIcons.sparkles,
-                      size: 20,
-                      color: AppTokens.primary(context),
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Catat Cepat Serbaguna',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w700,
-                            color: AppTokens.textPrimary(context),
-                          ),
-                        ),
-                        Text(
-                          'Tulis alami atau gunakan suara untuk multi-catatan',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: AppTokens.textSecondary(context),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  IconButton(
-                    onPressed: _toggleListening,
-                    tooltip: _isListening ? 'Hentikan Rekam' : 'Bicara Sekarang',
-                    style: IconButton.styleFrom(
-                      backgroundColor: _isListening
-                          ? AppTokens.error(context).withValues(alpha: 0.15)
-                          : AppTokens.primary(context).withValues(alpha: 0.12),
-                    ),
-                    icon: Icon(
-                      _isListening ? LucideIcons.micOff : LucideIcons.mic,
-                      color: _isListening
-                          ? AppTokens.error(context)
-                          : AppTokens.primary(context),
-                    ),
-                  ),
-                ],
-              ),
               if (_speechStatus.isNotEmpty) ...[
                 const SizedBox(height: 6),
                 Text(
@@ -315,7 +300,7 @@ class _QuickCaptureSheetState extends ConsumerState<QuickCaptureSheet> {
                     child: Row(
                       children: [
                         _ShortcutChip(
-                          icon: LucideIcons.notebookPen,
+                          icon: Icons.edit_note_rounded,
                           label: 'Catatan',
                           onTap: () {
                             Navigator.of(context).pop();
@@ -328,7 +313,7 @@ class _QuickCaptureSheetState extends ConsumerState<QuickCaptureSheet> {
                         ),
                         const SizedBox(width: 8),
                         _ShortcutChip(
-                          icon: LucideIcons.checkSquare,
+                          icon: Icons.check_box_outlined,
                           label: 'Tugas',
                           onTap: () {
                             Navigator.of(context).pop();
@@ -341,7 +326,7 @@ class _QuickCaptureSheetState extends ConsumerState<QuickCaptureSheet> {
                         ),
                         const SizedBox(width: 8),
                         _ShortcutChip(
-                          icon: LucideIcons.walletCards,
+                          icon: Icons.account_balance_wallet_outlined,
                           label: 'Transaksi',
                           onTap: () {
                             Navigator.of(context).pop();
@@ -354,7 +339,7 @@ class _QuickCaptureSheetState extends ConsumerState<QuickCaptureSheet> {
                         ),
                         const SizedBox(width: 8),
                         _ShortcutChip(
-                          icon: LucideIcons.calendar,
+                          icon: Icons.calendar_month_rounded,
                           label: 'Meeting',
                           onTap: () {
                             Navigator.of(context).pop();
@@ -397,7 +382,7 @@ class _QuickCaptureSheetState extends ConsumerState<QuickCaptureSheet> {
                     child: Row(
                       children: [
                         Icon(
-                          LucideIcons.walletCards,
+                          Icons.account_balance_wallet_outlined,
                           size: 16,
                           color: item.type == TransactionType.expense
                               ? AppTokens.error(context)
@@ -444,7 +429,7 @@ class _QuickCaptureSheetState extends ConsumerState<QuickCaptureSheet> {
                     child: Row(
                       children: [
                         Icon(
-                          LucideIcons.checkSquare,
+                          Icons.check_box_outlined,
                           size: 16,
                           color: AppTokens.info(context),
                         ),
@@ -497,7 +482,7 @@ class _QuickCaptureSheetState extends ConsumerState<QuickCaptureSheet> {
                     child: Row(
                       children: [
                         Icon(
-                          LucideIcons.notebookPen,
+                          Icons.edit_note_rounded,
                           size: 16,
                           color: AppTokens.primary(context),
                         ),
@@ -532,26 +517,27 @@ class _QuickCaptureSheetState extends ConsumerState<QuickCaptureSheet> {
               FilledButton.icon(
                 onPressed: captureState.isSaving || batch.isEmpty ? null : _saveAll,
                 icon: captureState.isSaving
-                    ? const SizedBox(
+                    ? SizedBox(
                         width: 16,
                         height: 16,
                         child: CircularProgressIndicator(
                           strokeWidth: 2,
-                          color: Colors.white,
+                          color: theme.colorScheme.onPrimary,
                         ),
                       )
-                    : const Icon(LucideIcons.check, size: 18),
+                    : const Icon(Icons.check_rounded, size: 18),
                 label: Text(
                   captureState.isSaving
                       ? 'Menyimpan...'
                       : (batch.isEmpty
                           ? 'Tulis Kalimat untuk Menyimpan'
                           : 'Simpan ${batch.totalCount} Entri'),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                   style: const TextStyle(fontWeight: FontWeight.w600),
                 ),
                 style: FilledButton.styleFrom(
-                  backgroundColor: AppTokens.primary(context),
-                  foregroundColor: Colors.white,
+                  minimumSize: const Size.fromHeight(48),
                   padding: const EdgeInsets.symmetric(vertical: 12),
                   shape: RoundedRectangleBorder(borderRadius: HubRadius.rSm),
                 ),
@@ -560,6 +546,7 @@ class _QuickCaptureSheetState extends ConsumerState<QuickCaptureSheet> {
           ),
         ),
       ),
+    ),
     );
   }
 }

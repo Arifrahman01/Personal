@@ -304,9 +304,11 @@ class _NisabBenchmarkHeroCard extends ConsumerWidget {
                     children: [
                       Text(
                         '$percentage% dari Nisab',
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: AppTokens.textSecondary(context),
+                        style: HubTypography.tabular(
+                          TextStyle(
+                            fontSize: 11,
+                            color: AppTokens.textSecondary(context),
+                          ),
                         ),
                       ),
                       Container(
@@ -539,10 +541,12 @@ class _ZakatHaulTrackerCard extends ConsumerWidget {
                           haul.isHaulFulfilled
                               ? 'Haul Telah Genap (354 Hari)'
                               : '${haul.daysRemaining} Hari Lagi',
-                          style: TextStyle(
-                            fontSize: 22,
-                            fontWeight: FontWeight.w800,
-                            color: haulColor,
+                          style: HubTypography.tabular(
+                            TextStyle(
+                              fontSize: 22,
+                              fontWeight: FontWeight.w800,
+                              color: haulColor,
+                            ),
                           ),
                         ),
                         const SizedBox(height: 2),
@@ -829,10 +833,12 @@ class _ZakatFitrahCalculatorCard extends ConsumerWidget {
                 ),
                 child: Text(
                   '2.5 kg / jiwa',
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w700,
-                    color: AppTokens.primary(context),
+                  style: HubTypography.tabular(
+                    TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      color: AppTokens.primary(context),
+                    ),
                   ),
                 ),
               ),
@@ -883,10 +889,12 @@ class _ZakatFitrahCalculatorCard extends ConsumerWidget {
                     ),
                     Text(
                       '$familyCount Jiwa',
-                      style: TextStyle(
-                        fontWeight: FontWeight.w800,
-                        fontSize: 13,
-                        color: AppTokens.textPrimary(context),
+                      style: HubTypography.tabular(
+                        TextStyle(
+                          fontWeight: FontWeight.w800,
+                          fontSize: 13,
+                          color: AppTokens.textPrimary(context),
+                        ),
                       ),
                     ),
                     IconButton(
@@ -908,9 +916,11 @@ class _ZakatFitrahCalculatorCard extends ConsumerWidget {
               Expanded(
                 child: Text(
                   'Harga Beras: Rp ${formatRupiah(ricePrice.round()).replaceAll('Rp ', '')}/kg',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: AppTokens.textSecondary(context),
+                  style: HubTypography.tabular(
+                    TextStyle(
+                      fontSize: 12,
+                      color: AppTokens.textSecondary(context),
+                    ),
                   ),
                 ),
               ),

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:lucide_icons_flutter/lucide_icons.dart';
+import 'package:personal_hub/core/theme/app_tokens.dart';
 import 'package:personal_hub/core/theme/hub_widgets.dart';
 import 'package:personal_hub/features/meetings/models/meeting.dart';
 import 'package:personal_hub/features/meetings/providers/meetings_providers.dart';
@@ -323,37 +323,47 @@ class _LiveMeetingRecorderScreenState
                 : 'Rekam Meeting',
           ),
           leading: IconButton(
-            icon: const Icon(LucideIcons.arrowLeft),
+            icon: const Icon(Icons.arrow_back_rounded),
             onPressed: _handleBackPress,
             tooltip: 'Kembali',
           ),
           actions: [
             // Language selector ID / EN
-            Container(
-              margin: const EdgeInsets.only(right: 8),
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              decoration: BoxDecoration(
-                color: theme.colorScheme.surfaceContainerHighest,
-                borderRadius: BorderRadius.circular(16),
-              ),
-              child: DropdownButtonHideUnderline(
-                child: DropdownButton<String>(
-                  value: sessionState.localeId,
-                  isDense: true,
-                  icon: const Icon(LucideIcons.chevronDown, size: 14),
-                  items: const [
-                    DropdownMenuItem(value: 'id_ID', child: Text('ID')),
-                    DropdownMenuItem(value: 'en_US', child: Text('EN')),
-                  ],
-                  onChanged: sessionState.isRecording
-                      ? null
-                      : (val) {
-                          if (val != null) {
-                            recorder.setLocale(val);
-                          }
-                        },
+            MenuAnchor(
+              builder: (context, controller, child) {
+                return Padding(
+                  padding: const EdgeInsets.only(right: 8),
+                  child: ActionChip(
+                    label: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(sessionState.localeId == 'en_US' ? 'EN' : 'ID'),
+                        const SizedBox(width: 2),
+                        const Icon(Icons.keyboard_arrow_down_rounded, size: 16),
+                      ],
+                    ),
+                    onPressed: sessionState.isRecording
+                        ? null
+                        : () {
+                            if (controller.isOpen) {
+                              controller.close();
+                            } else {
+                              controller.open();
+                            }
+                          },
+                  ),
+                );
+              },
+              menuChildren: [
+                MenuItemButton(
+                  onPressed: () => recorder.setLocale('id_ID'),
+                  child: const Text('ID'),
                 ),
-              ),
+                MenuItemButton(
+                  onPressed: () => recorder.setLocale('en_US'),
+                  child: const Text('EN'),
+                ),
+              ],
             ),
 
             // Live Timer HH:mm:ss with Tabular Figures
@@ -362,18 +372,20 @@ class _LiveMeetingRecorderScreenState
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
               decoration: BoxDecoration(
                 color: sessionState.isRecording
-                    ? theme.colorScheme.errorContainer.withValues(alpha: 0.3)
+                    ? theme.colorScheme.errorContainer
                     : theme.colorScheme.surfaceContainerHighest,
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Text(
                 sessionState.formattedElapsed,
-                style: theme.textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.w700,
-                  fontFeatures: const [FontFeature.tabularFigures()],
-                  color: sessionState.isRecording
-                      ? theme.colorScheme.error
-                      : theme.colorScheme.onSurface,
+                style: HubTypography.tabular(
+                  theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w700,
+                        color: sessionState.isRecording
+                            ? theme.colorScheme.onErrorContainer
+                            : theme.colorScheme.onSurface,
+                      ) ??
+                      const TextStyle(fontWeight: FontWeight.w700),
                 ),
               ),
             ),
@@ -403,7 +415,7 @@ class _LiveMeetingRecorderScreenState
                         Row(
                           children: [
                             Icon(
-                              LucideIcons.history,
+                              Icons.history_rounded,
                               size: 16,
                               color: theme.colorScheme.primary,
                             ),
@@ -419,7 +431,7 @@ class _LiveMeetingRecorderScreenState
                             IconButton(
                               visualDensity: VisualDensity.compact,
                               padding: EdgeInsets.zero,
-                              icon: const Icon(LucideIcons.x, size: 16),
+                              icon: const Icon(Icons.close_rounded, size: 16),
                               onPressed: () {
                                 recorder.clearDraft();
                                 ref.invalidate(activeMeetingDraftProvider);
@@ -477,7 +489,7 @@ class _LiveMeetingRecorderScreenState
                     controller: _titleController,
                     decoration: InputDecoration(
                       hintText: 'Judul Rapat (opsional / otomatis)',
-                      prefixIcon: const Icon(LucideIcons.calendarDays, size: 20),
+                      prefixIcon: const Icon(Icons.calendar_today_rounded, size: 20),
                       filled: true,
                       fillColor: theme.colorScheme.surfaceContainerHighest
                           .withValues(alpha: 0.4),
@@ -499,30 +511,33 @@ class _LiveMeetingRecorderScreenState
                     horizontal: 16,
                     vertical: 6,
                   ),
-                  child: Row(
-                    children: [
-                      Text(
-                        'Format:',
-                        style: theme.textTheme.labelMedium?.copyWith(
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      for (final style in MeetingNoteStyle.values) ...[
-                        Padding(
-                          padding: const EdgeInsets.only(right: 6),
-                          child: ChoiceChip(
-                            label: Text(style.label),
-                            selected: _selectedStyle == style,
-                            onSelected: (selected) {
-                              if (selected) {
-                                setState(() => _selectedStyle = style);
-                              }
-                            },
+                  child: SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      children: [
+                        Text(
+                          'Format:',
+                          style: theme.textTheme.labelMedium?.copyWith(
+                            fontWeight: FontWeight.w600,
                           ),
                         ),
+                        const SizedBox(width: 8),
+                        for (final style in MeetingNoteStyle.values) ...[
+                          Padding(
+                            padding: const EdgeInsets.only(right: 6),
+                            child: ChoiceChip(
+                              label: Text(style.label),
+                              selected: _selectedStyle == style,
+                              onSelected: (selected) {
+                                if (selected) {
+                                  setState(() => _selectedStyle = style);
+                                }
+                              },
+                            ),
+                          ),
+                        ],
                       ],
-                    ],
+                    ),
                   ),
                 ),
 
@@ -547,11 +562,15 @@ class _LiveMeetingRecorderScreenState
                           ),
                         ),
                         const SizedBox(width: 8),
-                        Text(
-                          'Merekam percakapan...',
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: theme.colorScheme.error,
-                            fontWeight: FontWeight.w700,
+                        Expanded(
+                          child: Text(
+                            'Merekam percakapan...',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: theme.colorScheme.error,
+                              fontWeight: FontWeight.w700,
+                            ),
                           ),
                         ),
                       ] else if (sessionState.isPaused) ...[
@@ -559,16 +578,20 @@ class _LiveMeetingRecorderScreenState
                           width: 10,
                           height: 10,
                           decoration: BoxDecoration(
-                            color: Colors.amber.shade700,
+                            color: HubColors.of(context).warning,
                             shape: BoxShape.circle,
                           ),
                         ),
                         const SizedBox(width: 8),
-                        Text(
-                          'Dijeda (Bisa edit teks / sisip catatan)',
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: Colors.amber.shade800,
-                            fontWeight: FontWeight.w700,
+                        Expanded(
+                          child: Text(
+                            'Dijeda (Bisa edit teks / sisip catatan)',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: HubColors.of(context).warning,
+                              fontWeight: FontWeight.w700,
+                            ),
                           ),
                         ),
                       ] else ...[
@@ -581,19 +604,26 @@ class _LiveMeetingRecorderScreenState
                           ),
                         ),
                         const SizedBox(width: 8),
-                        Text(
-                          'Siap merekam',
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: theme.colorScheme.outline,
+                        Expanded(
+                          child: Text(
+                            'Siap merekam',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: theme.colorScheme.onSurfaceVariant,
+                            ),
                           ),
                         ),
                       ],
-                      const Spacer(),
+                      const SizedBox(width: 8),
                       // Word count
                       Text(
                         '${sessionState.combinedTranscript.trim().split(RegExp(r'\s+')).where((s) => s.isNotEmpty).length} kata',
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: theme.colorScheme.outline,
+                        style: HubTypography.tabular(
+                          theme.textTheme.bodySmall?.copyWith(
+                                color: theme.colorScheme.onSurfaceVariant,
+                              ) ??
+                              const TextStyle(),
                         ),
                       ),
                     ],
@@ -621,7 +651,7 @@ class _LiveMeetingRecorderScreenState
                               mainAxisSize: MainAxisSize.min,
                               children: [
                                 Icon(
-                                  LucideIcons.mic,
+                                  Icons.mic_rounded,
                                   size: 40,
                                   color: theme.colorScheme.outline.withValues(
                                     alpha: 0.5,
@@ -688,25 +718,26 @@ class _LiveMeetingRecorderScreenState
                 Padding(
                   padding: const EdgeInsets.symmetric(
                     horizontal: 16,
-                    vertical: 4,
+                    vertical: 6,
                   ),
-                  child: Row(
+                  child: Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
                     children: [
                       OutlinedButton.icon(
                         onPressed: _showAddManualNoteDialog,
-                        icon: const Icon(LucideIcons.plus, size: 16),
+                        icon: const Icon(Icons.add_rounded, size: 16),
                         label: const Text('Sisip Catatan'),
                         style: OutlinedButton.styleFrom(
-                          visualDensity: VisualDensity.compact,
+                          minimumSize: const Size(0, 44),
                         ),
                       ),
-                      const SizedBox(width: 8),
                       OutlinedButton.icon(
                         onPressed: _pasteFromClipboard,
-                        icon: const Icon(LucideIcons.clipboardPaste, size: 16),
+                        icon: const Icon(Icons.content_paste_rounded, size: 16),
                         label: const Text('Tempel Transkrip'),
                         style: OutlinedButton.styleFrom(
-                          visualDensity: VisualDensity.compact,
+                          minimumSize: const Size(0, 44),
                         ),
                       ),
                     ],
@@ -715,69 +746,74 @@ class _LiveMeetingRecorderScreenState
 
                 // Primary Bottom Controls
                 Container(
-                  padding: const EdgeInsets.fromLTRB(16, 10, 16, 20),
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
                   decoration: BoxDecoration(
                     color: theme.colorScheme.surface,
                     border: Border(
                       top: BorderSide(
-                        color: theme.colorScheme.outlineVariant.withValues(
-                          alpha: 0.3,
-                        ),
+                        color: theme.colorScheme.outlineVariant,
                       ),
                     ),
                   ),
-                  child: Row(
-                    children: [
-                      // Pause / Resume / Start toggle
-                      if (sessionState.isRecording) ...[
-                        OutlinedButton.icon(
-                          onPressed: () => recorder.pause(),
-                          icon: const Icon(LucideIcons.pause),
-                          label: const Text('Jeda'),
-                          style: OutlinedButton.styleFrom(
-                            minimumSize: const Size(100, 48),
+                  child: SafeArea(
+                    top: false,
+                    child: Row(
+                      children: [
+                        // Pause / Resume / Start toggle
+                        if (sessionState.isRecording) ...[
+                          OutlinedButton.icon(
+                            onPressed: () => recorder.pause(),
+                            icon: const Icon(Icons.pause_rounded),
+                            label: const Text('Jeda'),
+                            style: OutlinedButton.styleFrom(
+                              minimumSize: const Size(100, 48),
+                            ),
                           ),
-                        ),
-                      ] else if (sessionState.isPaused) ...[
-                        FilledButton.tonalIcon(
-                          onPressed: () => recorder.resume(),
-                          icon: const Icon(LucideIcons.play),
-                          label: const Text('Lanjut'),
-                          style: FilledButton.styleFrom(
-                            minimumSize: const Size(100, 48),
+                        ] else if (sessionState.isPaused) ...[
+                          FilledButton.tonalIcon(
+                            onPressed: () => recorder.resume(),
+                            icon: const Icon(Icons.play_arrow_rounded),
+                            label: const Text('Lanjut'),
+                            style: FilledButton.styleFrom(
+                              minimumSize: const Size(100, 48),
+                            ),
                           ),
-                        ),
-                      ] else ...[
-                        FilledButton.tonalIcon(
-                          onPressed: () => recorder.start(
-                            title: _titleController.text.trim(),
-                            style: _selectedStyle.name,
-                            meetingId: widget.existingMeeting?.id,
+                        ] else ...[
+                          FilledButton.tonalIcon(
+                            onPressed: () => recorder.start(
+                              title: _titleController.text.trim(),
+                              style: _selectedStyle.name,
+                              meetingId: widget.existingMeeting?.id,
+                            ),
+                            icon: const Icon(Icons.mic_rounded),
+                            label: const Text('Mulai'),
+                            style: FilledButton.styleFrom(
+                              minimumSize: const Size(100, 48),
+                            ),
                           ),
-                          icon: const Icon(LucideIcons.mic),
-                          label: const Text('Mulai'),
-                          style: FilledButton.styleFrom(
-                            minimumSize: const Size(100, 48),
+                        ],
+                        const SizedBox(width: 12),
+
+                        // Selesai & Susun Catatan primary CTA
+                        Expanded(
+                          child: FilledButton.icon(
+                            onPressed:
+                                sessionState.combinedTranscript.trim().isEmpty
+                                ? null
+                                : () => _finishAndCompose(skipAi: false),
+                            icon: const Icon(Icons.auto_awesome_rounded),
+                            label: const Text(
+                              'Selesai & Susun Catatan',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            style: FilledButton.styleFrom(
+                              minimumSize: const Size(0, 48),
+                            ),
                           ),
                         ),
                       ],
-                      const SizedBox(width: 12),
-
-                      // Selesai & Susun Catatan primary CTA
-                      Expanded(
-                        child: FilledButton.icon(
-                          onPressed:
-                              sessionState.combinedTranscript.trim().isEmpty
-                              ? null
-                              : () => _finishAndCompose(skipAi: false),
-                          icon: const Icon(LucideIcons.sparkles),
-                          label: const Text('Selesai & Susun Catatan'),
-                          style: FilledButton.styleFrom(
-                            minimumSize: const Size(0, 48),
-                          ),
-                        ),
-                      ),
-                    ],
+                    ),
                   ),
                 ),
               ],
@@ -787,7 +823,7 @@ class _LiveMeetingRecorderScreenState
             if (_isComposing)
               Positioned.fill(
                 child: Container(
-                  color: Colors.black.withValues(alpha: 0.5),
+                  color: theme.colorScheme.scrim.withValues(alpha: 0.54),
                   child: Center(
                     child: Container(
                       padding: const EdgeInsets.all(24),
@@ -797,7 +833,7 @@ class _LiveMeetingRecorderScreenState
                         borderRadius: BorderRadius.circular(20),
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.2),
+                            color: theme.colorScheme.shadow.withValues(alpha: 0.2),
                             blurRadius: 16,
                           ),
                         ],

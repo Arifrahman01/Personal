@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:personal_hub/core/theme/app_tokens.dart';
 import 'package:personal_hub/features/finance/models/finance_models.dart';
 import 'package:personal_hub/features/finance/providers/asset_aggregator_providers.dart';
 import 'package:personal_hub/features/finance/providers/finance_providers.dart';
@@ -132,45 +131,35 @@ class _FinanceScreenState extends ConsumerState<FinanceScreen> {
             icon: const Icon(Icons.account_balance_wallet_outlined),
             onPressed: _openAssetDeclarationSheet,
           ),
-          PopupMenuButton<String>(
-            tooltip: 'Ekspor ke CSV',
-            icon: const Icon(Icons.download_rounded),
-            onSelected: (value) {
-              if (value == 'month') {
-                _handleExportCsv(allTime: false);
-              } else if (value == 'all') {
-                _handleExportCsv(allTime: true);
-              }
+          MenuAnchor(
+            builder: (context, controller, child) {
+              return IconButton(
+                tooltip: 'Ekspor ke CSV',
+                icon: const Icon(Icons.download_rounded),
+                onPressed: () {
+                  if (controller.isOpen) {
+                    controller.close();
+                  } else {
+                    controller.open();
+                  }
+                },
+              );
             },
-            itemBuilder: (_) => [
-              PopupMenuItem<String>(
-                value: 'month',
-                child: Row(
-                  children: [
-                    const Icon(Icons.calendar_today_rounded, size: 18),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        'Ekspor ${selectedMonth.label} (CSV)',
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                  ],
+            menuChildren: [
+              MenuItemButton(
+                leadingIcon: const Icon(Icons.calendar_today_rounded, size: 18),
+                onPressed: () => _handleExportCsv(allTime: false),
+                child: Text(
+                  'Ekspor ${selectedMonth.label} (CSV)',
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
-              const PopupMenuItem<String>(
-                value: 'all',
-                child: Row(
-                  children: [
-                    Icon(Icons.inventory_2_outlined, size: 18),
-                    SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        'Ekspor Semua Transaksi (CSV)',
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                  ],
+              MenuItemButton(
+                leadingIcon: const Icon(Icons.inventory_2_outlined, size: 18),
+                onPressed: () => _handleExportCsv(allTime: true),
+                child: const Text(
+                  'Ekspor Semua Transaksi (CSV)',
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
             ],
@@ -194,11 +183,8 @@ class _FinanceScreenState extends ConsumerState<FinanceScreen> {
         ],
       ),
       floatingActionButton: FloatingActionButton.extended(
-        backgroundColor: AppTokens.primary(context),
-        foregroundColor: Colors.white,
-        elevation: 2,
         onPressed: _openAddTransactionSheet,
-        icon: const Icon(Icons.add_rounded, color: Colors.white),
+        icon: const Icon(Icons.add_rounded),
         label: const Text(
           'Catat',
           style: TextStyle(fontWeight: FontWeight.w700),
@@ -206,18 +192,32 @@ class _FinanceScreenState extends ConsumerState<FinanceScreen> {
       ),
       body: SafeArea(
         child: ListView(
-          padding: const EdgeInsets.fromLTRB(16, 6, 16, 96),
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 96),
           children: [
             // Segmented Tab Switcher (Arus Kas & Tagihan vs Zakat Mal & Nisab)
-            _FinanceTabSelector(
-              selectedIndex: _selectedTabIndex,
-              onTabSelected: (index) {
-                setState(() {
-                  _selectedTabIndex = index;
-                });
+            SegmentedButton<int>(
+              segments: const [
+                ButtonSegment<int>(
+                  value: 0,
+                  label: Text('Arus Kas & Tagihan'),
+                  icon: Icon(Icons.auto_graph_rounded, size: 18),
+                ),
+                ButtonSegment<int>(
+                  value: 1,
+                  label: Text('Zakat Mal & Nisab'),
+                  icon: Icon(Icons.balance_rounded, size: 18),
+                ),
+              ],
+              selected: {_selectedTabIndex},
+              onSelectionChanged: (selection) {
+                if (selection.isNotEmpty) {
+                  setState(() {
+                    _selectedTabIndex = selection.first;
+                  });
+                }
               },
             ),
-            const SizedBox(height: 10),
+            const SizedBox(height: 12),
 
             // Tab Content
             if (_selectedTabIndex == 0)
@@ -231,110 +231,6 @@ class _FinanceScreenState extends ConsumerState<FinanceScreen> {
                 onDeclareAssets: _openAssetDeclarationSheet,
               ),
           ],
-        ),
-      ),
-    );
-  }
-}
-
-/// Segmented tab switcher with high-contrast tactile pills for Calm Clarity.
-class _FinanceTabSelector extends StatelessWidget {
-  const _FinanceTabSelector({
-    required this.selectedIndex,
-    required this.onTabSelected,
-  });
-
-  final int selectedIndex;
-  final ValueChanged<int> onTabSelected;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(4),
-      decoration: BoxDecoration(
-        color: AppTokens.card(context),
-        borderRadius: HubRadius.rPill,
-        border: Border.all(color: AppTokens.border(context)),
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: _TabPill(
-              label: 'Arus Kas & Tagihan',
-              icon: Icons.auto_graph_rounded,
-              isSelected: selectedIndex == 0,
-              onTap: () => onTabSelected(0),
-            ),
-          ),
-          const SizedBox(width: 4),
-          Expanded(
-            child: _TabPill(
-              label: 'Zakat Mal & Nisab',
-              icon: Icons.balance_rounded,
-              isSelected: selectedIndex == 1,
-              onTap: () => onTabSelected(1),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _TabPill extends StatelessWidget {
-  const _TabPill({
-    required this.label,
-    required this.icon,
-    required this.isSelected,
-    required this.onTap,
-  });
-
-  final String label;
-  final IconData icon;
-  final bool isSelected;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final activeColor = AppTokens.primary(context);
-    final inactiveColor = AppTokens.textSecondary(context);
-
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: HubRadius.rPill,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 200),
-          curve: Curves.easeOutCubic,
-          padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 8),
-          decoration: BoxDecoration(
-            color: isSelected ? activeColor : Colors.transparent,
-            borderRadius: HubRadius.rPill,
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
-                icon,
-                size: 16,
-                color: isSelected ? Colors.white : inactiveColor,
-              ),
-              const SizedBox(width: 6),
-              Flexible(
-                child: Text(
-                  label,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
-                    color: isSelected ? Colors.white : inactiveColor,
-                  ),
-                ),
-              ),
-            ],
-          ),
         ),
       ),
     );

@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:personal_hub/core/config/secure_config_store.dart';
 import 'package:personal_hub/core/theme/app_theme.dart';
 import 'package:personal_hub/features/vault/data/vault_repository.dart';
@@ -266,8 +265,8 @@ void main() {
       await tester.pump();
 
       // Tap explicit confirm button on the keypad
-      await tester.ensureVisible(find.byIcon(LucideIcons.check));
-      await tester.tap(find.byIcon(LucideIcons.check));
+      await tester.ensureVisible(find.byIcon(Icons.check_rounded));
+      await tester.tap(find.byIcon(Icons.check_rounded));
       await tester.pumpAndSettle();
 
       // Vault is unlocked successfully!

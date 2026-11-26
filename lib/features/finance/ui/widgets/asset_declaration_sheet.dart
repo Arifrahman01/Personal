@@ -169,16 +169,21 @@ class _AssetDeclarationSheetState extends ConsumerState<AssetDeclarationSheet> {
             FilteringTextInputFormatter.digitsOnly,
             RupiahTextInputFormatter(),
           ],
+          style: HubTypography.tabular(
+            Theme.of(context).textTheme.bodyLarge ?? const TextStyle(),
+          ),
           onChanged: (_) => setState(() {}),
           decoration: InputDecoration(
             labelText: label,
             prefixText: 'Rp ',
             hintText: hint,
             helperText: formattedPreview != null ? 'Terbaca: $formattedPreview' : null,
-            helperStyle: TextStyle(
-              color: AppTokens.success(context),
-              fontWeight: FontWeight.w600,
-              fontSize: 12,
+            helperStyle: HubTypography.tabular(
+              TextStyle(
+                color: AppTokens.success(context),
+                fontWeight: FontWeight.w600,
+                fontSize: 12,
+              ),
             ),
           ),
         ),
@@ -204,10 +209,18 @@ class _AssetDeclarationSheetState extends ConsumerState<AssetDeclarationSheet> {
   @override
   Widget build(BuildContext context) {
     final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
+    final colorScheme = Theme.of(context).colorScheme;
 
-    return Padding(
-      padding: EdgeInsets.fromLTRB(20, 20, 20, 20 + bottomInset),
-      child: SingleChildScrollView(
+    return SafeArea(
+      top: false,
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(
+          HubSpacing.xl,
+          HubSpacing.xs,
+          HubSpacing.xl,
+          HubSpacing.xl + bottomInset,
+        ),
+        child: SingleChildScrollView(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -286,8 +299,8 @@ class _AssetDeclarationSheetState extends ConsumerState<AssetDeclarationSheet> {
             const SizedBox(height: 20),
             FilledButton(
               style: FilledButton.styleFrom(
-                backgroundColor: AppTokens.primary(context),
-                foregroundColor: Colors.white,
+                backgroundColor: colorScheme.primary,
+                foregroundColor: colorScheme.onPrimary,
                 padding: const EdgeInsets.symmetric(vertical: 14),
                 shape: RoundedRectangleBorder(
                   borderRadius: HubRadius.rSm,
@@ -301,6 +314,7 @@ class _AssetDeclarationSheetState extends ConsumerState<AssetDeclarationSheet> {
             ),
           ],
         ),
+      ),
       ),
     );
   }

@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:personal_hub/app.dart';
 import 'package:personal_hub/core/database/app_database.dart';
 import 'package:personal_hub/core/theme/app_theme.dart';
@@ -49,7 +48,7 @@ class _StartupErrorApp extends StatelessWidget {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Icon(
-                      LucideIcons.alertCircle,
+                      Icons.error_outline_rounded,
                       size: 44,
                       color: colors.danger,
                     ),

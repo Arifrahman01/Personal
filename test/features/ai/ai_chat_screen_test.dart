@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:personal_hub/core/theme/app_theme.dart';
 import 'package:personal_hub/features/ai/models/ai_models.dart';
 import 'package:personal_hub/features/ai/providers/ai_providers.dart';
@@ -109,7 +108,7 @@ void main() {
       await tester.pumpAndSettle();
 
       // Sheet is closed and active context banner is displayed
-      expect(find.byIcon(LucideIcons.paperclip), findsWidgets);
+      expect(find.byIcon(Icons.attach_file_rounded), findsWidgets);
       expect(find.textContaining('Konteks aktif:'), findsOneWidget);
     },
   );

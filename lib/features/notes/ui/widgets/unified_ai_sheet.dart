@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:personal_hub/core/errors/app_exceptions.dart';
 import 'package:personal_hub/core/theme/app_tokens.dart';
 import 'package:personal_hub/core/theme/hub_widgets.dart';
@@ -204,50 +203,45 @@ class _UnifiedAiAssistantSheetState
     final theme = Theme.of(context);
     final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
 
-    return Container(
-      decoration: BoxDecoration(
-        color: AppTokens.card(context),
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(HubRadius.lg)),
-      ),
-      child: SafeArea(
-        top: false,
-        child: Padding(
-          padding: EdgeInsets.fromLTRB(
-            HubSpacing.md,
-            HubSpacing.sm,
-            HubSpacing.md,
-            HubSpacing.md + bottomInset,
-          ),
-          child: SizedBox(
-            height: MediaQuery.of(context).size.height * 0.70,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Header
-                Row(
-                  children: [
-                    Icon(
-                      LucideIcons.sparkles,
-                      size: 20,
-                      color: AppTokens.primary(context),
-                    ),
-                    const SizedBox(width: HubSpacing.sm),
-                    Expanded(
-                      child: Text(
-                        '✨ Asisten AI',
-                        style: theme.textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.w700,
-                          color: AppTokens.textPrimary(context),
-                        ),
+    return SafeArea(
+      top: false,
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(
+          HubSpacing.md,
+          HubSpacing.sm,
+          HubSpacing.md,
+          HubSpacing.md + bottomInset,
+        ),
+        child: SizedBox(
+          height: MediaQuery.of(context).size.height * 0.70,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Header
+              Row(
+                children: [
+                  Icon(
+                    Icons.auto_awesome_rounded,
+                    size: 20,
+                    color: AppTokens.primary(context),
+                  ),
+                  const SizedBox(width: HubSpacing.sm),
+                  Expanded(
+                    child: Text(
+                      '✨ Asisten AI',
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w700,
+                        color: AppTokens.textPrimary(context),
                       ),
                     ),
-                    IconButton(
-                      icon: const Icon(LucideIcons.x, size: 20),
-                      tooltip: 'Tutup',
-                      onPressed: () => Navigator.of(context).pop(),
-                    ),
-                  ],
-                ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close_rounded, size: 20),
+                    tooltip: 'Tutup',
+                    onPressed: () => Navigator.of(context).pop(),
+                  ),
+                ],
+              ),
                 Text(
                   'Pusat kecerdasan catatan: Ringkasan offline & cloud, perbaikan bahasa, dan ekstrak tugas.',
                   style: theme.textTheme.bodySmall?.copyWith(
@@ -268,12 +262,10 @@ class _UnifiedAiAssistantSheetState
                     dividerColor: Colors.transparent,
                     indicatorSize: TabBarIndicatorSize.tab,
                     indicator: BoxDecoration(
-                      color: AppTokens.primary(context),
+                      color: theme.colorScheme.primary,
                       borderRadius: HubRadius.rPill,
                     ),
-                    labelColor: theme.brightness == Brightness.dark
-                        ? AppTokens.canvasDark
-                        : Colors.white,
+                    labelColor: theme.colorScheme.onPrimary,
                     unselectedLabelColor: AppTokens.textSecondary(context),
                     labelStyle: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
                     unselectedLabelStyle: const TextStyle(fontWeight: FontWeight.w500, fontSize: 13),
@@ -301,8 +293,7 @@ class _UnifiedAiAssistantSheetState
             ),
           ),
         ),
-      ),
-    );
+      );
   }
 
   // TAB 1: Ringkas (Cloud & SLM Offline)
@@ -338,7 +329,7 @@ class _UnifiedAiAssistantSheetState
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      const Icon(LucideIcons.cloud, size: 16),
+                      const Icon(Icons.cloud_outlined, size: 16),
                       const SizedBox(width: 8),
                       const Text(
                         'Ringkas catatan',
@@ -376,7 +367,7 @@ class _UnifiedAiAssistantSheetState
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      const Icon(LucideIcons.cpu, size: 16),
+                      const Icon(Icons.memory_rounded, size: 16),
                       const SizedBox(width: 8),
                       const Text(
                         'Ringkas via AI Lokal (Offline)',
@@ -437,7 +428,7 @@ class _UnifiedAiAssistantSheetState
               padding: const EdgeInsets.all(HubSpacing.sm),
               child: Row(
                 children: [
-                  Icon(LucideIcons.circleAlert, size: 18, color: AppTokens.error(context)),
+                  Icon(Icons.error_outline_rounded, size: 18, color: AppTokens.error(context)),
                   const SizedBox(width: HubSpacing.sm),
                   Expanded(
                     child: Text(
@@ -529,7 +520,7 @@ class _UnifiedAiAssistantSheetState
             runSpacing: HubSpacing.sm,
             children: [
               ActionChip(
-                avatar: const Icon(LucideIcons.penLine, size: 16),
+                avatar: const Icon(Icons.edit_rounded, size: 16),
                 label: const Text('Rapikan bahasa'),
                 backgroundColor: _activeCloudAction == 'Rapikan bahasa'
                     ? AppTokens.primary(context).withValues(alpha: 0.15)
@@ -543,7 +534,7 @@ class _UnifiedAiAssistantSheetState
                         ),
               ),
               ActionChip(
-                avatar: const Icon(LucideIcons.listTodo, size: 16),
+                avatar: const Icon(Icons.checklist_rounded, size: 16),
                 label: const Text('Ubah jadi checklist'),
                 backgroundColor: _activeCloudAction == 'Ubah jadi checklist'
                     ? AppTokens.primary(context).withValues(alpha: 0.15)
@@ -587,7 +578,7 @@ class _UnifiedAiAssistantSheetState
               padding: const EdgeInsets.all(HubSpacing.sm),
               child: Row(
                 children: [
-                  Icon(LucideIcons.circleAlert, size: 18, color: AppTokens.error(context)),
+                  Icon(Icons.error_outline_rounded, size: 18, color: AppTokens.error(context)),
                   const SizedBox(width: HubSpacing.sm),
                   Expanded(
                     child: Text(
@@ -675,7 +666,7 @@ class _UnifiedAiAssistantSheetState
           if (_slmTaskResult == null && !_isSlmTaskLoading) ...[
             FilledButton.icon(
               onPressed: _runTaskExtraction,
-              icon: const Icon(LucideIcons.listPlus, size: 16),
+              icon: const Icon(Icons.playlist_add_rounded, size: 16),
               label: const Text('Ekstrak Tugas'),
             ),
           ],
@@ -708,7 +699,7 @@ class _UnifiedAiAssistantSheetState
               padding: const EdgeInsets.all(HubSpacing.sm),
               child: Row(
                 children: [
-                  Icon(LucideIcons.circleAlert, size: 18, color: AppTokens.error(context)),
+                  Icon(Icons.error_outline_rounded, size: 18, color: AppTokens.error(context)),
                   const SizedBox(width: HubSpacing.sm),
                   Expanded(
                     child: Text(
@@ -751,13 +742,13 @@ class _UnifiedAiAssistantSheetState
                     runSpacing: 6,
                     children: [
                       Chip(
-                        avatar: Icon(LucideIcons.flag, size: 14, color: priorityColor),
+                        avatar: Icon(Icons.flag_outlined, size: 14, color: priorityColor),
                         label: Text(priorityLabel),
                         visualDensity: VisualDensity.compact,
                       ),
                       if (dueDate?.isNotEmpty == true)
                         Chip(
-                          avatar: const Icon(LucideIcons.calendar, size: 14),
+                          avatar: const Icon(Icons.calendar_month_rounded, size: 14),
                           label: Text('Tenggat: $dueDate'),
                           visualDensity: VisualDensity.compact,
                         ),
@@ -767,12 +758,6 @@ class _UnifiedAiAssistantSheetState
                   SizedBox(
                     width: double.infinity,
                     child: FilledButton.icon(
-                      style: FilledButton.styleFrom(
-                        backgroundColor: AppTokens.primary(context),
-                        foregroundColor: theme.brightness == Brightness.dark
-                            ? AppTokens.canvasDark
-                            : Colors.white,
-                      ),
                       onPressed: () {
                         final buffer = StringBuffer('- [ ] $title');
                         if (dueDate != null && dueDate.isNotEmpty) {
@@ -781,7 +766,7 @@ class _UnifiedAiAssistantSheetState
                         buffer.write(' #$priority');
                         widget.onInsertTask(buffer.toString());
                       },
-                      icon: const Icon(LucideIcons.listCheck, size: 16),
+                      icon: const Icon(Icons.fact_check_outlined, size: 16),
                       label: const Text('Tambahkan Checklist ke Catatan'),
                     ),
                   ),
@@ -845,12 +830,6 @@ class _UnifiedAiAssistantSheetState
               const SizedBox(width: HubSpacing.sm),
               Expanded(
                 child: FilledButton(
-                  style: FilledButton.styleFrom(
-                    backgroundColor: AppTokens.primary(context),
-                    foregroundColor: theme.brightness == Brightness.dark
-                        ? AppTokens.canvasDark
-                        : Colors.white,
-                  ),
                   onPressed: () => widget.onReplace(content),
                   child: const Text('Terapkan'),
                 ),

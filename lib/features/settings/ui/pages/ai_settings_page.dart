@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:personal_hub/core/config/secure_config_store.dart';
 import 'package:personal_hub/core/constants/ai_constants.dart';
 import 'package:personal_hub/core/theme/app_tokens.dart';
@@ -76,7 +75,9 @@ class _AiSettingsPageState extends ConsumerState<AiSettingsPage> {
                   suffixIcon: IconButton(
                     tooltip: obscure ? 'Tampilkan' : 'Sembunyikan',
                     icon: Icon(
-                      obscure ? LucideIcons.eye : LucideIcons.eyeOff,
+                      obscure
+                          ? Icons.visibility_outlined
+                          : Icons.visibility_off_outlined,
                     ),
                     onPressed: () =>
                         setDialogState(() => obscure = !obscure),
@@ -218,17 +219,29 @@ class _AiSettingsPageState extends ConsumerState<AiSettingsPage> {
         backgroundColor: AppTokens.canvas(context),
         elevation: 0,
       ),
-      body: ListView(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-        children: [
-          // Model Policy Card
+      body: SafeArea(
+        child: ListView(
+          padding: const EdgeInsets.symmetric(
+            horizontal: HubSpacing.lg,
+            vertical: HubSpacing.lg,
+          ),
+          children: [
+            const HubSectionHeader(
+              title: 'KEBIJAKAN MODEL',
+              padding: EdgeInsets.symmetric(
+                horizontal: HubSpacing.xs,
+                vertical: HubSpacing.xs,
+              ),
+            ),
+            const SizedBox(height: HubSpacing.xs),
+            // Model Policy Card
           HubCard(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Row(
                   children: [
-                    Icon(LucideIcons.sparkles, size: 20, color: primary),
+                    Icon(Icons.auto_awesome_rounded, size: 20, color: primary),
                     const SizedBox(width: 10),
                     Expanded(
                       child: Text(
@@ -256,7 +269,15 @@ class _AiSettingsPageState extends ConsumerState<AiSettingsPage> {
               ],
             ),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: HubSpacing.lg),
+          const HubSectionHeader(
+            title: 'KREDENSIAL & SERVER',
+            padding: EdgeInsets.symmetric(
+              horizontal: HubSpacing.xs,
+              vertical: HubSpacing.xs,
+            ),
+          ),
+          const SizedBox(height: HubSpacing.xs),
 
           // API Key & Base URL
           HubCard(
@@ -265,7 +286,7 @@ class _AiSettingsPageState extends ConsumerState<AiSettingsPage> {
               children: [
                 Row(
                   children: [
-                    Icon(LucideIcons.key, size: 20, color: primary),
+                    Icon(Icons.vpn_key_outlined, size: 20, color: primary),
                     const SizedBox(width: 10),
                     Expanded(
                       child: Text(
@@ -340,7 +361,15 @@ class _AiSettingsPageState extends ConsumerState<AiSettingsPage> {
               ],
             ),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: HubSpacing.lg),
+          const HubSectionHeader(
+            title: 'DIAGNOSTIK KONEKSI',
+            padding: EdgeInsets.symmetric(
+              horizontal: HubSpacing.xs,
+              vertical: HubSpacing.xs,
+            ),
+          ),
+          const SizedBox(height: HubSpacing.xs),
 
           // Test Connection Card
           HubCard(
@@ -349,7 +378,7 @@ class _AiSettingsPageState extends ConsumerState<AiSettingsPage> {
               children: [
                 Row(
                   children: [
-                    Icon(LucideIcons.activity, size: 20, color: primary),
+                    Icon(Icons.monitor_heart_outlined, size: 20, color: primary),
                     const SizedBox(width: 10),
                     Text(
                       'Uji Konektivitas AI',
@@ -369,22 +398,22 @@ class _AiSettingsPageState extends ConsumerState<AiSettingsPage> {
                 const SizedBox(height: 14),
                 FilledButton.icon(
                   style: FilledButton.styleFrom(
-                    backgroundColor: primary,
-                    foregroundColor: Colors.white,
-                    minimumSize: const Size.fromHeight(46),
+                    backgroundColor: theme.colorScheme.primary,
+                    foregroundColor: theme.colorScheme.onPrimary,
+                    minimumSize: const Size.fromHeight(48),
                     shape: RoundedRectangleBorder(borderRadius: HubRadius.rSm),
                   ),
                   onPressed: _isTestingAi ? null : _testAiConnection,
                   icon: _isTestingAi
-                      ? const SizedBox(
+                      ? SizedBox(
                           width: 16,
                           height: 16,
                           child: CircularProgressIndicator(
                             strokeWidth: 2,
-                            color: Colors.white,
+                            color: theme.colorScheme.onPrimary,
                           ),
                         )
-                      : const Icon(LucideIcons.play, size: 16),
+                      : const Icon(Icons.play_arrow_rounded, size: 16),
                   label: Text(_isTestingAi ? 'Menguji...' : 'Uji Koneksi AI'),
                 ),
                 if (_aiTestStatus != null) ...[
@@ -419,6 +448,7 @@ class _AiSettingsPageState extends ConsumerState<AiSettingsPage> {
             ),
           ),
         ],
+        ),
       ),
     );
   }

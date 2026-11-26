@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:personal_hub/core/theme/app_tokens.dart';
 import 'package:personal_hub/features/meetings/models/meeting.dart';
 import 'package:personal_hub/features/meetings/ui/meeting_form_screen.dart';
@@ -101,21 +100,20 @@ class _AgendaHubScreenState extends ConsumerState<AgendaHubScreen> {
     final created = await showModalBottomSheet<bool>(
       context: context,
       isScrollControlled: true,
-      backgroundColor: AppTokens.card(context),
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(HubRadius.lg)),
-      ),
+      useSafeArea: true,
+      showDragHandle: true,
       builder: (ctx) {
         return StatefulBuilder(
           builder: (context, setSheetState) {
-            final viewInsets = MediaQuery.of(context).viewInsets.bottom;
+            final viewInsets = MediaQuery.viewInsetsOf(context).bottom;
             return SafeArea(
-              child: Padding(
+              top: false,
+              child: SingleChildScrollView(
                 padding: EdgeInsets.fromLTRB(
+                  HubSpacing.lg,
                   HubSpacing.md,
-                  HubSpacing.md,
-                  HubSpacing.md,
-                  HubSpacing.md + viewInsets,
+                  HubSpacing.lg,
+                  HubSpacing.lg + viewInsets,
                 ),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
@@ -124,7 +122,7 @@ class _AgendaHubScreenState extends ConsumerState<AgendaHubScreen> {
                     Row(
                       children: [
                         Icon(
-                          LucideIcons.checkSquare,
+                          Icons.check_box_outlined,
                           color: AppTokens.primary(context),
                           size: 20,
                         ),
@@ -166,21 +164,22 @@ class _AgendaHubScreenState extends ConsumerState<AgendaHubScreen> {
                     ),
                     const SizedBox(height: HubSpacing.xs),
                     SegmentedButton<TaskPriority>(
+                      showSelectedIcon: false,
                       style: SegmentedButton.styleFrom(
                         visualDensity: VisualDensity.compact,
                       ),
                       segments: const [
                         ButtonSegment(
                           value: TaskPriority.low,
-                          label: Text('Rendah'),
+                          label: Text('Rendah', maxLines: 1, overflow: TextOverflow.ellipsis),
                         ),
                         ButtonSegment(
                           value: TaskPriority.medium,
-                          label: Text('Sedang'),
+                          label: Text('Sedang', maxLines: 1, overflow: TextOverflow.ellipsis),
                         ),
                         ButtonSegment(
                           value: TaskPriority.high,
-                          label: Text('Tinggi'),
+                          label: Text('Tinggi', maxLines: 1, overflow: TextOverflow.ellipsis),
                         ),
                       ],
                       selected: {selectedPriority},
@@ -205,7 +204,7 @@ class _AgendaHubScreenState extends ConsumerState<AgendaHubScreen> {
                               Navigator.of(context).pop(true);
                             }
                           },
-                          icon: const Icon(LucideIcons.plus, size: 16),
+                          icon: const Icon(Icons.add_rounded, size: 16),
                           label: const Text('Simpan'),
                         ),
                       ],
@@ -239,7 +238,7 @@ class _AgendaHubScreenState extends ConsumerState<AgendaHubScreen> {
           key: const Key('agenda_add_meeting_fab'),
           heroTag: 'agenda_add_meeting_fab',
           onPressed: _openAddMeeting,
-          icon: const Icon(LucideIcons.plus),
+          icon: const Icon(Icons.add_rounded),
           label: const Text('Meeting Baru'),
         );
       case 1:
@@ -247,7 +246,7 @@ class _AgendaHubScreenState extends ConsumerState<AgendaHubScreen> {
           key: const Key('agenda_add_task_fab'),
           heroTag: 'agenda_add_task_fab',
           onPressed: _showAddTaskDialog,
-          icon: const Icon(LucideIcons.plus),
+          icon: const Icon(Icons.add_rounded),
           label: const Text('Tambah Tugas'),
         );
       case 2:
@@ -283,27 +282,47 @@ class _AgendaHubScreenState extends ConsumerState<AgendaHubScreen> {
           ),
         ),
         bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(56),
+          preferredSize: const Size.fromHeight(52),
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
             child: SizedBox(
               width: double.infinity,
               child: SegmentedButton<int>(
+                showSelectedIcon: false,
+                style: SegmentedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
+                  visualDensity: VisualDensity.compact,
+                ),
                 segments: const [
                   ButtonSegment<int>(
                     value: 0,
-                    label: Text('Meeting'),
-                    icon: Icon(LucideIcons.calendar, size: 16),
+                    label: Text(
+                      'Meeting',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      softWrap: false,
+                    ),
+                    icon: Icon(Icons.calendar_month_rounded, size: 16),
                   ),
                   ButtonSegment<int>(
                     value: 1,
-                    label: Text('Tugas & Habit'),
-                    icon: Icon(LucideIcons.checkSquare, size: 16),
+                    label: Text(
+                      'Tugas & Habit',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      softWrap: false,
+                    ),
+                    icon: Icon(Icons.check_box_outlined, size: 16),
                   ),
                   ButtonSegment<int>(
                     value: 2,
-                    label: Text('Sholat & Kiblat'),
-                    icon: Icon(LucideIcons.compass, size: 16),
+                    label: Text(
+                      'Sholat & Kiblat',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      softWrap: false,
+                    ),
+                    icon: Icon(Icons.explore_outlined, size: 16),
                   ),
                 ],
                 selected: {_selectedSection},

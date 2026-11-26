@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:personal_hub/core/errors/app_exceptions.dart';
 import 'package:personal_hub/core/theme/app_tokens.dart';
 import 'package:personal_hub/core/theme/hub_widgets.dart';
@@ -220,10 +219,12 @@ class _VaultGateScreenState extends ConsumerState<VaultGateScreen> {
     Color? backgroundColor,
     Color? borderColor,
   }) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final cardBg = backgroundColor ?? AppTokens.card(context);
-    final border = borderColor ?? AppTokens.border(context);
-    final primary = AppTokens.primary(context);
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final colors = HubColors.of(context);
+    final cardBg = backgroundColor ?? colors.surfaceCard;
+    final border = borderColor ?? colors.borderHairline;
+    final primary = colors.primary;
 
     return Material(
       color: Colors.transparent,
@@ -241,9 +242,9 @@ class _VaultGateScreenState extends ConsumerState<VaultGateScreen> {
             border: Border.all(color: border, width: 1.2),
             boxShadow: [
               BoxShadow(
-                color: isDark
-                    ? Colors.black.withValues(alpha: 0.35)
-                    : Colors.black.withValues(alpha: 0.06),
+                color: theme.colorScheme.shadow.withValues(
+                  alpha: isDark ? 0.35 : 0.06,
+                ),
                 blurRadius: 6,
                 offset: const Offset(0, 2),
               ),
@@ -259,9 +260,10 @@ class _VaultGateScreenState extends ConsumerState<VaultGateScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-    final primary = AppTokens.primary(context);
-    final textPrimary = AppTokens.textPrimary(context);
+    final colorScheme = theme.colorScheme;
+    final colors = HubColors.of(context);
+    final primary = colors.primary;
+    final textPrimary = colors.textPrimary;
 
     if (_isLoading) {
       return Scaffold(
@@ -307,7 +309,7 @@ class _VaultGateScreenState extends ConsumerState<VaultGateScreen> {
                             shape: BoxShape.circle,
                           ),
                           child: Icon(
-                            _hasPin ? LucideIcons.lock : LucideIcons.shieldCheck,
+                            _hasPin ? Icons.lock_outline_rounded : Icons.verified_user_outlined,
                             size: 24,
                             color: primary,
                           ),
@@ -332,7 +334,7 @@ class _VaultGateScreenState extends ConsumerState<VaultGateScreen> {
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              Icon(LucideIcons.shield, size: 12, color: primary),
+                              Icon(Icons.shield_outlined, size: 12, color: primary),
                               const SizedBox(width: 5),
                               Text(
                                 'Terkunci Aman',
@@ -371,7 +373,9 @@ class _VaultGateScreenState extends ConsumerState<VaultGateScreen> {
                       const SizedBox(height: 12),
                       // PIN dots indicator with primary emerald-teal glow
                       Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 4),
+                        padding: const EdgeInsets.symmetric(
+                          vertical: HubSpacing.sm,
+                        ),
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: List.generate(dotCount, (index) {
@@ -379,26 +383,23 @@ class _VaultGateScreenState extends ConsumerState<VaultGateScreen> {
                             return AnimatedContainer(
                               duration: const Duration(milliseconds: 180),
                               curve: Curves.easeOutCubic,
-                              margin: const EdgeInsets.symmetric(horizontal: 7),
+                              margin: const EdgeInsets.symmetric(horizontal: 8),
                               width: isFilled ? 16 : 14,
                               height: isFilled ? 16 : 14,
                               decoration: BoxDecoration(
                                 shape: BoxShape.circle,
-                                color: isFilled
-                                    ? primary
-                                    : (isDark
-                                        ? Colors.white.withValues(alpha: 0.08)
-                                        : Colors.black.withValues(alpha: 0.06)),
+                                color: isFilled ? primary : colors.surfaceSubtle,
                                 border: Border.all(
                                   color: isFilled
                                       ? primary
-                                      : AppTokens.border(context),
+                                      : colors.textSecondary
+                                          .withValues(alpha: 0.35),
                                   width: 1.5,
                                 ),
                                 boxShadow: isFilled
                                     ? [
                                         BoxShadow(
-                                          color: primary.withValues(alpha: 0.45),
+                                          color: primary.withValues(alpha: 0.40),
                                           blurRadius: 8,
                                           spreadRadius: 1,
                                         ),
@@ -409,7 +410,7 @@ class _VaultGateScreenState extends ConsumerState<VaultGateScreen> {
                           }),
                         ),
                       ),
-                      const SizedBox(height: 10),
+                      const SizedBox(height: HubSpacing.md),
                       // Adaptive tactile keypad
                       Padding(
                         padding: const EdgeInsets.symmetric(vertical: 2),
@@ -423,17 +424,19 @@ class _VaultGateScreenState extends ConsumerState<VaultGateScreen> {
                                   _buildKeypadButton(
                                     content: Text(
                                       d,
-                                      style: TextStyle(
-                                        fontSize: 24,
-                                        fontWeight: FontWeight.w600,
-                                        color: textPrimary,
+                                      style: HubTypography.tabular(
+                                        TextStyle(
+                                          fontSize: 24,
+                                          fontWeight: FontWeight.w600,
+                                          color: textPrimary,
+                                        ),
                                       ),
                                     ),
                                     onTap: () => _onKeypadDigit(d),
                                   ),
                               ],
                             ),
-                            const SizedBox(height: 10),
+                            const SizedBox(height: HubSpacing.md),
                             Row(
                               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                               children: [
@@ -441,17 +444,19 @@ class _VaultGateScreenState extends ConsumerState<VaultGateScreen> {
                                   _buildKeypadButton(
                                     content: Text(
                                       d,
-                                      style: TextStyle(
-                                        fontSize: 24,
-                                        fontWeight: FontWeight.w600,
-                                        color: textPrimary,
+                                      style: HubTypography.tabular(
+                                        TextStyle(
+                                          fontSize: 24,
+                                          fontWeight: FontWeight.w600,
+                                          color: textPrimary,
+                                        ),
                                       ),
                                     ),
                                     onTap: () => _onKeypadDigit(d),
                                   ),
                               ],
                             ),
-                            const SizedBox(height: 10),
+                            const SizedBox(height: HubSpacing.md),
                             Row(
                               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                               children: [
@@ -459,17 +464,19 @@ class _VaultGateScreenState extends ConsumerState<VaultGateScreen> {
                                   _buildKeypadButton(
                                     content: Text(
                                       d,
-                                      style: TextStyle(
-                                        fontSize: 24,
-                                        fontWeight: FontWeight.w600,
-                                        color: textPrimary,
+                                      style: HubTypography.tabular(
+                                        TextStyle(
+                                          fontSize: 24,
+                                          fontWeight: FontWeight.w600,
+                                          color: textPrimary,
+                                        ),
                                       ),
                                     ),
                                     onTap: () => _onKeypadDigit(d),
                                   ),
                               ],
                             ),
-                            const SizedBox(height: 10),
+                            const SizedBox(height: HubSpacing.md),
                             Row(
                               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                               children: [
@@ -479,7 +486,7 @@ class _VaultGateScreenState extends ConsumerState<VaultGateScreen> {
                                     backgroundColor: primary.withValues(alpha: 0.15),
                                     borderColor: primary.withValues(alpha: 0.5),
                                     content: Icon(
-                                      LucideIcons.check,
+                                      Icons.check_rounded,
                                       color: primary,
                                       size: 24,
                                     ),
@@ -490,7 +497,7 @@ class _VaultGateScreenState extends ConsumerState<VaultGateScreen> {
                                 else if (_canUseBiometrics)
                                   _buildKeypadButton(
                                     content: Icon(
-                                      LucideIcons.fingerprint,
+                                      Icons.fingerprint_rounded,
                                       color: primary,
                                       size: 24,
                                     ),
@@ -499,7 +506,7 @@ class _VaultGateScreenState extends ConsumerState<VaultGateScreen> {
                                 else
                                   _buildKeypadButton(
                                     content: Icon(
-                                      LucideIcons.rotateCcw,
+                                      Icons.refresh_rounded,
                                       color: AppTokens.textSecondary(context),
                                       size: 20,
                                     ),
@@ -520,7 +527,7 @@ class _VaultGateScreenState extends ConsumerState<VaultGateScreen> {
                                 // Backspace button
                                 _buildKeypadButton(
                                   content: Icon(
-                                    LucideIcons.delete,
+                                    Icons.backspace_outlined,
                                     color: AppTokens.textSecondary(context),
                                     size: 20,
                                   ),
@@ -542,15 +549,15 @@ class _VaultGateScreenState extends ConsumerState<VaultGateScreen> {
                         decoration: InputDecoration(
                           labelText: 'Buat PIN (min. 4 digit)',
                           hintText: 'Minimal 4 digit angka',
-                          prefixIcon: const Icon(LucideIcons.keyRound),
+                          prefixIcon: const Icon(Icons.vpn_key_outlined),
                           suffixIcon: IconButton(
                             tooltip: _obscurePin
                                 ? 'Tampilkan PIN'
                                 : 'Sembunyikan PIN',
                             icon: Icon(
                               _obscurePin
-                                  ? LucideIcons.eye
-                                  : LucideIcons.eyeOff,
+                                  ? Icons.visibility_outlined
+                                  : Icons.visibility_off_outlined,
                             ),
                             onPressed: () {
                               setState(() {
@@ -574,7 +581,7 @@ class _VaultGateScreenState extends ConsumerState<VaultGateScreen> {
                         decoration: const InputDecoration(
                           labelText: 'Ulangi PIN',
                           hintText: 'Ulangi PIN yang sama',
-                          prefixIcon: Icon(LucideIcons.shieldCheck),
+                          prefixIcon: Icon(Icons.verified_user_outlined),
                         ),
                       ),
                     ],
@@ -592,8 +599,8 @@ class _VaultGateScreenState extends ConsumerState<VaultGateScreen> {
                     const SizedBox(height: 18),
                     FilledButton.icon(
                       style: FilledButton.styleFrom(
-                        backgroundColor: primary,
-                        foregroundColor: Colors.white,
+                        backgroundColor: colorScheme.primary,
+                        foregroundColor: colorScheme.onPrimary,
                         minimumSize: const Size.fromHeight(48),
                         shape: RoundedRectangleBorder(
                           borderRadius: HubRadius.rSm,
@@ -605,18 +612,18 @@ class _VaultGateScreenState extends ConsumerState<VaultGateScreen> {
                               ? _handleUnlockWithPin
                               : _handleSetupPin),
                       icon: _isSubmitting
-                          ? const SizedBox(
+                          ? SizedBox(
                               width: 18,
                               height: 18,
                               child: CircularProgressIndicator(
                                 strokeWidth: 2,
-                                color: Colors.white,
+                                color: colorScheme.onPrimary,
                               ),
                             )
                           : Icon(
                               _hasPin
-                                  ? LucideIcons.lockOpen
-                                  : LucideIcons.checkCircle,
+                                  ? Icons.lock_open_rounded
+                                  : Icons.check_circle_outline_rounded,
                               size: 18,
                             ),
                       label: Text(
@@ -636,7 +643,7 @@ class _VaultGateScreenState extends ConsumerState<VaultGateScreen> {
                         onPressed: _isSubmitting
                             ? null
                             : _handleUnlockWithBiometrics,
-                        icon: const Icon(LucideIcons.fingerprint, size: 18),
+                        icon: const Icon(Icons.fingerprint_rounded, size: 18),
                         label: const Text('Buka dengan Biometrik'),
                       ),
                     ],

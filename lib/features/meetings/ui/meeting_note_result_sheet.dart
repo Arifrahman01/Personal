@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:personal_hub/core/theme/app_tokens.dart';
 import 'package:personal_hub/core/theme/hub_widgets.dart';
 import 'package:personal_hub/features/meetings/models/meeting.dart';
@@ -31,7 +30,7 @@ class MeetingNoteResultSheet extends ConsumerStatefulWidget {
       context: context,
       isScrollControlled: true,
       useSafeArea: true,
-      backgroundColor: Colors.transparent,
+      showDragHandle: true,
       builder: (_) => MeetingNoteResultSheet(
         result: result,
         onPromoteActionItem: onPromoteActionItem,
@@ -196,15 +195,10 @@ class _MeetingNoteResultSheetState
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
     final structured = widget.result.structuredNote;
     final aiSucceeded = widget.result.aiSucceeded;
 
-    return Container(
-      decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF161B22) : Colors.white,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-      ),
+    return ConstrainedBox(
       constraints: BoxConstraints(
         maxHeight: MediaQuery.sizeOf(context).height * 0.9,
       ),
@@ -212,19 +206,6 @@ class _MeetingNoteResultSheetState
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // Drag handle
-          Center(
-            child: Container(
-              width: 36,
-              height: 4,
-              margin: const EdgeInsets.only(top: 12, bottom: 8),
-              decoration: BoxDecoration(
-                color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.3),
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-          ),
-
           // Header
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
@@ -246,20 +227,20 @@ class _MeetingNoteResultSheetState
                         HubStatusBadge(
                           label: 'Tersimpan ke Catatan & Meeting',
                           color: HubColors.of(context).success,
-                          icon: LucideIcons.checkCircle,
+                          icon: Icons.check_circle_outline_rounded,
                         )
                       else
                         HubStatusBadge(
                           label: 'Tersimpan ke Catatan & Meeting (Offline)',
                           color: HubColors.of(context).warning,
-                          icon: LucideIcons.alertTriangle,
+                          icon: Icons.warning_amber_rounded,
                         ),
                     ],
                   ),
                 ),
                 IconButton(
                   onPressed: () => Navigator.of(context).pop(),
-                  icon: const Icon(LucideIcons.x),
+                  icon: const Icon(Icons.close_rounded),
                   tooltip: 'Tutup',
                 ),
               ],
@@ -297,7 +278,7 @@ class _MeetingNoteResultSheetState
                     child: Row(
                       children: [
                         Icon(
-                          LucideIcons.info,
+                          Icons.info_outline_rounded,
                           color: theme.colorScheme.error,
                           size: 18,
                         ),
@@ -388,7 +369,7 @@ class _MeetingNoteResultSheetState
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Icon(
-                            LucideIcons.check,
+                            Icons.check_rounded,
                             size: 16,
                             color: theme.colorScheme.primary,
                           ),
@@ -409,15 +390,23 @@ class _MeetingNoteResultSheetState
 
                 // Action Items Section
                 if (_actionItems.isNotEmpty) ...[
-                  Row(
+                  Wrap(
+                    alignment: WrapAlignment.spaceBetween,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    spacing: 8,
+                    runSpacing: 4,
                     children: [
-                      Expanded(
-                        child: Text(
-                          'Tindak Lanjut & Tugas (${_actionItems.length})',
-                          style: theme.textTheme.labelLarge?.copyWith(
-                            color: theme.colorScheme.primary,
-                            fontWeight: FontWeight.w700,
-                          ),
+                      Text(
+                        'Tindak Lanjut & Tugas (${_actionItems.length})',
+                        style: HubTypography.tabular(
+                          theme.textTheme.labelLarge?.copyWith(
+                                color: theme.colorScheme.primary,
+                                fontWeight: FontWeight.w700,
+                              ) ??
+                              TextStyle(
+                                color: theme.colorScheme.primary,
+                                fontWeight: FontWeight.w700,
+                              ),
                         ),
                       ),
                       TextButton.icon(
@@ -428,7 +417,7 @@ class _MeetingNoteResultSheetState
                                 height: 14,
                                 child: CircularProgressIndicator(strokeWidth: 2),
                               )
-                            : const Icon(LucideIcons.listPlus, size: 16),
+                            : const Icon(Icons.playlist_add_rounded, size: 16),
                         label: const Text('Masukkan Semua ke Tugas'),
                       ),
                     ],
@@ -447,23 +436,36 @@ class _MeetingNoteResultSheetState
 
           // Bottom Action Bar
           const Divider(height: 1),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-            child: Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: _openInNoteEditor,
-                    icon: const Icon(LucideIcons.fileEdit, size: 18),
-                    label: const Text('Buka di Editor Catatan'),
+          SafeArea(
+            top: false,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: _openInNoteEditor,
+                      style: OutlinedButton.styleFrom(
+                        minimumSize: const Size(0, 48),
+                      ),
+                      icon: const Icon(Icons.edit_note_rounded, size: 18),
+                      label: const Text(
+                        'Buka di Editor Catatan',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
                   ),
-                ),
-                const SizedBox(width: 12),
-                FilledButton(
-                  onPressed: () => Navigator.of(context).pop(),
-                  child: const Text('Selesai'),
-                ),
-              ],
+                  const SizedBox(width: 12),
+                  FilledButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    style: FilledButton.styleFrom(
+                      minimumSize: const Size(88, 48),
+                    ),
+                    child: const Text('Selesai'),
+                  ),
+                ],
+              ),
             ),
           ),
         ],

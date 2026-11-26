@@ -7,7 +7,6 @@ import 'package:flutter_compass/flutter_compass.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:intl/intl.dart';
-import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:personal_hub/core/theme/app_tokens.dart';
 import 'package:personal_hub/core/theme/hub_widgets.dart';
 import 'package:personal_hub/features/prayer/models/prayer_models.dart';
@@ -16,7 +15,7 @@ import 'package:personal_hub/features/prayer/services/firebase_adzan_service.dar
 import 'package:personal_hub/features/prayer/services/qibla_calculator.dart';
 
 /// Layar Jadwal Sholat, Notifikasi Adzan (FCM & Lokal), dan Kompas Kiblat
-/// Desain "Calm Clarity" Material 3 (100% LucideIcons, Tabular Figures, Pengaturan Modal).
+/// Desain "Calm Clarity" Material 3 (Google Material Icons, Tabular Figures, Pengaturan Modal).
 class PrayerScheduleScreen extends ConsumerStatefulWidget {
   const PrayerScheduleScreen({super.key, this.isEmbedded = false});
 
@@ -146,8 +145,8 @@ class _PrayerScheduleScreenState extends ConsumerState<PrayerScheduleScreen> {
                 ListTile(
                   leading: Icon(
                     preset.name == prefs.cityName
-                        ? LucideIcons.circleDot
-                        : LucideIcons.mapPin,
+                        ? Icons.radio_button_checked_rounded
+                        : Icons.place_outlined,
                     color: preset.name == prefs.cityName
                         ? AppTokens.primary(context)
                         : AppTokens.textSecondary(context),
@@ -208,6 +207,78 @@ class _PrayerScheduleScreenState extends ConsumerState<PrayerScheduleScreen> {
     final nextAsync = ref.watch(nextPrayerProvider);
     final fcmStatus = ref.watch(firebaseAdzanStatusProvider);
 
+    final tabBody = prefsAsync.when(
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error: (error, _) => Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Text('Gagal memuat pengaturan jadwal sholat: $error'),
+        ),
+      ),
+      data: (prefs) {
+        final times = timesAsync.asData?.value;
+        final next = nextAsync.asData?.value;
+        return TabBarView(
+          children: [
+            _ScheduleAndNotifTab(
+              prefs: prefs,
+              times: times,
+              nextPrayer: next,
+              isLocating: _isLocating,
+              onPickCity: () => _showCityPicker(prefs),
+              onDetectGps: _detectGpsLocation,
+            ),
+            _QiblaCompassTab(prefs: prefs),
+          ],
+        );
+      },
+    );
+
+    if (widget.isEmbedded) {
+      return DefaultTabController(
+        length: 2,
+        child: Material(
+          color: AppTokens.canvas(context),
+          child: Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 8, 0),
+                child: Row(
+                  children: [
+                    const Expanded(
+                      child: TabBar.secondary(
+                        dividerColor: Colors.transparent,
+                        tabs: [
+                          Tab(text: 'Jadwal & Notif'),
+                          Tab(text: 'Arah Kiblat'),
+                        ],
+                      ),
+                    ),
+                    if (prefsAsync.asData?.value != null)
+                      IconButton(
+                        constraints: const BoxConstraints(
+                          minWidth: 48,
+                          minHeight: 48,
+                        ),
+                        icon: const Icon(Icons.settings_outlined),
+                        tooltip: 'Pengaturan Adzan & Lanjutan',
+                        onPressed: () => _openAdzanSettingsSheet(
+                          context,
+                          prefsAsync.asData!.value,
+                          fcmStatus,
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+              Divider(height: 1, color: AppTokens.border(context)),
+              Expanded(child: tabBody),
+            ],
+          ),
+        ),
+      );
+    }
+
     return DefaultTabController(
       length: 2,
       child: Scaffold(
@@ -216,12 +287,15 @@ class _PrayerScheduleScreenState extends ConsumerState<PrayerScheduleScreen> {
           backgroundColor: AppTokens.canvas(context),
           elevation: 0,
           scrolledUnderElevation: 0,
-          automaticallyImplyLeading: !widget.isEmbedded,
-          title: widget.isEmbedded ? null : const Text('Jadwal Sholat & Kiblat'),
+          title: const Text('Jadwal Sholat & Kiblat'),
           actions: [
             if (prefsAsync.asData?.value != null)
               IconButton(
-                icon: const Icon(LucideIcons.settings),
+                constraints: const BoxConstraints(
+                  minWidth: 48,
+                  minHeight: 48,
+                ),
+                icon: const Icon(Icons.settings_outlined),
                 tooltip: 'Pengaturan Adzan & Lanjutan',
                 onPressed: () => _openAdzanSettingsSheet(
                   context,
@@ -230,47 +304,22 @@ class _PrayerScheduleScreenState extends ConsumerState<PrayerScheduleScreen> {
                 ),
               ),
           ],
-          bottom: TabBar(
-            indicatorColor: AppTokens.primary(context),
-            labelColor: AppTokens.primary(context),
-            unselectedLabelColor: AppTokens.textSecondary(context),
-            tabs: const [
+          bottom: const TabBar.secondary(
+            tabs: [
               Tab(
-                icon: Icon(LucideIcons.clock),
+                icon: Icon(Icons.schedule_rounded),
                 text: 'Jadwal & Notif',
               ),
               Tab(
-                icon: Icon(LucideIcons.compass),
+                icon: Icon(Icons.explore_outlined),
                 text: 'Arah Kiblat',
               ),
             ],
           ),
         ),
-        body: prefsAsync.when(
-          loading: () => const Center(child: CircularProgressIndicator()),
-          error: (error, _) => Center(
-            child: Padding(
-              padding: const EdgeInsets.all(24),
-              child: Text('Gagal memuat pengaturan jadwal sholat: $error'),
-            ),
-          ),
-          data: (prefs) {
-            final times = timesAsync.asData?.value;
-            final next = nextAsync.asData?.value;
-            return TabBarView(
-              children: [
-                _ScheduleAndNotifTab(
-                  prefs: prefs,
-                  times: times,
-                  nextPrayer: next,
-                  isLocating: _isLocating,
-                  onPickCity: () => _showCityPicker(prefs),
-                  onDetectGps: _detectGpsLocation,
-                ),
-                _QiblaCompassTab(prefs: prefs),
-              ],
-            );
-          },
+        body: SafeArea(
+          top: false,
+          child: tabBody,
         ),
       ),
     );
@@ -318,7 +367,7 @@ class _ScheduleAndNotifTab extends ConsumerWidget {
               Row(
                 children: [
                   Icon(
-                    LucideIcons.mapPin,
+                    Icons.place_outlined,
                     color: AppTokens.primary(context),
                     size: 20,
                   ),
@@ -335,15 +384,19 @@ class _ScheduleAndNotifTab extends ConsumerWidget {
                   ),
                   OutlinedButton.icon(
                     onPressed: onPickCity,
-                    icon: const Icon(LucideIcons.mapPin, size: 14),
+                    icon: const Icon(Icons.place_outlined, size: 16),
                     label: const Text('Ganti'),
                     style: OutlinedButton.styleFrom(
-                      visualDensity: VisualDensity.compact,
-                      padding: const EdgeInsets.symmetric(horizontal: 10),
+                      minimumSize: const Size(48, 48),
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
                     ),
                   ),
                   const SizedBox(width: 6),
                   IconButton(
+                    constraints: const BoxConstraints(
+                      minWidth: 48,
+                      minHeight: 48,
+                    ),
                     tooltip: 'Gunakan GPS',
                     onPressed: isLocating ? null : onDetectGps,
                     icon: isLocating
@@ -352,16 +405,18 @@ class _ScheduleAndNotifTab extends ConsumerWidget {
                             height: 18,
                             child: CircularProgressIndicator(strokeWidth: 2),
                           )
-                        : const Icon(LucideIcons.locateFixed, size: 18),
+                        : const Icon(Icons.my_location_rounded, size: 18),
                   ),
                 ],
               ),
               const SizedBox(height: 6),
               Text(
                 '$hijriText • $gregorianText',
-                style: TextStyle(
-                  fontSize: 13,
-                  color: AppTokens.textSecondary(context),
+                style: HubTypography.tabular(
+                  TextStyle(
+                    fontSize: 13,
+                    color: AppTokens.textSecondary(context),
+                  ),
                 ),
               ),
               if (nextPrayer != null) ...[
@@ -378,7 +433,7 @@ class _ScheduleAndNotifTab extends ConsumerWidget {
                   child: Row(
                     children: [
                       Icon(
-                        LucideIcons.bellRing,
+                        Icons.notifications_active_outlined,
                         color: AppTokens.primary(context),
                         size: 20,
                       ),
@@ -386,10 +441,12 @@ class _ScheduleAndNotifTab extends ConsumerWidget {
                       Expanded(
                         child: Text(
                           'Berikutnya: ${nextPrayer!.name.label} (${timeFmt.format(nextPrayer!.time)})',
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
-                            color: AppTokens.textPrimary(context),
+                          style: HubTypography.tabular(
+                            TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                              color: AppTokens.textPrimary(context),
+                            ),
                           ),
                         ),
                       ),
@@ -522,7 +579,7 @@ class _AdzanSettingsSheet extends ConsumerWidget {
                 ),
               ),
               IconButton(
-                icon: const Icon(LucideIcons.x),
+                icon: const Icon(Icons.close_rounded),
                 onPressed: () => Navigator.of(context).pop(),
               ),
             ],
@@ -538,21 +595,22 @@ class _AdzanSettingsSheet extends ConsumerWidget {
           ),
           const SizedBox(height: 8),
           SegmentedButton<AdzanNotificationMode>(
+            showSelectedIcon: false,
             segments: const [
               ButtonSegment(
                 value: AdzanNotificationMode.firebaseFcm,
-                label: Text('FCM'),
-                icon: Icon(LucideIcons.cloud, size: 16),
+                label: Text('FCM', maxLines: 1, overflow: TextOverflow.ellipsis),
+                icon: Icon(Icons.cloud_outlined, size: 16),
               ),
               ButtonSegment(
                 value: AdzanNotificationMode.localOffline,
-                label: Text('Lokal'),
-                icon: Icon(LucideIcons.bell, size: 16),
+                label: Text('Lokal', maxLines: 1, overflow: TextOverflow.ellipsis),
+                icon: Icon(Icons.notifications_outlined, size: 16),
               ),
               ButtonSegment(
                 value: AdzanNotificationMode.both,
-                label: Text('Keduanya'),
-                icon: Icon(LucideIcons.refreshCw, size: 16),
+                label: Text('Keduanya', maxLines: 1, overflow: TextOverflow.ellipsis),
+                icon: Icon(Icons.sync_rounded, size: 16),
               ),
             ],
             selected: {prefs.notificationMode},
@@ -591,8 +649,8 @@ class _AdzanSettingsSheet extends ConsumerWidget {
                     Chip(
                       avatar: Icon(
                         fcmStatus.isConfigured
-                            ? LucideIcons.checkCircle2
-                            : LucideIcons.info,
+                            ? Icons.check_circle_outline_rounded
+                            : Icons.info_outline_rounded,
                         size: 16,
                         color: fcmStatus.isConfigured
                             ? AppTokens.success(context)
@@ -606,7 +664,7 @@ class _AdzanSettingsSheet extends ConsumerWidget {
                       ),
                     ),
                     Chip(
-                      avatar: const Icon(LucideIcons.hash, size: 14),
+                      avatar: const Icon(Icons.tag_rounded, size: 14),
                       label: Text(
                         topicName,
                         overflow: TextOverflow.ellipsis,
@@ -632,14 +690,14 @@ class _AdzanSettingsSheet extends ConsumerWidget {
                   children: [
                     OutlinedButton.icon(
                       onPressed: onSyncFcm,
-                      icon: const Icon(LucideIcons.refreshCw, size: 14),
+                      icon: const Icon(Icons.sync_rounded, size: 14),
                       label: const Text('Sinkronkan FCM'),
                     ),
                     if (fcmStatus.fcmToken != null &&
                         fcmStatus.fcmToken!.isNotEmpty)
                       OutlinedButton.icon(
                         onPressed: () => onCopyToken(fcmStatus.fcmToken!),
-                        icon: const Icon(LucideIcons.copy, size: 14),
+                        icon: const Icon(Icons.copy_rounded, size: 14),
                         label: const Text('Salin Token'),
                       ),
                   ],
@@ -657,32 +715,32 @@ class _AdzanSettingsSheet extends ConsumerWidget {
             ),
           ),
           const SizedBox(height: 10),
-          DropdownButtonFormField<PrayerMethod>(
-            initialValue: prefs.method,
-            decoration: const InputDecoration(labelText: 'Metode Hisab'),
-            items: [
+          DropdownMenu<PrayerMethod>(
+            initialSelection: prefs.method,
+            expandedInsets: EdgeInsets.zero,
+            label: const Text('Metode Hisab'),
+            dropdownMenuEntries: [
               for (final m in PrayerMethod.values)
-                DropdownMenuItem(value: m, child: Text(m.label)),
+                DropdownMenuEntry(value: m, label: m.label),
             ],
-            onChanged: (value) {
+            onSelected: (value) {
               if (value != null) {
                 notifier.setMethod(value);
               }
             },
           ),
           const SizedBox(height: 12),
-          DropdownButtonFormField<int>(
-            initialValue: prefs.preReminderMinutes,
-            decoration: const InputDecoration(
-              labelText: 'Pengingat Sebelum Adzan',
-            ),
-            items: const [
-              DropdownMenuItem(value: 0, child: Text('Tidak ada')),
-              DropdownMenuItem(value: 5, child: Text('5 menit sebelum')),
-              DropdownMenuItem(value: 10, child: Text('10 menit sebelum')),
-              DropdownMenuItem(value: 15, child: Text('15 menit sebelum')),
+          DropdownMenu<int>(
+            initialSelection: prefs.preReminderMinutes,
+            expandedInsets: EdgeInsets.zero,
+            label: const Text('Pengingat Sebelum Adzan'),
+            dropdownMenuEntries: const [
+              DropdownMenuEntry(value: 0, label: 'Tidak ada'),
+              DropdownMenuEntry(value: 5, label: '5 menit sebelum'),
+              DropdownMenuEntry(value: 10, label: '10 menit sebelum'),
+              DropdownMenuEntry(value: 15, label: '15 menit sebelum'),
             ],
-            onChanged: (value) {
+            onSelected: (value) {
               if (value != null) {
                 notifier.setPreReminderMinutes(value);
               }
@@ -724,7 +782,7 @@ class _PrayerRow extends StatelessWidget {
 
     return ListTile(
       leading: Icon(
-        isNext ? LucideIcons.bellRing : LucideIcons.clock,
+        isNext ? Icons.notifications_active_outlined : Icons.schedule_rounded,
         color: isNext ? primaryColor : AppTokens.textSecondary(context),
         size: 20,
       ),
@@ -769,7 +827,7 @@ class _SyuruqRow extends StatelessWidget {
   Widget build(BuildContext context) {
     return ListTile(
       leading: Icon(
-        LucideIcons.sunrise,
+        Icons.wb_twilight_rounded,
         color: AppTokens.textSecondary(context),
         size: 20,
       ),
@@ -961,7 +1019,7 @@ class _QiblaCompassTab extends StatelessWidget {
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             Icon(
-                              LucideIcons.checkCircle2,
+                              Icons.check_circle_outline_rounded,
                               color: AppTokens.success(context),
                               size: 18,
                             ),
@@ -1054,7 +1112,7 @@ class _QiblaCompassTab extends StatelessWidget {
                     Transform.rotate(
                       angle: angleRadians,
                       child: Icon(
-                        LucideIcons.navigation,
+                        Icons.navigation_rounded,
                         size: 96,
                         color: isAligned
                             ? AppTokens.success(context)
@@ -1074,8 +1132,8 @@ class _QiblaCompassTab extends StatelessWidget {
                 children: [
                   Icon(
                     hasLiveCompass
-                        ? LucideIcons.radio
-                        : LucideIcons.compass,
+                        ? Icons.sensors_rounded
+                        : Icons.explore_outlined,
                     color: isAligned
                         ? AppTokens.success(context)
                         : AppTokens.primary(context),
@@ -1087,9 +1145,11 @@ class _QiblaCompassTab extends StatelessWidget {
                       hasLiveCompass
                           ? 'Kompas aktif (heading: ${heading.toStringAsFixed(0)}°). Putar perangkat hingga panah menunjuk lurus ke depan.'
                           : 'Sensor kompas tidak tersedia atau belum mengirim data. Gunakan sudut ${qiblaBearing.toStringAsFixed(1)}° dari Utara sebagai patokan arah kiblat.',
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: AppTokens.textSecondary(context),
+                      style: HubTypography.tabular(
+                        TextStyle(
+                          fontSize: 13,
+                          color: AppTokens.textSecondary(context),
+                        ),
                       ),
                     ),
                   ),

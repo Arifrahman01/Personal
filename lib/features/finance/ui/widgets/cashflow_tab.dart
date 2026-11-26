@@ -282,10 +282,12 @@ class _SpendingAnomalyBanner extends StatelessWidget {
                       ),
                       Text(
                         '${anomaly.deviationMultiple}x Normal',
-                        style: TextStyle(
-                          fontWeight: FontWeight.w800,
-                          color: warnColor,
-                          fontSize: 12,
+                        style: HubTypography.tabular(
+                          TextStyle(
+                            fontWeight: FontWeight.w800,
+                            color: warnColor,
+                            fontSize: 12,
+                          ),
                         ),
                       ),
                     ],
@@ -478,9 +480,11 @@ class _PredictiveCashflowCard extends StatelessWidget {
                             cashflowAsync.maybeWhen(
                               data: (proj) => Text(
                                 '${proj.daysRemainingInMonth} hari tersisa',
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  color: AppTokens.textSecondary(context),
+                                style: HubTypography.tabular(
+                                  TextStyle(
+                                    fontSize: 11,
+                                    color: AppTokens.textSecondary(context),
+                                  ),
                                 ),
                               ),
                               orElse: () => const SizedBox.shrink(),
@@ -938,10 +942,12 @@ class _RecurringBillTile extends StatelessWidget {
                 ),
                 child: Text(
                   '$confidencePct% akurat',
-                  style: TextStyle(
-                    fontSize: 9,
-                    fontWeight: FontWeight.w700,
-                    color: AppTokens.success(context),
+                  style: HubTypography.tabular(
+                    TextStyle(
+                      fontSize: 9,
+                      fontWeight: FontWeight.w700,
+                      color: AppTokens.success(context),
+                    ),
                   ),
                 ),
               ),
@@ -973,6 +979,7 @@ class _QuickAiCaptureCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isBusy = aiState.isParsing || aiState.isSavingDrafts;
+    final colorScheme = Theme.of(context).colorScheme;
 
     return HubCard(
       padding: const EdgeInsets.all(16),
@@ -1032,20 +1039,20 @@ class _QuickAiCaptureCard extends StatelessWidget {
               const SizedBox(width: 8),
               FilledButton(
                 style: FilledButton.styleFrom(
-                  backgroundColor: AppTokens.primary(context),
-                  foregroundColor: Colors.white,
+                  backgroundColor: colorScheme.primary,
+                  foregroundColor: colorScheme.onPrimary,
                   shape: RoundedRectangleBorder(
                     borderRadius: HubRadius.rSm,
                   ),
                 ),
                 onPressed: isBusy ? null : onParse,
                 child: aiState.isParsing
-                    ? const SizedBox(
+                    ? SizedBox(
                         width: 18,
                         height: 18,
                         child: CircularProgressIndicator(
                           strokeWidth: 2,
-                          color: Colors.white,
+                          color: colorScheme.onPrimary,
                         ),
                       )
                     : const Text(
@@ -1085,16 +1092,16 @@ class _QuickAiCaptureCard extends StatelessWidget {
                 FilledButton.icon(
                   style: FilledButton.styleFrom(
                     backgroundColor: AppTokens.success(context),
-                    foregroundColor: Colors.white,
+                    foregroundColor: colorScheme.onPrimary,
                   ),
                   onPressed: isBusy ? null : onSaveAll,
                   icon: aiState.isSavingDrafts
-                      ? const SizedBox(
+                      ? SizedBox(
                           width: 16,
                           height: 16,
                           child: CircularProgressIndicator(
                             strokeWidth: 2,
-                            color: Colors.white,
+                            color: colorScheme.onPrimary,
                           ),
                         )
                       : const Icon(Icons.check_rounded),
@@ -1347,23 +1354,12 @@ class _GroupedTransactionListView extends StatelessWidget {
       data: (transactions) {
         if (transactions.isEmpty) {
           return HubCard(
-            padding: const EdgeInsets.all(24),
-            child: Column(
-              children: [
-                Icon(
-                  Icons.account_balance_wallet_outlined,
-                  size: 36,
-                  color: AppTokens.textSecondary(context),
-                ),
-                const SizedBox(height: 10),
-                Text(
-                  'Belum ada transaksi di ${selectedMonth.label}.',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    color: AppTokens.textSecondary(context),
-                  ),
-                ),
-              ],
+            padding: const EdgeInsets.all(HubSpacing.sm),
+            child: HubEmptyState(
+              icon: Icons.account_balance_wallet_outlined,
+              title: 'Belum ada transaksi di ${selectedMonth.label}.',
+              message:
+                  'Ketuk tombol "Catat" atau gunakan Catat Cepat AI untuk mulai mencatat transaksi bulan ini.',
             ),
           );
         }
@@ -1409,18 +1405,21 @@ class _GroupedTransactionListView extends StatelessWidget {
                       alignment: Alignment.centerRight,
                       padding: const EdgeInsets.only(right: 18),
                       decoration: BoxDecoration(
-                        color: AppTokens.error(context),
+                        color: Theme.of(context).colorScheme.error,
                         borderRadius: HubRadius.rSm,
                       ),
-                      child: const Row(
+                      child: Row(
                         mainAxisAlignment: MainAxisAlignment.end,
                         children: [
-                          Icon(Icons.delete_outline_rounded, color: Colors.white),
-                          SizedBox(width: 6),
+                          Icon(
+                            Icons.delete_outline_rounded,
+                            color: Theme.of(context).colorScheme.onError,
+                          ),
+                          const SizedBox(width: 6),
                           Text(
                             'Hapus',
                             style: TextStyle(
-                              color: Colors.white,
+                              color: Theme.of(context).colorScheme.onError,
                               fontWeight: FontWeight.w700,
                             ),
                           ),

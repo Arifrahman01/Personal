@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:personal_hub/core/theme/app_tokens.dart';
 import 'package:personal_hub/core/theme/hub_widgets.dart';
 import 'package:personal_hub/features/finance/ui/finance_screen.dart';
@@ -21,7 +20,8 @@ class GlobalSearchSheet extends ConsumerStatefulWidget {
     return showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
-      backgroundColor: Colors.transparent,
+      useSafeArea: true,
+      showDragHandle: true,
       builder: (_) => const GlobalSearchSheet(),
     );
   }
@@ -90,99 +90,54 @@ class _GlobalSearchSheetState extends ConsumerState<GlobalSearchSheet> {
   @override
   Widget build(BuildContext context) {
     final searchAsync = ref.watch(globalSearchResultsProvider);
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final bottomInset = MediaQuery.of(context).viewInsets.bottom;
+    final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
 
-    return Container(
+    return ConstrainedBox(
       constraints: BoxConstraints(
-        maxHeight: MediaQuery.of(context).size.height * 0.88,
+        maxHeight: MediaQuery.sizeOf(context).height * 0.88,
       ),
-      margin: EdgeInsets.only(bottom: bottomInset),
-      decoration: BoxDecoration(
-        color: AppTokens.card(context),
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(HubRadius.lg)),
-        border: Border(
-          top: BorderSide(color: AppTokens.border(context), width: 1),
-        ),
-      ),
-      child: SafeArea(
-        top: false,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            // Handle bar
-            Center(
-              child: Container(
-                margin: const EdgeInsets.only(top: 12, bottom: 8),
-                width: 36,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: isDark ? Colors.white24 : Colors.black12,
-                  borderRadius: HubRadius.rPill,
-                ),
-              ),
-            ),
-
-            // Search Header
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: TextField(
-                      controller: _controller,
-                      autofocus: true,
-                      onChanged: _onQueryChanged,
-                      decoration: InputDecoration(
+      child: Padding(
+        padding: EdgeInsets.only(bottom: bottomInset),
+        child: SafeArea(
+          top: false,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // Search Header
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: SearchBar(
+                        controller: _controller,
+                        autoFocus: true,
+                        onChanged: _onQueryChanged,
                         hintText: 'Cari catatan, meeting, tugas, transaksi...',
-                        hintStyle: TextStyle(
-                          color: AppTokens.textSecondary(context),
-                          fontSize: 14,
-                        ),
-                        prefixIcon: Icon(
-                          LucideIcons.search,
-                          size: 18,
+                        leading: Icon(
+                          Icons.search_rounded,
+                          size: 20,
                           color: AppTokens.textSecondary(context),
                         ),
-                        suffixIcon: _controller.text.isNotEmpty
-                            ? IconButton(
-                                icon: const Icon(LucideIcons.x, size: 16),
-                                onPressed: _clearQuery,
-                              )
+                        trailing: _controller.text.isNotEmpty
+                            ? [
+                                IconButton(
+                                  icon: const Icon(Icons.close_rounded, size: 18),
+                                  onPressed: _clearQuery,
+                                ),
+                              ]
                             : null,
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 14,
-                          vertical: 10,
-                        ),
-                        filled: true,
-                        fillColor: AppTokens.canvas(context),
-                        border: OutlineInputBorder(
-                          borderRadius: HubRadius.rSm,
-                          borderSide: BorderSide(color: AppTokens.border(context)),
-                        ),
-                        enabledBorder: OutlineInputBorder(
-                          borderRadius: HubRadius.rSm,
-                          borderSide: BorderSide(color: AppTokens.border(context)),
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: HubRadius.rSm,
-                          borderSide: BorderSide(
-                            color: AppTokens.primary(context),
-                            width: 1.5,
-                          ),
-                        ),
                       ),
                     ),
-                  ),
-                  const SizedBox(width: 8),
-                  TextButton(
-                    onPressed: () => Navigator.of(context).pop(),
-                    child: const Text('Batal'),
-                  ),
-                ],
+                    const SizedBox(width: 8),
+                    TextButton(
+                      onPressed: () => Navigator.of(context).pop(),
+                      child: const Text('Batal'),
+                    ),
+                  ],
+                ),
               ),
-            ),
 
             // Filter Chips
             SingleChildScrollView(
@@ -243,7 +198,7 @@ class _GlobalSearchSheetState extends ConsumerState<GlobalSearchSheet> {
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             Icon(
-                              LucideIcons.search,
+                              Icons.search_rounded,
                               size: 40,
                               color: AppTokens.textSecondary(context).withValues(alpha: 0.5),
                             ),
@@ -291,10 +246,10 @@ class _GlobalSearchSheetState extends ConsumerState<GlobalSearchSheet> {
                     itemBuilder: (context, index) {
                       final item = filtered[index];
                       final icon = switch (item.category) {
-                        GlobalSearchCategory.note => LucideIcons.notebookPen,
-                        GlobalSearchCategory.meeting => LucideIcons.calendar,
-                        GlobalSearchCategory.task => LucideIcons.checkSquare,
-                        GlobalSearchCategory.transaction => LucideIcons.walletCards,
+                        GlobalSearchCategory.note => Icons.edit_note_rounded,
+                        GlobalSearchCategory.meeting => Icons.calendar_month_rounded,
+                        GlobalSearchCategory.task => Icons.check_box_outlined,
+                        GlobalSearchCategory.transaction => Icons.account_balance_wallet_outlined,
                       };
 
                       return HubCard(
@@ -382,6 +337,7 @@ class _GlobalSearchSheetState extends ConsumerState<GlobalSearchSheet> {
           ],
         ),
       ),
+    ),
     );
   }
 }

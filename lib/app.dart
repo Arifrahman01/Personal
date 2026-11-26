@@ -2,7 +2,6 @@ import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:personal_hub/core/theme/app_theme.dart';
 import 'package:personal_hub/features/agenda/ui/agenda_hub_screen.dart';
 import 'package:personal_hub/features/ai/ui/ai_chat_screen.dart';
@@ -149,56 +148,56 @@ class _MainNavigationShellState extends ConsumerState<MainNavigationShell>
 
     final bottomNavDestinations = const [
       NavigationDestination(
-        icon: Icon(LucideIcons.sun),
-        selectedIcon: Icon(LucideIcons.sun),
+        icon: Icon(Icons.wb_sunny_outlined),
+        selectedIcon: Icon(Icons.wb_sunny_rounded),
         label: 'Hari Ini',
       ),
       NavigationDestination(
-        icon: Icon(LucideIcons.calendar),
-        selectedIcon: Icon(LucideIcons.calendar),
+        icon: Icon(Icons.calendar_month_outlined),
+        selectedIcon: Icon(Icons.calendar_month_rounded),
         label: 'Agenda',
       ),
       NavigationDestination(
-        icon: Icon(LucideIcons.notebookPen),
-        selectedIcon: Icon(LucideIcons.notebookPen),
+        icon: Icon(Icons.edit_note_outlined),
+        selectedIcon: Icon(Icons.edit_note_rounded),
         label: 'Catatan',
       ),
       NavigationDestination(
-        icon: Icon(LucideIcons.walletCards),
-        selectedIcon: Icon(LucideIcons.walletCards),
+        icon: Icon(Icons.account_balance_wallet_outlined),
+        selectedIcon: Icon(Icons.account_balance_wallet_rounded),
         label: 'Keuangan',
       ),
       NavigationDestination(
-        icon: Icon(LucideIcons.shieldCheck),
-        selectedIcon: Icon(LucideIcons.shieldCheck),
+        icon: Icon(Icons.verified_user_outlined),
+        selectedIcon: Icon(Icons.verified_user_rounded),
         label: 'Vault',
       ),
     ];
 
     final railDestinations = const [
       NavigationRailDestination(
-        icon: Icon(LucideIcons.sun),
-        selectedIcon: Icon(LucideIcons.sun),
+        icon: Icon(Icons.wb_sunny_outlined),
+        selectedIcon: Icon(Icons.wb_sunny_rounded),
         label: Text('Hari Ini'),
       ),
       NavigationRailDestination(
-        icon: Icon(LucideIcons.calendar),
-        selectedIcon: Icon(LucideIcons.calendar),
+        icon: Icon(Icons.calendar_month_outlined),
+        selectedIcon: Icon(Icons.calendar_month_rounded),
         label: Text('Agenda'),
       ),
       NavigationRailDestination(
-        icon: Icon(LucideIcons.notebookPen),
-        selectedIcon: Icon(LucideIcons.notebookPen),
+        icon: Icon(Icons.edit_note_outlined),
+        selectedIcon: Icon(Icons.edit_note_rounded),
         label: Text('Catatan'),
       ),
       NavigationRailDestination(
-        icon: Icon(LucideIcons.walletCards),
-        selectedIcon: Icon(LucideIcons.walletCards),
+        icon: Icon(Icons.account_balance_wallet_outlined),
+        selectedIcon: Icon(Icons.account_balance_wallet_rounded),
         label: Text('Keuangan'),
       ),
       NavigationRailDestination(
-        icon: Icon(LucideIcons.shieldCheck),
-        selectedIcon: Icon(LucideIcons.shieldCheck),
+        icon: Icon(Icons.verified_user_outlined),
+        selectedIcon: Icon(Icons.verified_user_rounded),
         label: Text('Vault'),
       ),
     ];
@@ -259,6 +258,7 @@ class _PrivacyShieldOverlay extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     final colors = HubColors.of(context);
     final canvasColor = colors.canvas;
     final primaryColor = colors.primary;
@@ -287,7 +287,7 @@ class _PrivacyShieldOverlay extends StatelessWidget {
                       ),
                     ),
                     child: Icon(
-                      LucideIcons.shieldCheck,
+                      Icons.verified_user_rounded,
                       size: 38,
                       color: primaryColor,
                     ),
@@ -296,8 +296,7 @@ class _PrivacyShieldOverlay extends StatelessWidget {
                   Text(
                     'Personal Hub - Layar Terlindungi',
                     textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontSize: 18,
+                    style: theme.textTheme.titleMedium?.copyWith(
                       fontWeight: FontWeight.bold,
                       letterSpacing: 0.3,
                       color: colors.textPrimary,
@@ -307,8 +306,7 @@ class _PrivacyShieldOverlay extends StatelessWidget {
                   Text(
                     'Data sensitif disembunyikan saat aplikasi tidak aktif',
                     textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontSize: 13,
+                    style: theme.textTheme.bodySmall?.copyWith(
                       color: colors.textSecondary,
                     ),
                   ),

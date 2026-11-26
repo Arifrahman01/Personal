@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:lucide_icons_flutter/lucide_icons.dart';
+import 'package:personal_hub/core/constants/ai_constants.dart';
 import 'package:personal_hub/core/theme/app_theme.dart';
 import 'package:personal_hub/features/home/providers/home_module_preferences.dart';
 import 'package:personal_hub/features/prayer/ui/prayer_schedule_screen.dart';
@@ -16,8 +16,10 @@ class SettingsScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final colors = HubColors.of(context);
     final themeMode = ref.watch(themeModeProvider);
-    final primary = AppTokens.primary(context);
+    final primary = colors.primary;
 
     return Scaffold(
       backgroundColor: AppTokens.canvas(context),
@@ -37,7 +39,7 @@ class SettingsScreen extends ConsumerWidget {
               children: [
                 Row(
                   children: [
-                    Icon(LucideIcons.palette, size: 20, color: primary),
+                    Icon(Icons.palette_outlined, size: 20, color: primary),
                     const SizedBox(width: 10),
                     Text(
                       'Tampilan Antarmuka',
@@ -55,17 +57,17 @@ class SettingsScreen extends ConsumerWidget {
                       ButtonSegment(
                         value: ThemeMode.system,
                         label: Text('Sistem'),
-                        icon: Icon(LucideIcons.sunMoon, size: 16),
+                        icon: Icon(Icons.brightness_auto_rounded, size: 16),
                       ),
                       ButtonSegment(
                         value: ThemeMode.light,
                         label: Text('Terang'),
-                        icon: Icon(LucideIcons.sun, size: 16),
+                        icon: Icon(Icons.light_mode_outlined, size: 16),
                       ),
                       ButtonSegment(
                         value: ThemeMode.dark,
                         label: Text('Gelap'),
-                        icon: Icon(LucideIcons.moon, size: 16),
+                        icon: Icon(Icons.dark_mode_outlined, size: 16),
                       ),
                     ],
                     selected: {themeMode},
@@ -79,39 +81,35 @@ class SettingsScreen extends ConsumerWidget {
               ],
             ),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: HubSpacing.lg),
 
           // Menu Sections Header
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
-            child: Text(
-              'PREFERENSI & MODUL',
-              style: TextStyle(
-                fontSize: 11,
-                fontWeight: FontWeight.w700,
-                color: AppTokens.textSecondary(context),
-                letterSpacing: 0.8,
-              ),
+          const HubSectionHeader(
+            title: 'PREFERENSI & MODUL',
+            padding: EdgeInsets.symmetric(
+              horizontal: HubSpacing.xs,
+              vertical: HubSpacing.xs,
             ),
           ),
-          const SizedBox(height: 6),
+          const SizedBox(height: HubSpacing.xs),
 
           // 2. Tampilkan di Beranda
           _SettingsMenuTile(
-            icon: LucideIcons.layoutGrid,
-            iconColor: const Color(0xFFF59E0B),
+            icon: Icons.grid_view_rounded,
+            iconColor: colors.warning,
             title: 'Tampilkan di Beranda',
             subtitle: 'Atur kartu modul yang aktif di halaman Beranda Hari Ini.',
             onTap: () => _openHomeModulesSheet(context),
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: HubSpacing.md),
 
           // 3. Asisten AI
           _SettingsMenuTile(
-            icon: LucideIcons.bot,
+            icon: Icons.smart_toy_outlined,
             iconColor: primary,
             title: 'Asisten AI',
-            subtitle: 'Model deepseek-v4.1-flash:free, API Key & uji koneksi.',
+            subtitle:
+                'Model prioritas ${AiConstants.freeModel}, kunci akses & uji koneksi.',
             onTap: () {
               Navigator.of(context).push(
                 MaterialPageRoute<void>(
@@ -120,14 +118,14 @@ class SettingsScreen extends ConsumerWidget {
               );
             },
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: HubSpacing.md),
 
           // 4. Keamanan & Brankas
           _SettingsMenuTile(
-            icon: LucideIcons.shieldCheck,
-            iconColor: AppTokens.success(context),
+            icon: Icons.verified_user_outlined,
+            iconColor: colors.success,
             title: 'Keamanan & Brankas',
-            subtitle: 'PIN Utama, Duress PIN (anti-pemaksaan), dan Kunci Otomatis.',
+            subtitle: 'PIN Utama, PIN Darurat, dan Kunci Otomatis.',
             onTap: () {
               Navigator.of(context).push(
                 MaterialPageRoute<void>(
@@ -136,12 +134,12 @@ class SettingsScreen extends ConsumerWidget {
               );
             },
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: HubSpacing.md),
 
           // 5. Jadwal Sholat & Adzan
           _SettingsMenuTile(
-            icon: LucideIcons.bell,
-            iconColor: AppTokens.info(context),
+            icon: Icons.notifications_outlined,
+            iconColor: colors.info,
             title: 'Jadwal Sholat & Adzan',
             subtitle: '5 waktu sholat harian, notifikasi pengingat, hisab & kiblat.',
             onTap: () {
@@ -152,14 +150,15 @@ class SettingsScreen extends ConsumerWidget {
               );
             },
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: HubSpacing.md),
 
           // 6. Backup & Sinkronisasi
           _SettingsMenuTile(
-            icon: LucideIcons.hardDrive,
-            iconColor: const Color(0xFF8B5CF6),
+            icon: Icons.storage_rounded,
+            iconColor: colorScheme.tertiary,
             title: 'Backup & Sinkronisasi',
-            subtitle: 'Ekspor .phub, Simpan Otomatis: 7 Harian • 4 Mingguan • 3 Bulanan, & Cloud Sync.',
+            subtitle:
+                'Cadangkan data (.phub), Simpan Otomatis: 7 Harian • 4 Mingguan • 3 Bulanan, & Sinkronisasi Cloud.',
             onTap: () {
               Navigator.of(context).push(
                 MaterialPageRoute<void>(
@@ -181,7 +180,7 @@ class SettingsScreen extends ConsumerWidget {
                     color: primary.withValues(alpha: 0.12),
                     shape: BoxShape.circle,
                   ),
-                  child: Icon(LucideIcons.sparkles, size: 20, color: primary),
+                  child: Icon(Icons.auto_awesome_rounded, size: 20, color: primary),
                 ),
                 const SizedBox(height: 10),
                 Text(
@@ -192,10 +191,10 @@ class SettingsScreen extends ConsumerWidget {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  'Enkripsi AES-256-GCM Lokal • Offline-First',
+                  'Terenkripsi Lokal • Siap Tanpa Internet',
                   style: TextStyle(
                     fontSize: 12,
-                    color: AppTokens.textSecondary(context),
+                    color: colors.textSecondary,
                   ),
                 ),
               ],
@@ -211,33 +210,27 @@ class SettingsScreen extends ConsumerWidget {
     showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
-      backgroundColor: AppTokens.card(context),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(HubRadius.lg)),
-      ),
+      useSafeArea: true,
+      showDragHandle: true,
       builder: (sheetContext) {
         return Consumer(
           builder: (context, ref, _) {
             final prefs = ref.watch(homeModulePreferencesProvider);
             final notifier = ref.read(homeModulePreferencesProvider.notifier);
 
-            return Padding(
-              padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
-              child: Column(
+            return SafeArea(
+              top: false,
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.fromLTRB(
+                  HubSpacing.xl,
+                  HubSpacing.xs,
+                  HubSpacing.xl,
+                  HubSpacing.xxl,
+                ),
+                child: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Center(
-                    child: Container(
-                      width: 38,
-                      height: 4,
-                      decoration: BoxDecoration(
-                        color: AppTokens.border(context),
-                        borderRadius: HubRadius.rPill,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
                   const Text(
                     'Tampilkan di Beranda',
                     style: TextStyle(
@@ -280,11 +273,12 @@ class SettingsScreen extends ConsumerWidget {
                   ),
                   SwitchListTile(
                     title: const Text('Ringkasan AI Harian'),
-                    subtitle: const Text('Executive summary harian'),
+                    subtitle: const Text('Ringkasan aktivitas & agenda harian'),
                     value: prefs.showAiBriefing,
                     onChanged: notifier.toggleAiBriefing,
                   ),
                 ],
+              ),
               ),
             );
           },
@@ -348,7 +342,7 @@ class _SettingsMenuTile extends StatelessWidget {
           ),
           const SizedBox(width: 6),
           Icon(
-            LucideIcons.chevronRight,
+            Icons.chevron_right_rounded,
             size: 18,
             color: AppTokens.textSecondary(context),
           ),
