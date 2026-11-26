@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:personal_hub/app.dart';
 import 'package:personal_hub/features/finance/models/finance_models.dart';
 import 'package:personal_hub/features/finance/providers/asset_aggregator_providers.dart';
 import 'package:personal_hub/features/finance/providers/finance_providers.dart';
@@ -123,6 +124,8 @@ class _FinanceScreenState extends ConsumerState<FinanceScreen> {
       appBar: AppBar(
         title: const Text(
           'Keuangan & Zakat',
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
           style: TextStyle(fontWeight: FontWeight.w800),
         ),
         actions: [
@@ -172,13 +175,18 @@ class _FinanceScreenState extends ConsumerState<FinanceScreen> {
                     height: 20,
                     child: CircularProgressIndicator(strokeWidth: 2),
                   )
-                : const Icon(Icons.auto_awesome_rounded),
+                : const Icon(Icons.insights_rounded),
             onPressed: aiState.isAnalyzing || summaryAsync.asData?.value == null
                 ? null
                 : () => _handleAnalyzeMonth(
                       summaryAsync.asData!.value,
                       selectedMonth,
                     ),
+          ),
+          IconButton(
+            tooltip: 'AI Copilot',
+            icon: const Icon(Icons.auto_awesome_outlined),
+            onPressed: () => MainNavigationShell.openAiChat(context),
           ),
         ],
       ),

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:personal_hub/app.dart';
 import 'package:personal_hub/core/theme/app_tokens.dart';
 import 'package:personal_hub/features/meetings/models/meeting.dart';
 import 'package:personal_hub/features/meetings/ui/meeting_form_screen.dart';
@@ -281,6 +282,18 @@ class _AgendaHubScreenState extends ConsumerState<AgendaHubScreen> {
             letterSpacing: -0.3,
           ),
         ),
+        actions: [
+          IconButton(
+            tooltip: 'Cari',
+            icon: const Icon(Icons.search_rounded),
+            onPressed: () => MainNavigationShell.openSearch(context),
+          ),
+          IconButton(
+            tooltip: 'AI Copilot',
+            icon: const Icon(Icons.auto_awesome_outlined),
+            onPressed: () => MainNavigationShell.openAiChat(context),
+          ),
+        ],
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(52),
           child: Padding(

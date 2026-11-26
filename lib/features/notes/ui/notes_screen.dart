@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:personal_hub/app.dart';
 import 'package:personal_hub/core/theme/app_tokens.dart';
 import 'package:personal_hub/core/theme/hub_widgets.dart';
 import 'package:personal_hub/features/notes/models/note.dart';
@@ -209,6 +210,11 @@ class _NotesScreenState extends ConsumerState<NotesScreen> {
           ),
         ),
         actions: [
+          IconButton(
+            tooltip: 'AI Copilot',
+            icon: const Icon(Icons.auto_awesome_outlined),
+            onPressed: () => MainNavigationShell.openAiChat(context),
+          ),
           MenuAnchor(
             builder: (context, controller, child) {
               return IconButton(
@@ -252,7 +258,7 @@ class _NotesScreenState extends ConsumerState<NotesScreen> {
       body: SafeArea(
         top: false,
         child: notesAsync.when(
-          loading: () => const Center(child: CircularProgressIndicator()),
+          loading: () => const HubSkeletonList(),
           error: (error, _) => Center(
             child: Padding(
               padding: const EdgeInsets.all(24),

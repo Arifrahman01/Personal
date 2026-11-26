@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:personal_hub/app.dart';
 import 'package:personal_hub/core/errors/app_exceptions.dart';
 import 'package:personal_hub/core/theme/app_tokens.dart';
 import 'package:personal_hub/core/theme/hub_widgets.dart';
@@ -228,6 +229,11 @@ class _VaultListScreenState extends ConsumerState<VaultListScreen> {
         elevation: 0,
         actions: [
           IconButton(
+            tooltip: 'AI Copilot',
+            icon: const Icon(Icons.auto_awesome_outlined),
+            onPressed: () => MainNavigationShell.openAiChat(context),
+          ),
+          IconButton(
             tooltip: 'Pengaturan Brankas & Duress PIN',
             icon: const Icon(Icons.verified_user_outlined),
             onPressed: _openSecuritySettings,
@@ -374,7 +380,7 @@ class _VaultListScreenState extends ConsumerState<VaultListScreen> {
             // Entries List
             Expanded(
               child: entriesAsync.when(
-                loading: () => const Center(child: CircularProgressIndicator()),
+                loading: () => const HubSkeletonList(),
                 error: (error, _) => Center(
                   child: Padding(
                     padding: const EdgeInsets.all(24),

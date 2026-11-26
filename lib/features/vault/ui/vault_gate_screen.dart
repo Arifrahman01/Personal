@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:personal_hub/app.dart';
 import 'package:personal_hub/core/errors/app_exceptions.dart';
 import 'package:personal_hub/core/theme/app_tokens.dart';
 import 'package:personal_hub/core/theme/hub_widgets.dart';
@@ -282,6 +283,13 @@ class _VaultGateScreenState extends ConsumerState<VaultGateScreen> {
         backgroundColor: AppTokens.canvas(context),
         centerTitle: false,
         elevation: 0,
+        actions: [
+          IconButton(
+            tooltip: 'AI Copilot',
+            icon: const Icon(Icons.auto_awesome_outlined),
+            onPressed: () => MainNavigationShell.openAiChat(context),
+          ),
+        ],
       ),
       body: SafeArea(
         child: KeyboardListener(

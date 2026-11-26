@@ -445,3 +445,109 @@ class HubPill extends StatelessWidget {
     );
   }
 }
+
+/// Static tonal Material 3 skeleton box placeholder (non-infinite so widget
+/// tests using `pumpAndSettle` remain deterministic).
+class HubSkeletonBox extends StatelessWidget {
+  final double? width;
+  final double height;
+  final BorderRadius? borderRadius;
+
+  const HubSkeletonBox({
+    super.key,
+    this.width,
+    required this.height,
+    this.borderRadius,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return Container(
+      width: width,
+      height: height,
+      decoration: BoxDecoration(
+        color: colorScheme.surfaceContainerHighest,
+        borderRadius: borderRadius ?? HubRadius.rXs,
+      ),
+    );
+  }
+}
+
+/// Tonal Material 3 skeleton card placeholder for async list loading states.
+class HubSkeletonCard extends StatelessWidget {
+  final bool showSubtitle;
+  final bool showTrailingPill;
+
+  const HubSkeletonCard({
+    super.key,
+    this.showSubtitle = true,
+    this.showTrailingPill = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return HubCard(
+      padding: const EdgeInsets.all(HubSpacing.lg),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Expanded(
+                child: HubSkeletonBox(height: 16),
+              ),
+              if (showTrailingPill) ...[
+                const SizedBox(width: HubSpacing.md),
+                HubSkeletonBox(
+                  width: 64,
+                  height: 22,
+                  borderRadius: HubRadius.rPill,
+                ),
+              ],
+            ],
+          ),
+          if (showSubtitle) ...[
+            const SizedBox(height: HubSpacing.sm),
+            const FractionallySizedBox(
+              widthFactor: 0.72,
+              child: HubSkeletonBox(height: 12),
+            ),
+            const SizedBox(height: HubSpacing.xs),
+            const FractionallySizedBox(
+              widthFactor: 0.45,
+              child: HubSkeletonBox(height: 12),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+/// Vertical list of tonal [HubSkeletonCard] placeholders.
+class HubSkeletonList extends StatelessWidget {
+  final int itemCount;
+  final EdgeInsetsGeometry padding;
+
+  const HubSkeletonList({
+    super.key,
+    this.itemCount = 4,
+    this.padding = const EdgeInsets.all(HubSpacing.lg),
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView.separated(
+      physics: const NeverScrollableScrollPhysics(),
+      shrinkWrap: true,
+      padding: padding,
+      itemCount: itemCount,
+      separatorBuilder: (context, index) =>
+          const SizedBox(height: HubSpacing.md),
+      itemBuilder: (context, index) => HubSkeletonCard(
+        showTrailingPill: index.isEven,
+      ),
+    );
+  }
+}

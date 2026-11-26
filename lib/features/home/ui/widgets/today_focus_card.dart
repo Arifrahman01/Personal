@@ -182,17 +182,19 @@ class TodayFocusCard extends StatelessWidget {
               onTap: () => onToggleTask(task.id),
               borderRadius: HubRadius.rXs,
               child: ConstrainedBox(
-                constraints: const BoxConstraints(minHeight: 40),
+                constraints: const BoxConstraints(minHeight: 48),
                 child: Padding(
                   padding: const EdgeInsets.symmetric(vertical: 4),
                   child: Row(
                     children: [
                       SizedBox(
-                        width: 28,
-                        height: 28,
+                        width: 32,
+                        height: 32,
                         child: Checkbox(
                           value: task.isDone,
                           onChanged: (_) => onToggleTask(task.id),
+                          materialTapTargetSize:
+                              MaterialTapTargetSize.shrinkWrap,
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(4),
                           ),

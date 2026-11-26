@@ -116,8 +116,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Container(
-          width: 20,
-          height: 20,
+          constraints: const BoxConstraints(minWidth: 22, minHeight: 22),
+          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
           alignment: Alignment.center,
           decoration: BoxDecoration(
             color: AppTokens.primary(context).withValues(alpha: 0.12),
@@ -125,10 +125,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           ),
           child: Text(
             number,
-            style: TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.w700,
-              color: AppTokens.primary(context),
+            style: HubTypography.tabular(
+              TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
+                color: AppTokens.primary(context),
+              ),
             ),
           ),
         ),
@@ -230,7 +232,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           ),
           IconButton(
             tooltip: 'AI Copilot',
-            icon: const Icon(Icons.auto_awesome_rounded),
+            icon: const Icon(Icons.auto_awesome_outlined),
             onPressed: _openAiChat,
           ),
           IconButton(

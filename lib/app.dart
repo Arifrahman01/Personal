@@ -205,7 +205,7 @@ class _MainNavigationShellState extends ConsumerState<MainNavigationShell>
     final content = Center(
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 840),
-        child: IndexedStack(
+        child: _FadeThroughIndexedStack(
           index: _selectedIndex,
           children: screens,
         ),
@@ -247,6 +247,83 @@ class _MainNavigationShellState extends ConsumerState<MainNavigationShell>
         shell,
         if (_isObscured) const _PrivacyShieldOverlay(),
       ],
+    );
+  }
+}
+
+/// Preserves offstage tab state via [IndexedStack] while adding a crisp
+/// Material 3 fade-through transition when switching tabs.
+class _FadeThroughIndexedStack extends StatefulWidget {
+  const _FadeThroughIndexedStack({
+    required this.index,
+    required this.children,
+  });
+
+  final int index;
+  final List<Widget> children;
+
+  @override
+  State<_FadeThroughIndexedStack> createState() =>
+      _FadeThroughIndexedStackState();
+}
+
+class _FadeThroughIndexedStackState extends State<_FadeThroughIndexedStack>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+  late final Animation<double> _fade;
+  late final Animation<double> _scale;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 220),
+      value: 1.0,
+    );
+    final curved = CurvedAnimation(
+      parent: _controller,
+      curve: Curves.easeOutCubic,
+    );
+    _fade = Tween<double>(begin: 0.85, end: 1.0).animate(curved);
+    _scale = Tween<double>(begin: 0.985, end: 1.0).animate(curved);
+  }
+
+  @override
+  void didUpdateWidget(covariant _FadeThroughIndexedStack oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.index != widget.index) {
+      if (MediaQuery.disableAnimationsOf(context)) {
+        _controller.value = 1.0;
+      } else {
+        _controller.forward(from: 0.0);
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final stack = IndexedStack(
+      index: widget.index,
+      children: widget.children,
+    );
+
+    if (MediaQuery.disableAnimationsOf(context)) {
+      return stack;
+    }
+
+    return FadeTransition(
+      opacity: _fade,
+      child: ScaleTransition(
+        scale: _scale,
+        child: stack,
+      ),
     );
   }
 }
