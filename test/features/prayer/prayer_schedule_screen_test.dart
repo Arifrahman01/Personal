@@ -1,9 +1,14 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:google_fonts/google_fonts.dart';
+import 'package:http/http.dart' as http;
+import 'package:http/testing.dart';
 import 'package:personal_hub/core/config/secure_config_store.dart';
 import 'package:personal_hub/core/database/app_database.dart';
+import 'package:personal_hub/features/prayer/providers/prayer_providers.dart';
+import 'package:personal_hub/features/prayer/services/prayer_location_service.dart';
 import 'package:personal_hub/features/prayer/ui/prayer_schedule_screen.dart';
 import 'package:personal_hub/features/vault/providers/vault_lock_controller.dart';
 import 'package:personal_hub/features/vault/providers/vault_providers.dart';
@@ -45,7 +50,6 @@ class _FakeClipboardAdapter implements ClipboardAdapter {
 
 void main() {
   setUpAll(() {
-    GoogleFonts.config.allowRuntimeFetching = false;
     sqfliteFfiInit();
   });
 
@@ -53,9 +57,16 @@ void main() {
     required AppDatabase appDb,
     bool isEmbedded = false,
   }) {
+    final mockLocationClient = MockClient(
+      (_) async => http.Response(jsonEncode(const []), 200),
+    );
+
     return ProviderScope(
       overrides: [
         appDatabaseProvider.overrideWithValue(appDb),
+        prayerLocationServiceProvider.overrideWithValue(
+          PrayerLocationService(client: mockLocationClient),
+        ),
         secureConfigStoreProvider.overrideWithValue(
           SecureConfigStore(_InMemorySecureStorage()),
         ),
@@ -158,10 +169,61 @@ void main() {
 
       expect(find.textContaining('Arah Kiblat —'), findsOneWidget);
       expect(find.textContaining('dari Utara Sejati'), findsOneWidget);
+      expect(find.textContaining('km ke Ka\'bah'), findsOneWidget);
+      expect(find.textContaining('Koordinat:'), findsNothing);
       expect(find.text('U'), findsOneWidget);
       expect(find.text('S'), findsOneWidget);
       expect(find.text('T'), findsOneWidget);
       expect(find.text('B'), findsOneWidget);
     });
+
+    testWidgets(
+      'location picker shows Muslim Pro-style search, province & timezone without coordinates and updates city on selection',
+      (tester) async {
+        tester.view.physicalSize = const Size(390 * 2, 844 * 2);
+        tester.view.devicePixelRatio = 2.0;
+        addTearDown(() {
+          tester.view.resetPhysicalSize();
+          tester.view.resetDevicePixelRatio();
+        });
+
+        final appDb = await AppDatabase.open(
+          pathOverride: inMemoryDatabasePath,
+          factoryOverride: databaseFactoryFfiNoIsolate,
+        );
+        addTearDown(() async => appDb.close());
+
+        await tester.pumpWidget(buildTestablePrayerScreen(appDb: appDb));
+        await tester.pumpAndSettle();
+
+        // Buka pemilih lokasi kota/kecamatan
+        await tester.tap(find.text('Ganti'));
+        await tester.pumpAndSettle();
+
+        expect(find.text('Pilih Lokasi Sholat'), findsOneWidget);
+        expect(find.text('Deteksi Lokasi Otomatis (GPS)'), findsOneWidget);
+        expect(find.text('DKI Jakarta • WIB'), findsAtLeastNWidgets(1));
+        expect(find.textContaining('-6.2088'), findsNothing);
+        expect(find.textContaining('106.8456'), findsNothing);
+
+        // Cari kota Malang & pilih
+        await tester.enterText(find.byType(TextField), 'Malang');
+        await tester.pump(const Duration(milliseconds: 500));
+        await tester.pumpAndSettle();
+
+        final malangTile = find.descendant(
+          of: find.byType(ListTile),
+          matching: find.text('Malang'),
+        );
+        expect(malangTile, findsOneWidget);
+        expect(find.text('Jawa Timur • WIB'), findsOneWidget);
+
+        await tester.tap(malangTile);
+        await tester.pumpAndSettle();
+
+        expect(find.text('Malang'), findsOneWidget);
+        expect(find.text('Jawa Timur • WIB'), findsOneWidget);
+      },
+    );
   });
 }

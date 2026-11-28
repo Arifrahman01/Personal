@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:personal_hub/core/theme/app_tokens.dart';
@@ -32,6 +34,7 @@ class GlobalSearchSheet extends ConsumerStatefulWidget {
 
 class _GlobalSearchSheetState extends ConsumerState<GlobalSearchSheet> {
   final TextEditingController _controller = TextEditingController();
+  Timer? _debounce;
   GlobalSearchCategory? _selectedCategory;
 
   @override
@@ -43,45 +46,69 @@ class _GlobalSearchSheetState extends ConsumerState<GlobalSearchSheet> {
 
   @override
   void dispose() {
+    _debounce?.cancel();
     _controller.dispose();
     super.dispose();
   }
 
   void _onQueryChanged(String query) {
+    setState(() {});
+    _debounce?.cancel();
+    if (query.trim().isEmpty) {
+      ref.read(homeSearchQueryProvider.notifier).setQuery(query);
+      return;
+    }
+    _debounce = Timer(const Duration(milliseconds: 250), () {
+      if (!mounted) return;
+      ref.read(homeSearchQueryProvider.notifier).setQuery(query);
+    });
+  }
+
+  void _onQuerySubmitted(String query) {
+    _debounce?.cancel();
     ref.read(homeSearchQueryProvider.notifier).setQuery(query);
   }
 
   void _clearQuery() {
+    _debounce?.cancel();
     _controller.clear();
+    setState(() {});
     ref.read(homeSearchQueryProvider.notifier).clear();
   }
 
-  void _handleResultTap(GlobalSearchResult result) {
-    Navigator.of(context).pop();
+  Future<void> _handleResultTap(GlobalSearchResult result) async {
+    final navigator = Navigator.of(context);
+    final preloadedNotes = ref.read(notesListProvider).asData?.value;
+    final notesFuture = result.category == GlobalSearchCategory.note &&
+            preloadedNotes == null
+        ? ref.read(notesListProvider.future)
+        : null;
+
+    navigator.pop();
 
     switch (result.category) {
       case GlobalSearchCategory.note:
-        final notes = ref.read(notesListProvider).asData?.value ?? const [];
+        final notes = preloadedNotes ?? await notesFuture!;
         final matched = notes.where((n) => n.id == result.id).firstOrNull;
         if (matched != null) {
-          Navigator.of(context).push(
+          await navigator.push(
             MaterialPageRoute<void>(
               builder: (_) => NoteEditorScreen(note: matched),
             ),
           );
         }
       case GlobalSearchCategory.meeting:
-        Navigator.of(context).push(
+        await navigator.push(
           MaterialPageRoute<void>(
             builder: (_) => MeetingDetailScreen(meetingId: result.id),
           ),
         );
       case GlobalSearchCategory.task:
-        Navigator.of(context).push(
+        await navigator.push(
           MaterialPageRoute<void>(builder: (_) => const TasksHabitsScreen()),
         );
       case GlobalSearchCategory.transaction:
-        Navigator.of(context).push(
+        await navigator.push(
           MaterialPageRoute<void>(builder: (_) => const FinanceScreen()),
         );
     }
@@ -114,6 +141,7 @@ class _GlobalSearchSheetState extends ConsumerState<GlobalSearchSheet> {
                         controller: _controller,
                         autoFocus: true,
                         onChanged: _onQueryChanged,
+                        onSubmitted: _onQuerySubmitted,
                         hintText: 'Cari catatan, meeting, tugas, transaksi...',
                         leading: Icon(
                           Icons.search_rounded,
@@ -258,17 +286,12 @@ class _GlobalSearchSheetState extends ConsumerState<GlobalSearchSheet> {
                         child: Row(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Container(
-                              padding: const EdgeInsets.all(8),
-                              decoration: BoxDecoration(
-                                color: AppTokens.primary(context).withValues(alpha: 0.12),
-                                borderRadius: HubRadius.rSm,
-                              ),
-                              child: Icon(
-                                icon,
-                                size: 18,
-                                color: AppTokens.primary(context),
-                              ),
+                            LuxeIconMedallion(
+                              icon: icon,
+                              color: AppTokens.primary(context),
+                              size: 38,
+                              iconSize: 18,
+                              borderRadius: 11,
                             ),
                             const SizedBox(width: 12),
                             Expanded(

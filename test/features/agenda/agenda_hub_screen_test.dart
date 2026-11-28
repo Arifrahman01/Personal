@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:personal_hub/core/config/secure_config_store.dart';
 import 'package:personal_hub/core/database/app_database.dart';
 import 'package:personal_hub/features/agenda/ui/agenda_hub_screen.dart';
@@ -45,7 +44,6 @@ class _FakeClipboardAdapter implements ClipboardAdapter {
 
 void main() {
   setUpAll(() {
-    GoogleFonts.config.allowRuntimeFetching = false;
     sqfliteFfiInit();
   });
 

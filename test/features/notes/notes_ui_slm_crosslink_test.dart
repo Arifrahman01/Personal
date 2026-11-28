@@ -184,14 +184,14 @@ void main() {
         await tester.tap(find.text('✨ Asisten AI'));
         await tester.pumpAndSettle();
 
-        // Tap "Ringkas via AI Lokal (Offline)" on the Ringkas tab
-        final ringkasButton = find.text('Ringkas via AI Lokal (Offline)');
+        // Tap "Ringkas Cepat (Offline)" on the Ringkas tab
+        final ringkasButton = find.text('Ringkas Cepat (Offline)');
         expect(ringkasButton, findsOneWidget);
         await tester.tap(ringkasButton);
         await tester.pumpAndSettle();
 
         // Bottom sheet appears with offline badge
-        expect(find.text('Ringkasan AI Lokal (Offline)'), findsOneWidget);
+        expect(find.text('Ringkasan Cepat (Offline)'), findsOneWidget);
         expect(find.text('100% Offline'), findsOneWidget);
         expect(find.text('Hasil Ringkasan'), findsOneWidget);
 
@@ -242,8 +242,8 @@ void main() {
         await tester.tap(find.text('Ekstrak Tugas'));
         await tester.pumpAndSettle();
 
-        expect(find.text('Ekstrak Tugas via SLM'), findsOneWidget);
-        expect(find.text('SLM On-Device'), findsOneWidget);
+        expect(find.text('Ekstrak Tugas Cepat (Offline)'), findsOneWidget);
+        expect(find.text('Heuristik Offline'), findsOneWidget);
         expect(find.text('Tambahkan Checklist ke Catatan'), findsOneWidget);
 
         await tester.ensureVisible(find.text('Tambahkan Checklist ke Catatan'));

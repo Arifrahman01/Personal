@@ -18,24 +18,38 @@ Future<void> ensureAdzanNotificationChannel([
   if (kIsWeb || defaultTargetPlatform != TargetPlatform.android) {
     return;
   }
-  final notifications = plugin ?? FlutterLocalNotificationsPlugin();
-  await notifications.initialize(
-    settings: const InitializationSettings(
-      android: AndroidInitializationSettings('@mipmap/ic_launcher'),
-    ),
-  );
-  const channel = AndroidNotificationChannel(
-    adzanChannelId,
-    adzanChannelName,
-    description: adzanChannelDescription,
-    importance: Importance.max,
-    playSound: true,
-  );
-  await notifications
-      .resolvePlatformSpecificImplementation<
-        AndroidFlutterLocalNotificationsPlugin
-      >()
-      ?.createNotificationChannel(channel);
+  try {
+    final notifications = plugin ?? FlutterLocalNotificationsPlugin();
+    await notifications.initialize(
+      settings: const InitializationSettings(
+        android: AndroidInitializationSettings('@mipmap/ic_launcher'),
+        iOS: DarwinInitializationSettings(
+          requestAlertPermission: false,
+          requestBadgePermission: false,
+          requestSoundPermission: false,
+        ),
+        macOS: DarwinInitializationSettings(
+          requestAlertPermission: false,
+          requestBadgePermission: false,
+          requestSoundPermission: false,
+        ),
+      ),
+    );
+    const channel = AndroidNotificationChannel(
+      adzanChannelId,
+      adzanChannelName,
+      description: adzanChannelDescription,
+      importance: Importance.max,
+      playSound: true,
+    );
+    await notifications
+        .resolvePlatformSpecificImplementation<
+          AndroidFlutterLocalNotificationsPlugin
+        >()
+        ?.createNotificationChannel(channel);
+  } catch (_) {
+    // Abaikan error platform channel pada environment headless/test.
+  }
 }
 
 /// Menampilkan notifikasi lokal dari payload FCM Adzan.
@@ -45,7 +59,8 @@ Future<void> showAdzanPushNotification(
 }) async {
   if (kIsWeb ||
       (defaultTargetPlatform != TargetPlatform.android &&
-          defaultTargetPlatform != TargetPlatform.iOS)) {
+          defaultTargetPlatform != TargetPlatform.iOS &&
+          defaultTargetPlatform != TargetPlatform.macOS)) {
     return;
   }
   final notifications = plugin ?? FlutterLocalNotificationsPlugin();
@@ -63,7 +78,16 @@ Future<void> showAdzanPushNotification(
         priority: Priority.high,
         playSound: payload.playAdzanSound,
       ),
-      iOS: DarwinNotificationDetails(presentSound: payload.playAdzanSound),
+      iOS: DarwinNotificationDetails(
+        presentAlert: true,
+        presentBadge: true,
+        presentSound: payload.playAdzanSound,
+      ),
+      macOS: DarwinNotificationDetails(
+        presentAlert: true,
+        presentBadge: true,
+        presentSound: payload.playAdzanSound,
+      ),
     ),
   );
 }

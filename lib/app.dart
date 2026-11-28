@@ -1,21 +1,30 @@
+import 'dart:async';
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:personal_hub/core/notifications/notification_bootstrap_service.dart';
 import 'package:personal_hub/core/theme/app_theme.dart';
 import 'package:personal_hub/features/agenda/ui/agenda_hub_screen.dart';
 import 'package:personal_hub/features/ai/ui/ai_chat_screen.dart';
+import 'package:personal_hub/features/finance/providers/finance_providers.dart';
 import 'package:personal_hub/features/finance/ui/finance_screen.dart';
+import 'package:personal_hub/features/finance/ui/widgets/add_transaction_sheet.dart';
+import 'package:personal_hub/features/home/providers/app_shortcuts_providers.dart';
+import 'package:personal_hub/features/home/services/app_shortcuts_service.dart';
 import 'package:personal_hub/features/home/ui/global_search_sheet.dart';
 import 'package:personal_hub/features/home/ui/home_screen.dart';
+import 'package:personal_hub/features/home/ui/quick_capture_sheet.dart';
 import 'package:personal_hub/features/meetings/models/meeting.dart';
+import 'package:personal_hub/features/notes/ui/note_editor_screen.dart';
 import 'package:personal_hub/features/notes/ui/notes_screen.dart';
 import 'package:personal_hub/features/settings/ui/settings_screen.dart';
 import 'package:personal_hub/features/tasks/providers/tasks_providers.dart';
 import 'package:personal_hub/features/vault/providers/vault_providers.dart';
 import 'package:personal_hub/features/vault/ui/vault_gate_screen.dart';
 
-/// Root Material 3 application widget for Personal Hub v3.0 ("Calm Clarity").
+/// Root Material 3 application widget for Personal Hub v4.0 ("Sanctuary Luxe").
 class PersonalHubApp extends ConsumerWidget {
   const PersonalHubApp({super.key});
 
@@ -34,8 +43,8 @@ class PersonalHubApp extends ConsumerWidget {
   }
 }
 
-/// Adaptive 5-tab navigation shell with docked NavigationBar (< 600dp) and
-/// NavigationRail (>= 600dp), plus Vault background auto-lock & Calm Clarity privacy shield.
+/// Adaptive 5-tab navigation shell with floating capsule dock (< 600dp) and
+/// sculpted workspace sidebar NavigationRail (>= 600dp), plus Vault auto-lock & privacy shield.
 class MainNavigationShell extends ConsumerStatefulWidget {
   const MainNavigationShell({super.key});
 
@@ -65,6 +74,10 @@ class MainNavigationShell extends ConsumerStatefulWidget {
 
 class _MainNavigationShellState extends ConsumerState<MainNavigationShell>
     with WidgetsBindingObserver {
+  static const MethodChannel _shortcutChannel = MethodChannel(
+    'personal_hub/app_shortcuts',
+  );
+
   int _selectedIndex = 0;
   bool _isObscured = false;
 
@@ -72,10 +85,84 @@ class _MainNavigationShellState extends ConsumerState<MainNavigationShell>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    _shortcutChannel.setMethodCallHandler(_handleShortcutMethodCall);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      try {
+        unawaited(
+          ref
+              .read(notificationBootstrapProvider)
+              .syncAll(requestPermissions: true),
+        );
+      } catch (_) {
+        // Ignore if widget tree was torn down immediately in widget tests.
+      }
+      unawaited(_checkInitialShortcut());
+    });
+  }
+
+  Future<dynamic> _handleShortcutMethodCall(MethodCall call) async {
+    if (call.method == 'onShortcutTriggered' && call.arguments is String) {
+      if (mounted) {
+        _applyShortcutIntent(call.arguments as String);
+      }
+    }
+    return null;
+  }
+
+  Future<void> _checkInitialShortcut() async {
+    try {
+      final rawId = await _shortcutChannel.invokeMethod<String>(
+        'getInitialShortcut',
+      );
+      if (rawId != null && rawId.trim().isNotEmpty && mounted) {
+        _applyShortcutIntent(rawId);
+      }
+    } on MissingPluginException {
+      // Unsupported on iOS/desktop/tests without Android host channel.
+    } on PlatformException {
+      // Ignore transient platform channel failures on startup.
+    }
+  }
+
+  void _applyShortcutIntent(String rawShortcutId) {
+    final result = ref
+        .read(activeShortcutIntentProvider.notifier)
+        .processShortcutIntent(rawShortcutId);
+    _selectTab(result.tabIndex.clamp(0, 4));
+
+    switch (result.shortcutId) {
+      case AppShortcutIds.prayerSchedule:
+        final section = (result.payload['agendaSection'] as num?)?.toInt() ?? 2;
+        ref.read(agendaSelectedSectionProvider.notifier).setSection(section);
+        break;
+      case AppShortcutIds.quickCapture:
+        QuickCaptureSheet.show(context);
+        break;
+      case AppShortcutIds.newNote:
+        Navigator.of(context).push(
+          MaterialPageRoute<void>(builder: (_) => const NoteEditorScreen()),
+        );
+        break;
+      case AppShortcutIds.newTransaction:
+        showModalBottomSheet<void>(
+          context: context,
+          isScrollControlled: true,
+          useSafeArea: true,
+          showDragHandle: true,
+          builder: (_) => AddTransactionSheet(
+            selectedMonth: ref.read(selectedFinanceMonthProvider),
+          ),
+        );
+        break;
+      default:
+        break;
+    }
   }
 
   @override
   void dispose() {
+    _shortcutChannel.setMethodCallHandler(null);
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
@@ -94,6 +181,19 @@ class _MainNavigationShellState extends ConsumerState<MainNavigationShell>
         }
         break;
       case AppLifecycleState.resumed:
+        if (_isObscured) {
+          setState(() {
+            _isObscured = false;
+          });
+        }
+        try {
+          unawaited(
+            ref
+                .read(notificationBootstrapProvider)
+                .syncAll(requestPermissions: false),
+          );
+        } catch (_) {}
+        break;
       case AppLifecycleState.detached:
         if (_isObscured) {
           setState(() {
@@ -127,11 +227,23 @@ class _MainNavigationShellState extends ConsumerState<MainNavigationShell>
       );
   }
 
+  void _toggleThemeMode() {
+    final current = ref.read(themeModeProvider);
+    final isDark = current == ThemeMode.dark ||
+        (current == ThemeMode.system &&
+            Theme.of(context).brightness == Brightness.dark);
+    ref
+        .read(themeModeProvider.notifier)
+        .setThemeMode(isDark ? ThemeMode.light : ThemeMode.dark);
+  }
+
   @override
   Widget build(BuildContext context) {
     final colors = HubColors.of(context);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final screenWidth = MediaQuery.sizeOf(context).width;
     final isWide = screenWidth >= 600;
+    final isExtended = screenWidth >= 920;
 
     final screens = [
       HomeScreen(
@@ -146,7 +258,7 @@ class _MainNavigationShellState extends ConsumerState<MainNavigationShell>
       const VaultTabView(),
     ];
 
-    final bottomNavDestinations = const [
+    const bottomNavDestinations = [
       NavigationDestination(
         icon: Icon(Icons.wb_sunny_outlined),
         selectedIcon: Icon(Icons.wb_sunny_rounded),
@@ -174,7 +286,7 @@ class _MainNavigationShellState extends ConsumerState<MainNavigationShell>
       ),
     ];
 
-    final railDestinations = const [
+    const railDestinations = [
       NavigationRailDestination(
         icon: Icon(Icons.wb_sunny_outlined),
         selectedIcon: Icon(Icons.wb_sunny_rounded),
@@ -204,7 +316,7 @@ class _MainNavigationShellState extends ConsumerState<MainNavigationShell>
 
     final content = Center(
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 840),
+        constraints: const BoxConstraints(maxWidth: 1080),
         child: _FadeThroughIndexedStack(
           index: _selectedIndex,
           children: screens,
@@ -215,28 +327,257 @@ class _MainNavigationShellState extends ConsumerState<MainNavigationShell>
     Widget shell;
     if (isWide) {
       shell = Scaffold(
-        backgroundColor: colors.canvas,
+        backgroundColor: Colors.transparent,
         body: Row(
           children: [
-            NavigationRail(
-              selectedIndex: _selectedIndex,
-              onDestinationSelected: _selectTab,
-              labelType: NavigationRailLabelType.all,
-              destinations: railDestinations,
+            Container(
+              decoration: BoxDecoration(
+                color: colors.surfaceCard.withValues(alpha: isDark ? 0.94 : 0.96),
+                border: Border(
+                  right: BorderSide(color: colors.borderHairline, width: 1),
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: isDark ? 0.30 : 0.04),
+                    blurRadius: 18,
+                    offset: const Offset(4, 0),
+                  ),
+                ],
+              ),
+              child: SafeArea(
+                right: false,
+                child: NavigationRail(
+                  selectedIndex: _selectedIndex,
+                  onDestinationSelected: _selectTab,
+                  extended: isExtended,
+                  minWidth: 84,
+                  minExtendedWidth: 236,
+                  labelType: isExtended
+                      ? NavigationRailLabelType.none
+                      : NavigationRailLabelType.all,
+                  leading: Padding(
+                    padding: EdgeInsets.fromLTRB(
+                      isExtended ? 16 : 8,
+                      10,
+                      isExtended ? 16 : 8,
+                      14,
+                    ),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: isExtended
+                          ? CrossAxisAlignment.start
+                          : CrossAxisAlignment.center,
+                      children: [
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const LuxeBrandEmblem(size: 38),
+                            if (isExtended) ...[
+                              const SizedBox(width: 10),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 10,
+                                  vertical: 4,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: colors.primarySoft,
+                                  borderRadius: HubRadius.rPill,
+                                  border: Border.all(
+                                    color: colors.primary.withValues(alpha: 0.25),
+                                  ),
+                                ),
+                                child: Text(
+                                  'Sanctuary',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w800,
+                                    color: colors.primary,
+                                    letterSpacing: 0.2,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        if (isExtended)
+                          SizedBox(
+                            width: 204,
+                            child: OutlinedButton.icon(
+                              onPressed: () =>
+                                  MainNavigationShell.openSearch(context),
+                              style: OutlinedButton.styleFrom(
+                                alignment: Alignment.centerLeft,
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 14,
+                                  vertical: 11,
+                                ),
+                                backgroundColor: colors.surfaceSubtle
+                                    .withValues(alpha: 0.55),
+                                side: BorderSide(color: colors.borderHairline),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: HubRadius.rPill,
+                                ),
+                              ),
+                              icon: Icon(
+                                Icons.search_rounded,
+                                size: 17,
+                                color: colors.textSecondary,
+                              ),
+                              label: Text(
+                                'Pencarian cepat...',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                  color: colors.textSecondary,
+                                ),
+                              ),
+                            ),
+                          )
+                        else
+                          LuxeHeaderIconButton(
+                            tooltip: 'Pencarian Global',
+                            icon: Icons.search_rounded,
+                            onPressed: () =>
+                                MainNavigationShell.openSearch(context),
+                          ),
+                      ],
+                    ),
+                  ),
+                  trailing: Padding(
+                    padding: EdgeInsets.fromLTRB(
+                      isExtended ? 16 : 8,
+                      12,
+                      isExtended ? 16 : 8,
+                      12,
+                    ),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (isExtended)
+                          SizedBox(
+                            width: 204,
+                            child: DecoratedBox(
+                              decoration: BoxDecoration(
+                                gradient: LinearGradient(
+                                  colors: [colors.accentAi, colors.primary],
+                                ),
+                                borderRadius: HubRadius.rSm,
+                                boxShadow: [
+                                  BoxShadow(
+                                    color:
+                                        colors.accentAi.withValues(alpha: 0.28),
+                                    blurRadius: 12,
+                                    offset: const Offset(0, 4),
+                                  ),
+                                ],
+                              ),
+                              child: Material(
+                                type: MaterialType.transparency,
+                                child: InkWell(
+                                  borderRadius: HubRadius.rSm,
+                                  onTap: () =>
+                                      MainNavigationShell.openAiChat(context),
+                                  child: const Padding(
+                                    padding: EdgeInsets.symmetric(
+                                      horizontal: 14,
+                                      vertical: 11,
+                                    ),
+                                    child: Row(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.center,
+                                      children: [
+                                        Icon(
+                                          Icons.auto_awesome_rounded,
+                                          size: 16,
+                                          color: Colors.white,
+                                        ),
+                                        SizedBox(width: 8),
+                                        Text(
+                                          'Samudra AI',
+                                          style: TextStyle(
+                                            fontSize: 13,
+                                            fontWeight: FontWeight.w700,
+                                            color: Colors.white,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          )
+                        else
+                          LuxeHeaderIconButton(
+                            tooltip: 'Buka Samudra AI',
+                            icon: Icons.auto_awesome_rounded,
+                            accentColor: colors.accentAi,
+                            onPressed: () =>
+                                MainNavigationShell.openAiChat(context),
+                          ),
+                        const SizedBox(height: 8),
+                        LuxeHeaderIconButton(
+                          tooltip: 'Ganti Tema',
+                          icon: isDark
+                              ? Icons.light_mode_rounded
+                              : Icons.dark_mode_rounded,
+                          accentColor: colors.accentGold,
+                          onPressed: _toggleThemeMode,
+                        ),
+                      ],
+                    ),
+                  ),
+                  destinations: railDestinations,
+                ),
+              ),
             ),
-            const VerticalDivider(thickness: 1, width: 1),
             Expanded(child: content),
           ],
         ),
       );
     } else {
       shell = Scaffold(
-        backgroundColor: colors.canvas,
+        backgroundColor: Colors.transparent,
+        extendBody: true,
         body: content,
-        bottomNavigationBar: NavigationBar(
-          selectedIndex: _selectedIndex,
-          onDestinationSelected: _selectTab,
-          destinations: bottomNavDestinations,
+        bottomNavigationBar: SafeArea(
+          top: false,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(12, 0, 12, 10),
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                color: colors.surfaceElevated.withValues(
+                  alpha: isDark ? 0.94 : 0.97,
+                ),
+                borderRadius: BorderRadius.circular(28),
+                border: Border.all(
+                  color: colors.borderHairline,
+                  width: 1.0,
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: isDark ? 0.42 : 0.10),
+                    blurRadius: 24,
+                    offset: const Offset(0, 10),
+                  ),
+                ],
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(28),
+                child: NavigationBar(
+                  height: 66,
+                  backgroundColor: Colors.transparent,
+                  surfaceTintColor: Colors.transparent,
+                  selectedIndex: _selectedIndex,
+                  onDestinationSelected: _selectTab,
+                  destinations: bottomNavDestinations,
+                ),
+              ),
+            ),
+          ),
         ),
       );
     }
@@ -244,7 +585,7 @@ class _MainNavigationShellState extends ConsumerState<MainNavigationShell>
     return Stack(
       fit: StackFit.expand,
       children: [
-        shell,
+        LuxeAmbientBackground(child: shell),
         if (_isObscured) const _PrivacyShieldOverlay(),
       ],
     );
@@ -329,7 +670,7 @@ class _FadeThroughIndexedStackState extends State<_FadeThroughIndexedStack>
 }
 
 /// Full-screen tactile frosted glass overlay that obscures sensitive screen content during OS multitasking.
-/// Styled according to Calm Clarity design tokens (HubColors).
+/// Styled according to Sanctuary Luxe design tokens (HubColors).
 class _PrivacyShieldOverlay extends StatelessWidget {
   const _PrivacyShieldOverlay();
 
@@ -339,6 +680,7 @@ class _PrivacyShieldOverlay extends StatelessWidget {
     final colors = HubColors.of(context);
     final canvasColor = colors.canvas;
     final primaryColor = colors.primary;
+    final goldColor = colors.accentGold;
 
     return Positioned.fill(
       child: AbsorbPointer(
@@ -346,36 +688,56 @@ class _PrivacyShieldOverlay extends StatelessWidget {
           child: BackdropFilter(
             filter: ImageFilter.blur(sigmaX: 24, sigmaY: 24),
             child: Container(
-              color: canvasColor.withValues(alpha: 0.90),
+              color: canvasColor.withValues(alpha: 0.92),
               alignment: Alignment.center,
               padding: const EdgeInsets.symmetric(horizontal: 32),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Container(
-                    width: 76,
-                    height: 76,
+                    width: 112,
+                    height: 112,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      color: primaryColor.withValues(alpha: 0.15),
+                      color: goldColor.withValues(alpha: 0.08),
                       border: Border.all(
-                        color: primaryColor.withValues(alpha: 0.4),
-                        width: 1.5,
+                        color: goldColor.withValues(alpha: 0.28),
+                        width: 1.2,
                       ),
                     ),
-                    child: Icon(
-                      Icons.verified_user_rounded,
-                      size: 38,
-                      color: primaryColor,
+                    alignment: Alignment.center,
+                    child: Container(
+                      width: 80,
+                      height: 80,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        gradient: LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: [
+                            primaryColor.withValues(alpha: 0.24),
+                            goldColor.withValues(alpha: 0.14),
+                          ],
+                        ),
+                        border: Border.all(
+                          color: primaryColor.withValues(alpha: 0.50),
+                          width: 1.5,
+                        ),
+                      ),
+                      child: Icon(
+                        Icons.verified_user_rounded,
+                        size: 38,
+                        color: primaryColor,
+                      ),
                     ),
                   ),
-                  const SizedBox(height: 20),
+                  const SizedBox(height: 22),
                   Text(
                     'Personal Hub - Layar Terlindungi',
                     textAlign: TextAlign.center,
                     style: theme.textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.bold,
-                      letterSpacing: 0.3,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 0.2,
                       color: colors.textPrimary,
                     ),
                   ),
@@ -385,6 +747,7 @@ class _PrivacyShieldOverlay extends StatelessWidget {
                     textAlign: TextAlign.center,
                     style: theme.textTheme.bodySmall?.copyWith(
                       color: colors.textSecondary,
+                      height: 1.4,
                     ),
                   ),
                 ],

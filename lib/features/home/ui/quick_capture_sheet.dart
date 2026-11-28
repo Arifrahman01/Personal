@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:personal_hub/core/theme/app_tokens.dart';
+import 'package:personal_hub/core/theme/hub_widgets.dart';
 import 'package:personal_hub/features/finance/models/finance_models.dart';
 import 'package:personal_hub/features/finance/ui/finance_screen.dart';
 import 'package:personal_hub/features/home/providers/universal_quick_capture_providers.dart';
@@ -175,19 +176,19 @@ class _QuickCaptureSheetState extends ConsumerState<QuickCaptureSheet> {
                 // Title and Mic row
                 Row(
                   children: [
-                    Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: AppTokens.primary(context).withValues(alpha: 0.12),
-                        borderRadius: HubRadius.rSm,
+                    LuxeIconMedallion(
+                      icon: Icons.auto_awesome_rounded,
+                      gradient: LinearGradient(
+                        colors: [
+                          AppTokens.ai(context),
+                          AppTokens.primary(context),
+                        ],
                       ),
-                      child: Icon(
-                        Icons.auto_awesome_rounded,
-                        size: 20,
-                        color: AppTokens.primary(context),
-                      ),
+                      size: 40,
+                      iconSize: 20,
+                      borderRadius: 12,
                     ),
-                    const SizedBox(width: 10),
+                    const SizedBox(width: 12),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,

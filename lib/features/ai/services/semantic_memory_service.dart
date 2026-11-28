@@ -174,7 +174,12 @@ class OfflinePseudoEmbedder {
     'themselves', 'then', 'there', 'these', 'they', 'this', 'those', 'through',
     'to', 'too', 'under', 'until', 'up', 'very', 'was', 'we', 'were', 'what',
     'when', 'where', 'which', 'while', 'who', 'whom', 'why', 'with', 'would',
-    'you', 'your', 'yours', 'yourself', 'yourselves'
+    'you', 'your', 'yours', 'yourself', 'yourselves',
+    // Common Indonesian stop-words
+    'yang', 'dan', 'di', 'ke', 'dari', 'untuk', 'dengan', 'pada', 'ini', 'itu',
+    'atau', 'adalah', 'juga', 'tidak', 'bisa', 'akan', 'sudah', 'saya', 'kita',
+    'kami', 'anda', 'dalam', 'oleh', 'sebagai', 'tersebut', 'lebih', 'karena',
+    'agar', 'bila', 'kalau', 'saat', 'tentang',
   };
 
   /// Deterministic 32-bit FNV-1a hash for string tokens.

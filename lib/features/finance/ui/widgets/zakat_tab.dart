@@ -9,7 +9,7 @@ import 'package:personal_hub/features/finance/models/gold_price_models.dart'
     as gold_models;
 import 'package:personal_hub/features/finance/providers/asset_aggregator_providers.dart';
 import 'package:personal_hub/features/finance/providers/zakat_providers.dart';
-import 'package:personal_hub/features/finance/ui/widgets/finance_shared_widgets.dart';
+import 'package:personal_hub/features/finance/ui/widgets/zakat_cards.dart';
 
 /// Tab 2: Smart Zakat Mal, 85g Gold Nisab Benchmark, Haul Tracker, & Zakat Fitrah Calculator.
 class ZakatTab extends ConsumerWidget {
@@ -35,63 +35,67 @@ class ZakatTab extends ConsumerWidget {
       ),
     );
 
-    await showDialog<void>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('Benchmark Harga Emas'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Batas Nisab Zakat Mal dihitung berdasarkan nilai 85 gram emas 24 karat.',
-              style: TextStyle(
-                fontSize: 13,
-                color: AppTokens.textSecondary(dialogContext),
+    try {
+      await showDialog<void>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: const Text('Benchmark Harga Emas'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Batas Nisab Zakat Mal dihitung berdasarkan nilai 85 gram emas 24 karat.',
+                style: TextStyle(
+                  fontSize: 13,
+                  color: AppTokens.textSecondary(dialogContext),
+                ),
               ),
+              const SizedBox(height: 14),
+              TextField(
+                controller: controller,
+                keyboardType: TextInputType.number,
+                inputFormatters: [
+                  FilteringTextInputFormatter.digitsOnly,
+                  RupiahTextInputFormatter(),
+                ],
+                decoration: const InputDecoration(
+                  labelText: 'Harga Emas per Gram (IDR)',
+                  prefixText: 'Rp ',
+                  hintText: '1450000',
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () async {
+                await ref
+                    .read(goldPriceBenchmarkProvider.notifier)
+                    .resetToDefault();
+                if (dialogContext.mounted) Navigator.of(dialogContext).pop();
+              },
+              child: const Text('Reset Default'),
             ),
-            const SizedBox(height: 14),
-            TextField(
-              controller: controller,
-              keyboardType: TextInputType.number,
-              inputFormatters: [
-                FilteringTextInputFormatter.digitsOnly,
-                RupiahTextInputFormatter(),
-              ],
-              decoration: const InputDecoration(
-                labelText: 'Harga Emas per Gram (IDR)',
-                prefixText: 'Rp ',
-                hintText: '1450000',
-              ),
+            FilledButton(
+              onPressed: () async {
+                final val = RupiahTextInputFormatter.parse(controller.text);
+                if (val > 0) {
+                  await ref
+                      .read(goldPriceBenchmarkProvider.notifier)
+                      .updateManualPrice(val);
+                  ref.read(goldPricePerGramProvider.notifier).setPrice(val);
+                }
+                if (dialogContext.mounted) Navigator.of(dialogContext).pop();
+              },
+              child: const Text('Simpan'),
             ),
           ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () async {
-              await ref
-                  .read(goldPriceBenchmarkProvider.notifier)
-                  .resetToDefault();
-              if (dialogContext.mounted) Navigator.of(dialogContext).pop();
-            },
-            child: const Text('Reset Default'),
-          ),
-          FilledButton(
-            onPressed: () async {
-              final val = RupiahTextInputFormatter.parse(controller.text);
-              if (val > 0) {
-                await ref
-                    .read(goldPriceBenchmarkProvider.notifier)
-                    .updateManualPrice(val);
-                ref.read(goldPricePerGramProvider.notifier).setPrice(val);
-              }
-              if (dialogContext.mounted) Navigator.of(dialogContext).pop();
-            },
-            child: const Text('Simpan'),
-          ),
-        ],
-      ),
-    );
+      );
+    } finally {
+      controller.dispose();
+    }
   }
 
   @override
@@ -107,15 +111,15 @@ class ZakatTab extends ConsumerWidget {
         const SizedBox(height: 12),
 
         // Step 2: Siklus Haul (1 Tahun / 354 Hari)
-        const _ZakatHaulTrackerCard(),
+        const ZakatHaulTrackerCard(),
         const SizedBox(height: 12),
 
         // Step 3: Kewajiban Zakat Mal (2.5%)
-        _ZakatMalObligationCard(onDeclareAssets: onDeclareAssets),
+        ZakatMalObligationCard(onDeclareAssets: onDeclareAssets),
         const SizedBox(height: 12),
 
         // Step 4: Kalkulator Zakat Fitrah Keluarga
-        const _ZakatFitrahCalculatorCard(),
+        const ZakatFitrahCalculatorCard(),
       ],
     );
   }
@@ -171,11 +175,21 @@ class _NisabBenchmarkHeroCard extends ConsumerWidget {
                 : '0.0';
 
             final statusColor = isNisabReached
-                ? AppTokens.success(context)
-                : AppTokens.warning(context);
+                ? const Color(0xFF34D399)
+                : const Color(0xFFF5C451);
 
-            return HubCard(
-              padding: const EdgeInsets.all(16),
+            return LuxeHeroCard(
+              gradient: const LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  Color(0xFF1A160B),
+                  Color(0xFF30240E),
+                  Color(0xFF0E2925),
+                ],
+              ),
+              glowColor: const Color(0xFFC98A1A),
+              padding: const EdgeInsets.all(18),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -183,25 +197,30 @@ class _NisabBenchmarkHeroCard extends ConsumerWidget {
                   Row(
                     children: [
                       Container(
-                        padding: const EdgeInsets.all(6),
+                        width: 34,
+                        height: 34,
                         decoration: BoxDecoration(
-                          color: AppTokens.warning(context).withValues(alpha: 0.15),
-                          shape: BoxShape.circle,
+                          color: const Color(0xFFF5C451).withValues(alpha: 0.18),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(
+                            color:
+                                const Color(0xFFF5C451).withValues(alpha: 0.40),
+                          ),
                         ),
-                        child: Icon(
+                        child: const Icon(
                           Icons.monetization_on_rounded,
                           size: 18,
-                          color: AppTokens.warning(context),
+                          color: Color(0xFFF5C451),
                         ),
                       ),
-                      const SizedBox(width: 8),
-                      Expanded(
+                      const SizedBox(width: 10),
+                      const Expanded(
                         child: Text(
                           'Batas Nisab 85g Emas',
                           style: TextStyle(
                             fontSize: 14,
                             fontWeight: FontWeight.w800,
-                            color: AppTokens.textPrimary(context),
+                            color: Colors.white,
                           ),
                         ),
                       ),
@@ -211,31 +230,33 @@ class _NisabBenchmarkHeroCard extends ConsumerWidget {
                         child: Container(
                           padding: const EdgeInsets.symmetric(
                             horizontal: 10,
-                            vertical: 4,
+                            vertical: 5,
                           ),
                           decoration: BoxDecoration(
-                            color: AppTokens.warning(context).withValues(alpha: 0.12),
+                            color:
+                                const Color(0xFFF5C451).withValues(alpha: 0.18),
                             borderRadius: HubRadius.rPill,
                             border: Border.all(
-                              color: AppTokens.warning(context).withValues(alpha: 0.4),
+                              color: const Color(0xFFF5C451)
+                                  .withValues(alpha: 0.50),
                             ),
                           ),
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              Icon(
+                              const Icon(
                                 Icons.edit_rounded,
                                 size: 12,
-                                color: AppTokens.warning(context),
+                                color: Color(0xFFFDE68A),
                               ),
                               const SizedBox(width: 4),
                               Text(
                                 'Rp ${formatRupiah(benchmark.pricePerGram.round()).replaceAll('Rp ', '')}/g',
                                 style: HubTypography.tabular(
-                                  TextStyle(
+                                  const TextStyle(
                                     fontSize: 11,
                                     fontWeight: FontWeight.w700,
-                                    color: AppTokens.warning(context),
+                                    color: Color(0xFFFDE68A),
                                   ),
                                 ),
                               ),
@@ -245,16 +266,16 @@ class _NisabBenchmarkHeroCard extends ConsumerWidget {
                       ),
                     ],
                   ),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 14),
 
                   // Nisab amount
                   Text(
                     formatRupiah(nisabThreshold.round()),
                     style: HubTypography.tabular(
-                      TextStyle(
-                        fontSize: 24,
+                      const TextStyle(
+                        fontSize: 26,
                         fontWeight: FontWeight.w800,
-                        color: AppTokens.warning(context),
+                        color: Color(0xFFFDE68A),
                       ),
                     ),
                   ),
@@ -263,21 +284,31 @@ class _NisabBenchmarkHeroCard extends ConsumerWidget {
                     'Setara 85 gram emas murni 24 karat (${benchmark.source})',
                     style: TextStyle(
                       fontSize: 12,
-                      color: AppTokens.textSecondary(context),
+                      color: Colors.white.withValues(alpha: 0.74),
                     ),
                   ),
+                  if (!benchmark.isManualOverride) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      'Menggunakan estimasi default — ketuk harga emas untuk menyesuaikan harga terkini.',
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: Colors.white.withValues(alpha: 0.65),
+                      ),
+                    ),
+                  ],
                   const SizedBox(height: 16),
 
                   // Comparison Bar
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text(
+                      const Text(
                         'Kekayaan Bersih Riil Saat Ini',
                         style: TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.w600,
-                          color: AppTokens.textPrimary(context),
+                          color: Colors.white,
                         ),
                       ),
                       Text(
@@ -292,13 +323,20 @@ class _NisabBenchmarkHeroCard extends ConsumerWidget {
                       ),
                     ],
                   ),
-                  const SizedBox(height: 6),
-                  LinearPercentBar(
+                  const SizedBox(height: 8),
+                  LuxeGlowingProgressBar(
                     value: ratio,
-                    color: statusColor,
                     height: 8,
+                    trackColor: Colors.white.withValues(alpha: 0.16),
+                    glowColor: statusColor,
+                    gradient: LinearGradient(
+                      colors: [
+                        statusColor,
+                        const Color(0xFFFDE68A),
+                      ],
+                    ),
                   ),
-                  const SizedBox(height: 6),
+                  const SizedBox(height: 8),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
@@ -307,18 +345,21 @@ class _NisabBenchmarkHeroCard extends ConsumerWidget {
                         style: HubTypography.tabular(
                           TextStyle(
                             fontSize: 11,
-                            color: AppTokens.textSecondary(context),
+                            color: Colors.white.withValues(alpha: 0.78),
                           ),
                         ),
                       ),
                       Container(
                         padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 2,
+                          horizontal: 9,
+                          vertical: 3,
                         ),
                         decoration: BoxDecoration(
-                          color: statusColor.withValues(alpha: 0.15),
+                          color: statusColor.withValues(alpha: 0.20),
                           borderRadius: HubRadius.rPill,
+                          border: Border.all(
+                            color: statusColor.withValues(alpha: 0.45),
+                          ),
                         ),
                         child: Text(
                           isNisabReached
@@ -339,20 +380,22 @@ class _NisabBenchmarkHeroCard extends ConsumerWidget {
                   Container(
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: AppTokens.canvas(context),
+                      color: Colors.black.withValues(alpha: 0.28),
                       borderRadius: HubRadius.rSm,
-                      border: Border.all(color: AppTokens.border(context)),
+                      border: Border.all(
+                        color: Colors.white.withValues(alpha: 0.14),
+                      ),
                     ),
                     child: Column(
                       children: [
-                        _AssetRow(
+                        _HeroAssetRow(
                           label: 'Kas & Tabungan Riil',
                           amount: breakdown.cashBalance,
                           isIncome: true,
                         ),
                         if (breakdown.preciousMetalsValue > 0) ...[
                           const SizedBox(height: 6),
-                          _AssetRow(
+                          _HeroAssetRow(
                             label:
                                 'Emas Fisik (${breakdown.preciousMetalsWeightGram}g)',
                             amount: breakdown.preciousMetalsValue,
@@ -361,7 +404,7 @@ class _NisabBenchmarkHeroCard extends ConsumerWidget {
                         ],
                         if (breakdown.investments > 0) ...[
                           const SizedBox(height: 6),
-                          _AssetRow(
+                          _HeroAssetRow(
                             label: 'Investasi Lancar',
                             amount: breakdown.investments,
                             isIncome: true,
@@ -369,7 +412,7 @@ class _NisabBenchmarkHeroCard extends ConsumerWidget {
                         ],
                         if (breakdown.shortTermDebts > 0) ...[
                           const SizedBox(height: 6),
-                          _AssetRow(
+                          _HeroAssetRow(
                             label: 'Hutang Jatuh Tempo (Pengurang)',
                             amount: breakdown.shortTermDebts,
                             isIncome: false,
@@ -383,14 +426,21 @@ class _NisabBenchmarkHeroCard extends ConsumerWidget {
                     width: double.infinity,
                     child: OutlinedButton.icon(
                       style: OutlinedButton.styleFrom(
-                        foregroundColor: AppTokens.textPrimary(context),
-                        side: BorderSide(color: AppTokens.border(context)),
+                        foregroundColor: Colors.white,
+                        backgroundColor: Colors.white.withValues(alpha: 0.08),
+                        side: BorderSide(
+                          color: const Color(0xFFF5C451).withValues(alpha: 0.45),
+                        ),
                         shape: RoundedRectangleBorder(
                           borderRadius: HubRadius.rSm,
                         ),
                       ),
                       onPressed: onDeclareAssets,
-                      icon: const Icon(Icons.add_card_rounded, size: 16),
+                      icon: const Icon(
+                        Icons.add_card_rounded,
+                        size: 16,
+                        color: Color(0xFFFDE68A),
+                      ),
                       label: const Text('Deklarasikan Aset & Hutang Lainnya'),
                     ),
                   ),
@@ -404,8 +454,8 @@ class _NisabBenchmarkHeroCard extends ConsumerWidget {
   }
 }
 
-class _AssetRow extends StatelessWidget {
-  const _AssetRow({
+class _HeroAssetRow extends StatelessWidget {
+  const _HeroAssetRow({
     required this.label,
     required this.amount,
     required this.isIncome,
@@ -417,18 +467,22 @@ class _AssetRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = isIncome ? AppTokens.success(context) : AppTokens.error(context);
+    final color = isIncome ? const Color(0xFF34D399) : const Color(0xFFFB7185);
 
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Text(
-          label,
-          style: TextStyle(
-            fontSize: 12,
-            color: AppTokens.textSecondary(context),
+        Flexible(
+          child: Text(
+            label,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              fontSize: 12,
+              color: Colors.white.withValues(alpha: 0.78),
+            ),
           ),
         ),
+        const SizedBox(width: 8),
         Text(
           '${isIncome ? '+' : '-'} ${formatRupiah(amount.round())}',
           style: HubTypography.tabular(
@@ -444,583 +498,3 @@ class _AssetRow extends StatelessWidget {
   }
 }
 
-/// Step 2: Zakat Haul Tracker Card (354 Days lunar cycle).
-class _ZakatHaulTrackerCard extends ConsumerWidget {
-  const _ZakatHaulTrackerCard();
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final haulAsync = ref.watch(zakatHaulTrackerProvider);
-
-    return haulAsync.when(
-      loading: () => const HubCard(
-        padding: EdgeInsets.all(24),
-        child: Center(child: CircularProgressIndicator()),
-      ),
-      error: (err, _) => HubCard(
-        padding: const EdgeInsets.all(16),
-        child: Text('Gagal memuat status haul: $err'),
-      ),
-      data: (haul) {
-        final progressPct = (haul.progressPercent * 100).toInt();
-
-        final haulColor = haul.isHaulFulfilled
-            ? AppTokens.success(context)
-            : haul.isHaulBroken
-                ? AppTokens.error(context)
-                : haul.isHaulActive
-                    ? AppTokens.primary(context)
-                    : AppTokens.textSecondary(context);
-
-        final haulStatusLabel = haul.isHaulFulfilled
-            ? 'HAUL GENAP'
-            : haul.isHaulBroken
-                ? 'TERPUTUS'
-                : haul.isHaulActive
-                    ? 'AKTIF'
-                    : 'INAKTIF';
-
-        return HubCard(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(6),
-                    decoration: BoxDecoration(
-                      color: AppTokens.primary(context).withValues(alpha: 0.12),
-                      shape: BoxShape.circle,
-                    ),
-                    child: Icon(
-                      Icons.history_toggle_off_rounded,
-                      size: 18,
-                      color: AppTokens.primary(context),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      'Siklus Haul (1 Tahun / 354 Hari)',
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w800,
-                        color: AppTokens.textPrimary(context),
-                      ),
-                    ),
-                  ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 3,
-                    ),
-                    decoration: BoxDecoration(
-                      color: haulColor.withValues(alpha: 0.15),
-                      borderRadius: HubRadius.rPill,
-                    ),
-                    child: Text(
-                      haulStatusLabel,
-                      style: TextStyle(
-                        fontSize: 10,
-                        fontWeight: FontWeight.w800,
-                        color: haulColor,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              Row(
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          haul.isHaulFulfilled
-                              ? 'Haul Telah Genap (354 Hari)'
-                              : '${haul.daysRemaining} Hari Lagi',
-                          style: HubTypography.tabular(
-                            TextStyle(
-                              fontSize: 22,
-                              fontWeight: FontWeight.w800,
-                              color: haulColor,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          'Target: ${FinanceMonth.formatShortDate(haul.targetHaulDate)}',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: AppTokens.textSecondary(context),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  // Progress Ring
-                  Stack(
-                    alignment: Alignment.center,
-                    children: [
-                      SizedBox(
-                        width: 48,
-                        height: 48,
-                        child: CircularProgressIndicator(
-                          value: haul.progressPercent.clamp(0.0, 1.0),
-                          strokeWidth: 5,
-                          color: haulColor,
-                          backgroundColor:
-                              AppTokens.border(context),
-                        ),
-                      ),
-                      Text(
-                        '$progressPct%',
-                        style: HubTypography.tabular(
-                          TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w800,
-                            color: AppTokens.textPrimary(context),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: haul.isHaulBroken
-                      ? AppTokens.error(context).withValues(alpha: 0.08)
-                      : AppTokens.canvas(context),
-                  borderRadius: HubRadius.rSm,
-                  border: Border.all(
-                    color: haul.isHaulBroken
-                        ? AppTokens.error(context).withValues(alpha: 0.3)
-                        : AppTokens.border(context),
-                  ),
-                ),
-                child: Row(
-                  children: [
-                    Icon(
-                      haul.isHaulBroken
-                          ? Icons.error_outline_rounded
-                          : Icons.info_outline_rounded,
-                      size: 16,
-                      color: haul.isHaulBroken
-                          ? AppTokens.error(context)
-                          : AppTokens.textSecondary(context),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        haul.isHaulBroken
-                            ? 'Saldo sempat turun di bawah nisab. Siklus haul dimulai kembali saat saldo mencapai nisab.'
-                            : haul.isHaulFulfilled
-                                ? 'Syarat 1 tahun haul terpenuhi. Anda berkewajiban menunaikan Zakat Mal.'
-                                : 'Harta konsisten di atas nisab sejak ${FinanceMonth.formatShortDate(haul.haulStartDate)}.',
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: haul.isHaulBroken
-                              ? AppTokens.error(context)
-                              : AppTokens.textSecondary(context),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
-}
-
-/// Step 3: Zakat Mal Obligation Card (2.5%).
-class _ZakatMalObligationCard extends ConsumerWidget {
-  const _ZakatMalObligationCard({required this.onDeclareAssets});
-
-  final VoidCallback onDeclareAssets;
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final zakatResult = ref.watch(zakatCalculationProvider);
-    final aggregatorAsync = ref.watch(financeAssetAggregatorProvider);
-    final haulAsync = ref.watch(zakatHaulTrackerProvider);
-
-    final realBreakdown = aggregatorAsync.asData?.value;
-    final haul = haulAsync.asData?.value;
-
-    final double effectiveWealth =
-        realBreakdown?.netZakatWealth ?? zakatResult.netZakatableWealth;
-    final bool isNisabMet =
-        realBreakdown?.isNisabReached ?? zakatResult.isNisabMet;
-    final bool isHaulCompleted =
-        haul?.isHaulFulfilled ?? zakatResult.haulCompleted;
-
-    final double zakatDue = (isNisabMet && isHaulCompleted)
-        ? (effectiveWealth * 0.025)
-        : 0.0;
-
-    final obligationColor = zakatDue > 0
-        ? AppTokens.success(context)
-        : AppTokens.textSecondary(context);
-
-    return HubCard(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(6),
-                decoration: BoxDecoration(
-                  color: AppTokens.success(context).withValues(alpha: 0.15),
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(
-                  Icons.verified_user_rounded,
-                  size: 18,
-                  color: AppTokens.success(context),
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  'Kewajiban Zakat Mal (2.5%)',
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w800,
-                    color: AppTokens.textPrimary(context),
-                  ),
-                ),
-              ),
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 8,
-                  vertical: 3,
-                ),
-                decoration: BoxDecoration(
-                  color: obligationColor.withValues(alpha: 0.15),
-                  borderRadius: HubRadius.rPill,
-                ),
-                child: Text(
-                  zakatDue > 0 ? 'WAJIB BAYAR' : 'BELUM WAJIB',
-                  style: TextStyle(
-                    fontSize: 10,
-                    fontWeight: FontWeight.w800,
-                    color: obligationColor,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Text(
-            formatRupiah(zakatDue.round()),
-            style: HubTypography.tabular(
-              TextStyle(
-                fontSize: 26,
-                fontWeight: FontWeight.w800,
-                color: zakatDue > 0
-                    ? AppTokens.success(context)
-                    : AppTokens.textPrimary(context),
-              ),
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            zakatDue > 0
-                ? 'Kewajiban Zakat Mal yang harus ditunaikan kepada 8 asnaf.'
-                : isNisabMet
-                    ? 'Harta telah mencapai nisab, zakat wajib ditunaikan setelah genap haul.'
-                    : 'Harta belum mencapai batas nisab 85g emas (~Rp 123 juta).',
-            style: TextStyle(
-              fontSize: 12,
-              color: AppTokens.textSecondary(context),
-            ),
-          ),
-          const SizedBox(height: 12),
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: AppTokens.canvas(context),
-              borderRadius: HubRadius.rSm,
-              border: Border.all(color: AppTokens.border(context)),
-            ),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Icon(
-                  Icons.menu_book_rounded,
-                  size: 16,
-                  color: AppTokens.primary(context),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    zakatResult.fiqhExplanation,
-                    style: TextStyle(
-                      fontSize: 11,
-                      height: 1.4,
-                      color: AppTokens.textSecondary(context),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-/// Step 4: Zakat Fitrah Household Calculator.
-class _ZakatFitrahCalculatorCard extends ConsumerWidget {
-  const _ZakatFitrahCalculatorCard();
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final familyCount = ref.watch(zakatFitrahFamilyCountProvider);
-    final ricePrice = ref.watch(zakatFitrahRicePriceProvider);
-    final fitrahResult = ref.watch(zakatFitrahCalculationProvider);
-
-    return HubCard(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(6),
-                decoration: BoxDecoration(
-                  color: AppTokens.primary(context).withValues(alpha: 0.12),
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(
-                  Icons.people_alt_rounded,
-                  size: 18,
-                  color: AppTokens.primary(context),
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  'Kalkulator Zakat Fitrah Keluarga',
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w800,
-                    color: AppTokens.textPrimary(context),
-                  ),
-                ),
-              ),
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 8,
-                  vertical: 3,
-                ),
-                decoration: BoxDecoration(
-                  color: AppTokens.primary(context).withValues(alpha: 0.12),
-                  borderRadius: HubRadius.rPill,
-                ),
-                child: Text(
-                  '2.5 kg / jiwa',
-                  style: HubTypography.tabular(
-                    TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w700,
-                      color: AppTokens.primary(context),
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 14),
-
-          // Family members counter
-          Row(
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Jumlah Jiwa Keluarga',
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        color: AppTokens.textPrimary(context),
-                      ),
-                    ),
-                    Text(
-                      'Tergolong diri sendiri dan tanggungan',
-                      style: TextStyle(
-                        fontSize: 11,
-                        color: AppTokens.textSecondary(context),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Container(
-                decoration: BoxDecoration(
-                  color: AppTokens.canvas(context),
-                  borderRadius: HubRadius.rSm,
-                  border: Border.all(color: AppTokens.border(context)),
-                ),
-                child: Row(
-                  children: [
-                    IconButton(
-                      icon: const Icon(Icons.remove_rounded, size: 18),
-                      onPressed: familyCount > 1
-                          ? () => ref
-                              .read(zakatFitrahFamilyCountProvider.notifier)
-                              .setCount(familyCount - 1)
-                          : null,
-                    ),
-                    Text(
-                      '$familyCount Jiwa',
-                      style: HubTypography.tabular(
-                        TextStyle(
-                          fontWeight: FontWeight.w800,
-                          fontSize: 13,
-                          color: AppTokens.textPrimary(context),
-                        ),
-                      ),
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.add_rounded, size: 18),
-                      onPressed: () => ref
-                          .read(zakatFitrahFamilyCountProvider.notifier)
-                          .setCount(familyCount + 1),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-
-          // Rice price selection
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  'Harga Beras: Rp ${formatRupiah(ricePrice.round()).replaceAll('Rp ', '')}/kg',
-                  style: HubTypography.tabular(
-                    TextStyle(
-                      fontSize: 12,
-                      color: AppTokens.textSecondary(context),
-                    ),
-                  ),
-                ),
-              ),
-              Wrap(
-                spacing: 6,
-                children: [
-                  for (final price in [14000.0, 15000.0, 18000.0])
-                    ChoiceChip(
-                      label: Text('${(price / 1000).round()}rb'),
-                      selected: (ricePrice - price).abs() < 1.0,
-                      onSelected: (_) => ref
-                          .read(zakatFitrahRicePriceProvider.notifier)
-                          .setPrice(price),
-                      selectedColor:
-                          AppTokens.primary(context).withValues(alpha: 0.15),
-                      labelStyle: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w700,
-                        color: (ricePrice - price).abs() < 1.0
-                            ? AppTokens.primary(context)
-                            : AppTokens.textSecondary(context),
-                      ),
-                    ),
-                ],
-              ),
-            ],
-          ),
-          const SizedBox(height: 14),
-
-          // Calculation results
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: AppTokens.canvas(context),
-              borderRadius: HubRadius.rSm,
-              border: Border.all(color: AppTokens.border(context)),
-            ),
-            child: Row(
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Total Beras',
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: AppTokens.textSecondary(context),
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        '${fitrahResult.totalRiceKg.toStringAsFixed(1)} kg',
-                        style: HubTypography.tabular(
-                          TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w800,
-                            color: AppTokens.success(context),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                Container(
-                  width: 1,
-                  height: 32,
-                  color: AppTokens.border(context),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Konversi Uang (Qimah)',
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: AppTokens.textSecondary(context),
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        formatRupiah(fitrahResult.totalDueIdr.round()),
-                        style: HubTypography.tabular(
-                          TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w800,
-                            color: AppTokens.primary(context),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}

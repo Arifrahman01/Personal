@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:personal_hub/core/theme/app_tokens.dart';
 import 'package:personal_hub/features/meetings/models/meeting.dart';
 
-/// Horizontal weekly date picker strip with capsule date pills.
+/// Horizontal weekly date picker strip with Sanctuary Luxe gradient capsule pills.
 class MeetingsWeekPicker extends StatelessWidget {
   const MeetingsWeekPicker({
     super.key,
@@ -89,11 +89,11 @@ class MeetingsWeekPicker extends StatelessWidget {
                   '${startMonday.day} ${_monthNames[startMonday.month - 1]} - ${endSunday.day} ${_monthNames[endSunday.month - 1]} ${endSunday.year}',
                   style: HubTypography.tabular(
                     theme.textTheme.titleSmall?.copyWith(
-                          fontWeight: FontWeight.w700,
+                          fontWeight: FontWeight.w800,
                           letterSpacing: -0.2,
                           color: colors.textPrimary,
                         ) ??
-                        const TextStyle(fontWeight: FontWeight.w700),
+                        const TextStyle(fontWeight: FontWeight.w800),
                   ),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
@@ -187,25 +187,42 @@ class _AllPill extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
     final colors = HubColors.of(context);
-    final fgColor = isSelected ? colorScheme.onPrimary : colors.textSecondary;
+    final fgColor = isSelected ? Colors.white : colors.textSecondary;
 
     return InkWell(
       key: const Key('all_days_pill'),
       onTap: onTap,
-      borderRadius: BorderRadius.circular(26),
+      borderRadius: BorderRadius.circular(22),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
-        constraints: const BoxConstraints(minWidth: 58, minHeight: 74),
+        constraints: const BoxConstraints(minWidth: 60, minHeight: 74),
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(26),
-          color: isSelected ? colorScheme.primary : colors.surfaceCard,
+          borderRadius: BorderRadius.circular(22),
+          color: isSelected ? null : colors.surfaceCard,
+          gradient: isSelected
+              ? const LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [Color(0xFF0E8F74), Color(0xFF09584A)],
+                )
+              : null,
           border: Border.all(
-            color: isSelected ? colorScheme.primary : colors.borderHairline,
+            color: isSelected
+                ? colors.primary.withValues(alpha: 0.7)
+                : colors.borderHairline,
             width: isSelected ? 1.5 : 1.0,
           ),
+          boxShadow: isSelected
+              ? [
+                  BoxShadow(
+                    color: colors.primary.withValues(alpha: 0.28),
+                    blurRadius: 12,
+                    offset: const Offset(0, 4),
+                  ),
+                ]
+              : null,
         ),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -221,7 +238,7 @@ class _AllPill extends StatelessWidget {
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: theme.textTheme.labelMedium?.copyWith(
-                fontWeight: isSelected ? FontWeight.w700 : FontWeight.w600,
+                fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
                 color: fgColor,
                 fontSize: 12,
               ),
@@ -253,38 +270,53 @@ class _DayPill extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
     final colors = HubColors.of(context);
 
     final dayLabelColor = isSelected
-        ? colorScheme.onPrimary.withValues(alpha: 0.90)
+        ? Colors.white.withValues(alpha: 0.88)
         : colors.textSecondary;
     final dateNumColor = isSelected
-        ? colorScheme.onPrimary
+        ? Colors.white
         : (isToday ? colors.primary : colors.textPrimary);
     final dotColor = hasMeetings
-        ? (isSelected ? colorScheme.onPrimary : colors.primary)
-        : Colors.transparent;
+        ? (isSelected ? colors.accentGold : colors.primary)
+        : (isToday && !isSelected ? colors.accentGold : Colors.transparent);
 
     return InkWell(
       key: Key('day_pill_${date.day}'),
       onTap: onTap,
-      borderRadius: BorderRadius.circular(26),
+      borderRadius: BorderRadius.circular(22),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
         constraints: const BoxConstraints(minWidth: 52, minHeight: 74),
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(26),
+          borderRadius: BorderRadius.circular(22),
           color: isSelected
-              ? colorScheme.primary
+              ? null
               : (isToday ? colors.primarySoft : colors.surfaceCard),
+          gradient: isSelected
+              ? const LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [Color(0xFF0E8F74), Color(0xFF09584A)],
+                )
+              : null,
           border: Border.all(
             color: isSelected
-                ? colorScheme.primary
+                ? colors.primary.withValues(alpha: 0.7)
                 : (isToday ? colors.primary : colors.borderHairline),
             width: isSelected || isToday ? 1.5 : 1.0,
           ),
+          boxShadow: isSelected
+              ? [
+                  BoxShadow(
+                    color: colors.primary.withValues(alpha: 0.28),
+                    blurRadius: 12,
+                    offset: const Offset(0, 4),
+                  ),
+                ]
+              : null,
         ),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -294,7 +326,7 @@ class _DayPill extends StatelessWidget {
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: theme.textTheme.labelSmall?.copyWith(
-                fontWeight: isSelected ? FontWeight.w700 : FontWeight.w600,
+                fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
                 color: dayLabelColor,
                 fontSize: 11,
               ),

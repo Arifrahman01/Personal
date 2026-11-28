@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:personal_hub/core/constants/ai_constants.dart';
+import 'package:personal_hub/core/notifications/app_notification_center.dart';
+import 'package:personal_hub/core/notifications/notification_bootstrap_service.dart';
 import 'package:personal_hub/core/theme/app_theme.dart';
 import 'package:personal_hub/features/home/providers/home_module_preferences.dart';
 import 'package:personal_hub/features/prayer/ui/prayer_schedule_screen.dart';
@@ -21,67 +23,141 @@ class SettingsScreen extends ConsumerWidget {
     final themeMode = ref.watch(themeModeProvider);
     final primary = colors.primary;
 
-    return Scaffold(
-      backgroundColor: AppTokens.canvas(context),
-      appBar: AppBar(
-        title: const Text('Pengaturan'),
-        backgroundColor: AppTokens.canvas(context),
-        centerTitle: false,
-        elevation: 0,
-      ),
-      body: ListView(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-        children: [
-          // 1. Tampilan (Tema) Segmented Button
-          HubCard(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Icon(Icons.palette_outlined, size: 20, color: primary),
-                    const SizedBox(width: 10),
-                    Text(
-                      'Tampilan Antarmuka',
-                      style: theme.textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w700,
+    return LuxeAmbientBackground(
+      child: Scaffold(
+        backgroundColor: Colors.transparent,
+        appBar: AppBar(
+          title: const Text(
+            'Pengaturan',
+            style: TextStyle(fontWeight: FontWeight.w800),
+          ),
+          backgroundColor: Colors.transparent,
+          centerTitle: false,
+          elevation: 0,
+          actions: [
+            LuxeHeaderIconButton(
+              tooltip: 'Uji Notifikasi',
+              icon: Icons.notifications_active_outlined,
+              accentColor: primary,
+              onPressed: () async {
+                final summary = await ref
+                    .read(notificationBootstrapProvider)
+                    .syncAll(requestPermissions: true, force: true);
+                final sent = await ref
+                    .read(appNotificationCenterProvider)
+                    .showTestNotification();
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(
+                        sent
+                            ? 'Tes notifikasi dikirim! ${summary.totalCount} jadwal aktif disinkronkan.'
+                            : 'Pengingat disinkronkan (${summary.totalCount} jadwal). Uji banner tersedia di Android/iOS/macOS.',
                       ),
                     ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                SizedBox(
-                  width: double.infinity,
-                  child: SegmentedButton<ThemeMode>(
-                    segments: const [
-                      ButtonSegment(
-                        value: ThemeMode.system,
-                        label: Text('Sistem'),
-                        icon: Icon(Icons.brightness_auto_rounded, size: 16),
+                  );
+                }
+              },
+            ),
+            const SizedBox(width: 4),
+          ],
+        ),
+        body: SingleChildScrollView(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+            // Signature Sanctuary Luxe Identity Banner
+            LuxeHeroCard(
+              padding: const EdgeInsets.all(18),
+              child: Row(
+                children: [
+                  const LuxeBrandEmblem(size: 46),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Personal Hub v4.0 ("Sanctuary Luxe")',
+                          style: TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w800,
+                            color: Colors.white,
+                          ),
+                        ),
+                        const SizedBox(height: 3),
+                        Text(
+                          'Terenkripsi Lokal • Siap Tanpa Internet',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.white.withValues(alpha: 0.78),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: HubSpacing.lg),
+
+            // 1. Tampilan (Tema) Segmented Button
+            HubCard(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      LuxeIconMedallion(
+                        icon: Icons.palette_outlined,
+                        color: primary,
+                        size: 34,
+                        iconSize: 18,
+                        borderRadius: 10,
                       ),
-                      ButtonSegment(
-                        value: ThemeMode.light,
-                        label: Text('Terang'),
-                        icon: Icon(Icons.light_mode_outlined, size: 16),
-                      ),
-                      ButtonSegment(
-                        value: ThemeMode.dark,
-                        label: Text('Gelap'),
-                        icon: Icon(Icons.dark_mode_outlined, size: 16),
+                      const SizedBox(width: 10),
+                      Text(
+                        'Tampilan Antarmuka',
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w800,
+                        ),
                       ),
                     ],
-                    selected: {themeMode},
-                    onSelectionChanged: (selection) {
-                      ref
-                          .read(themeModeProvider.notifier)
-                          .setThemeMode(selection.first);
-                    },
                   ),
-                ),
-              ],
+                  const SizedBox(height: 12),
+                  SizedBox(
+                    width: double.infinity,
+                    child: SegmentedButton<ThemeMode>(
+                      segments: const [
+                        ButtonSegment(
+                          value: ThemeMode.system,
+                          label: Text('Sistem'),
+                          icon: Icon(Icons.brightness_auto_rounded, size: 16),
+                        ),
+                        ButtonSegment(
+                          value: ThemeMode.light,
+                          label: Text('Terang'),
+                          icon: Icon(Icons.light_mode_outlined, size: 16),
+                        ),
+                        ButtonSegment(
+                          value: ThemeMode.dark,
+                          label: Text('Gelap'),
+                          icon: Icon(Icons.dark_mode_outlined, size: 16),
+                        ),
+                      ],
+                      selected: {themeMode},
+                      onSelectionChanged: (selection) {
+                        ref
+                            .read(themeModeProvider.notifier)
+                            .setThemeMode(selection.first);
+                      },
+                    ),
+                  ),
+                ],
+              ),
             ),
-          ),
-          const SizedBox(height: HubSpacing.lg),
+            const SizedBox(height: HubSpacing.lg),
 
           // Menu Sections Header
           const HubSectionHeader(
@@ -170,39 +246,11 @@ class SettingsScreen extends ConsumerWidget {
           const SizedBox(height: 32),
 
           // App Footer Info
-          Center(
-            child: Column(
-              children: [
-                Container(
-                  width: 40,
-                  height: 40,
-                  decoration: BoxDecoration(
-                    color: primary.withValues(alpha: 0.12),
-                    shape: BoxShape.circle,
-                  ),
-                  child: Icon(Icons.auto_awesome_rounded, size: 20, color: primary),
-                ),
-                const SizedBox(height: 10),
-                Text(
-                  'Personal Hub v3.0 ("Calm Clarity")',
-                  style: theme.textTheme.titleSmall?.copyWith(
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  'Terenkripsi Lokal • Siap Tanpa Internet',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: colors.textSecondary,
-                  ),
-                ),
-              ],
-            ),
-          ),
           const SizedBox(height: 24),
         ],
+        ),
       ),
+    ),
     );
   }
 
@@ -310,11 +358,12 @@ class _SettingsMenuTile extends StatelessWidget {
       onTap: onTap,
       child: Row(
         children: [
-          CircleAvatar(
-            radius: 20,
-            backgroundColor: iconColor.withValues(alpha: 0.15),
-            foregroundColor: iconColor,
-            child: Icon(icon, size: 20),
+          LuxeIconMedallion(
+            icon: icon,
+            color: iconColor,
+            size: 40,
+            iconSize: 20,
+            borderRadius: 12,
           ),
           const SizedBox(width: 12),
           Expanded(

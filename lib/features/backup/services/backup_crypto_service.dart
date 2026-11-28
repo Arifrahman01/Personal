@@ -21,6 +21,8 @@ class BackupCryptoService {
   static const int version = 1;
   static const String kdfName = 'PBKDF2-HMAC-SHA256';
   static const int iterations = 100000;
+  static const int minSupportedIterations = 100000;
+  static const int maxSupportedIterations = 2000000;
   static const int saltLength = 16;
   static const int nonceLength = 12;
   static const int minPassphraseLength = 6;
@@ -93,10 +95,13 @@ class BackupCryptoService {
         );
       }
 
+      final fileIterations = decoded['iterations'];
       if (decoded['format'] != formatId ||
           decoded['version'] != version ||
           decoded['kdf'] != kdfName ||
-          decoded['iterations'] != iterations) {
+          fileIterations is! int ||
+          fileIterations < minSupportedIterations ||
+          fileIterations > maxSupportedIterations) {
         throw const BackupDecryptionException(
           'Header berkas backup (.phub) tidak dikenali atau tidak didukung.',
         );
@@ -129,7 +134,14 @@ class BackupCryptoService {
         );
       }
 
-      final secretKey = await _pbkdf2.deriveKeyFromPassword(
+      final kdf = fileIterations == iterations
+          ? _pbkdf2
+          : Pbkdf2(
+              macAlgorithm: Hmac.sha256(),
+              iterations: fileIterations,
+              bits: 256,
+            );
+      final secretKey = await kdf.deriveKeyFromPassword(
         password: passphrase,
         nonce: salt,
       );

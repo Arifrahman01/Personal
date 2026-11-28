@@ -1,0 +1,5 @@
+# Salin berkas ini menjadi android/key.properties (JANGAN commit key.properties asli ke Git)
+storePassword=your-keystore-password
+keyPassword=your-key-password
+keyAlias=upload
+storeFile=../keystore/upload-keystore.jks

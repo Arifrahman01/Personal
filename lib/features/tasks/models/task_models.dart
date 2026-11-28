@@ -82,7 +82,7 @@ class PersonalTask {
     return {
       'id': id,
       'title': title,
-      'due_date': dueDate?.toIso8601String(),
+      'due_date': dueDate?.toUtc().toIso8601String(),
       'priority': priority.name,
       'is_done': isDone ? 1 : 0,
       'source_meeting_id': sourceMeetingId,
@@ -98,7 +98,7 @@ class PersonalTask {
       id: map['id'] as String,
       title: map['title'] as String,
       dueDate: rawDueDate != null && rawDueDate.isNotEmpty
-          ? DateTime.parse(rawDueDate)
+          ? DateTime.parse(rawDueDate).toLocal()
           : null,
       priority: TaskPriority.fromName(map['priority'] as String?),
       isDone: (map['is_done'] as int? ?? 0) == 1,

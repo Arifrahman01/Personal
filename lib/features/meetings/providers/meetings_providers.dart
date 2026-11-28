@@ -1,8 +1,10 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:personal_hub/core/database/app_database.dart';
+import 'package:personal_hub/core/notifications/app_notification_center.dart';
 import 'package:personal_hub/features/ai/providers/ai_providers.dart';
 import 'package:personal_hub/features/meetings/data/meetings_repository.dart';
 import 'package:personal_hub/features/meetings/models/meeting.dart';
+import 'package:personal_hub/features/meetings/services/ical_generator_service.dart';
 import 'package:personal_hub/features/meetings/services/meeting_ai_parser.dart';
 import 'package:personal_hub/features/meetings/services/meeting_note_composer_service.dart';
 import 'package:personal_hub/features/meetings/services/meeting_reminder_service.dart';
@@ -31,9 +33,16 @@ final meetingsRepositoryProvider = Provider<MeetingsRepository>((ref) {
   return MeetingsRepository(ref.watch(appDatabaseProvider));
 });
 
+/// Provides the singleton [IcalGeneratorService] for RFC 5545 export and import.
+final icalGeneratorServiceProvider = Provider<IcalGeneratorService>((ref) {
+  return const IcalGeneratorService();
+});
+
 /// Provides [MeetingReminderService] for scheduling local meeting notifications.
 final meetingReminderServiceProvider = Provider<MeetingReminderService>((ref) {
-  return MeetingReminderService();
+  return MeetingReminderService(
+    notificationCenter: ref.watch(appNotificationCenterProvider),
+  );
 });
 
 /// Provides [MeetingNoteComposerService] for composing and dual-persisting meeting notes.

@@ -57,7 +57,7 @@ class AppShortcutItem {
   /// Rute tujuan aplikasi (mis. '/quick_capture', '/prayer_schedule').
   final String targetRoute;
 
-  /// Indeks tab di MainNavigationShell (0: Beranda, 1: Catatan, 2: Meeting, 3: Vault, 4: AI).
+  /// Indeks tab di MainNavigationShell (0: Hari Ini, 1: Agenda, 2: Catatan, 3: Keuangan, 4: Vault).
   final int targetTabIndex;
 
   /// Metadata tambahan untuk payload intent saat shortcut dipicu.
@@ -280,9 +280,10 @@ class AppShortcutsService {
       subtitle: 'Jadwal sholat harian & arah kiblat',
       iconName: 'compass',
       targetRoute: AppShortcutRoutes.prayerSchedule,
-      targetTabIndex: 0,
+      targetTabIndex: 1, // Tab Agenda -> sub-bagian 2 (Sholat & Kiblat)
       payload: {
         'action': 'prayer_schedule',
+        'agendaSection': 2,
         'shortcutId': AppShortcutIds.prayerSchedule,
       },
       order: 2,
@@ -293,7 +294,7 @@ class AppShortcutsService {
       subtitle: 'Buat catatan teks atau checklist baru',
       iconName: 'notebook_pen',
       targetRoute: AppShortcutRoutes.newNote,
-      targetTabIndex: 1, // Tab Catatan di MainNavigationShell
+      targetTabIndex: 2, // Tab Catatan di MainNavigationShell
       payload: {
         'action': 'new_note',
         'shortcutId': AppShortcutIds.newNote,
@@ -306,7 +307,7 @@ class AppShortcutsService {
       subtitle: 'Catat transaksi & pengeluaran baru',
       iconName: 'receipt',
       targetRoute: AppShortcutRoutes.newTransaction,
-      targetTabIndex: 0, // Tab Beranda memunculkan modal/layar finance
+      targetTabIndex: 3, // Tab Keuangan di MainNavigationShell
       payload: {
         'action': 'new_transaction',
         'type': 'expense',

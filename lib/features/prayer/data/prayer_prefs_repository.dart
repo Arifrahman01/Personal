@@ -72,7 +72,7 @@ class PrayerPrefsRepository {
     if (raw.trim().isEmpty) {
       return _DecodedPrayerPayload(
         prayers: PrayerName.values.toSet(),
-        notificationMode: AdzanNotificationMode.firebaseFcm,
+        notificationMode: AdzanNotificationMode.both,
       );
     }
 
@@ -81,7 +81,7 @@ class PrayerPrefsRepository {
       if (decoded is List) {
         return _DecodedPrayerPayload(
           prayers: _parsePrayers(decoded),
-          notificationMode: AdzanNotificationMode.firebaseFcm,
+          notificationMode: AdzanNotificationMode.both,
         );
       }
       if (decoded is Map<String, dynamic>) {
@@ -93,7 +93,7 @@ class PrayerPrefsRepository {
         final rawMode = decoded['notification_mode'] as String?;
         final mode = AdzanNotificationMode.values.firstWhere(
           (m) => m.name == rawMode,
-          orElse: () => AdzanNotificationMode.firebaseFcm,
+          orElse: () => AdzanNotificationMode.both,
         );
         return _DecodedPrayerPayload(prayers: prayers, notificationMode: mode);
       }
@@ -103,7 +103,7 @@ class PrayerPrefsRepository {
 
     return _DecodedPrayerPayload(
       prayers: PrayerName.values.toSet(),
-      notificationMode: AdzanNotificationMode.firebaseFcm,
+      notificationMode: AdzanNotificationMode.both,
     );
   }
 

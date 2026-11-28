@@ -1,9 +1,11 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:personal_hub/core/database/app_database.dart';
+import 'package:personal_hub/core/notifications/app_notification_center.dart';
 import 'package:personal_hub/features/prayer/data/prayer_prefs_repository.dart';
 import 'package:personal_hub/features/prayer/models/prayer_models.dart';
 import 'package:personal_hub/features/prayer/services/firebase_adzan_service.dart';
 import 'package:personal_hub/features/prayer/services/prayer_alarm_scheduler.dart';
+import 'package:personal_hub/features/prayer/services/prayer_location_service.dart';
 import 'package:personal_hub/features/prayer/services/prayer_time_service.dart';
 
 /// Menyediakan instance [PrayerTimeService].
@@ -11,21 +13,33 @@ final prayerTimeServiceProvider = Provider<PrayerTimeService>((ref) {
   return const PrayerTimeService();
 });
 
+/// Menyediakan [PrayerLocationService] untuk resolusi kota/kecamatan ramah pengguna.
+final prayerLocationServiceProvider = Provider<PrayerLocationService>((ref) {
+  final service = PrayerLocationService();
+  ref.onDispose(service.dispose);
+  return service;
+});
+
 /// Menyediakan [PrayerPrefsRepository] yang terhubung ke [appDatabaseProvider].
 final prayerPrefsRepositoryProvider = Provider<PrayerPrefsRepository>((ref) {
   return PrayerPrefsRepository(ref.watch(appDatabaseProvider));
 });
 
-/// Menyediakan [PrayerAlarmScheduler].
+/// Menyediakan [PrayerAlarmScheduler] terhubung ke [appNotificationCenterProvider].
 final prayerAlarmSchedulerProvider = Provider<PrayerAlarmScheduler>((ref) {
   return PrayerAlarmScheduler(
     prayerTimeService: ref.watch(prayerTimeServiceProvider),
+    notificationCenter: ref.watch(appNotificationCenterProvider),
   );
 });
 
 /// Menyediakan [FirebaseAdzanService] dengan gateway FlutterFire.
 final firebaseAdzanServiceProvider = Provider<FirebaseAdzanService>((ref) {
-  return FirebaseAdzanService(FlutterFireFcmGateway());
+  return FirebaseAdzanService(
+    FlutterFireFcmGateway(
+      notificationsPlugin: ref.watch(appNotificationCenterProvider).plugin,
+    ),
+  );
 });
 
 /// Mengelola status sinkronisasi FCM Adzan terkini.
@@ -74,7 +88,19 @@ final firebaseAdzanStatusProvider =
 class PrayerPrefsNotifier extends AsyncNotifier<PrayerAlarmPrefs> {
   @override
   Future<PrayerAlarmPrefs> build() async {
-    final prefs = await ref.watch(prayerPrefsRepositoryProvider).loadPrefs();
+    final repo = ref.watch(prayerPrefsRepositoryProvider);
+    final prefs = await repo.loadPrefs();
+    if (PrayerLocationService.isRawCoordinateLabel(prefs.cityName)) {
+      final sanitized = prefs.copyWith(
+        cityName: PrayerLocationService.sanitizeCityName(
+          cityName: prefs.cityName,
+          latitude: prefs.latitude,
+          longitude: prefs.longitude,
+        ),
+      );
+      await repo.savePrefs(sanitized);
+      return sanitized;
+    }
     return prefs;
   }
 
@@ -85,11 +111,16 @@ class PrayerPrefsNotifier extends AsyncNotifier<PrayerAlarmPrefs> {
     await ref.read(prayerPrefsRepositoryProvider).savePrefs(nextPrefs);
     state = AsyncData(nextPrefs);
 
+    var fcmConfigured = false;
     if (nextPrefs.notificationMode == AdzanNotificationMode.firebaseFcm ||
         nextPrefs.notificationMode == AdzanNotificationMode.both) {
-      await ref
+      final status = await ref
           .read(firebaseAdzanStatusProvider.notifier)
-          .syncCity(cityName: nextPrefs.cityName, previousCityName: previousCity);
+          .syncCity(
+            cityName: nextPrefs.cityName,
+            previousCityName: previousCity,
+          );
+      fcmConfigured = status.isConfigured;
     } else if (previousPrefs == null ||
         previousPrefs.notificationMode != AdzanNotificationMode.localOffline) {
       await ref
@@ -97,17 +128,61 @@ class PrayerPrefsNotifier extends AsyncNotifier<PrayerAlarmPrefs> {
           .unsubscribeCity(previousCity ?? nextPrefs.cityName);
     }
 
+    await ref.read(appNotificationCenterProvider).initialize(
+      requestPermissions: true,
+    );
     await ref
         .read(prayerAlarmSchedulerProvider)
-        .syncAlarms(now: DateTime.now(), prefs: nextPrefs);
+        .syncAlarms(
+          now: DateTime.now(),
+          prefs: nextPrefs,
+          forceLocalFallback: !fcmConfigured,
+        );
+    ref.invalidate(notificationDiagnosticProvider);
+  }
+
+  /// Menjadwalkan ulang alarm lokal sholat & menyinkronkan FCM tanpa mengubah preferensi.
+  Future<int> resyncAlarms({bool requestPermissions = false}) async {
+    final current = state.asData?.value ?? await future;
+    await ref.read(appNotificationCenterProvider).initialize(
+      requestPermissions: requestPermissions,
+    );
+
+    var fcmConfigured = false;
+    if (current.notificationMode == AdzanNotificationMode.firebaseFcm ||
+        current.notificationMode == AdzanNotificationMode.both) {
+      final status = await ref
+          .read(firebaseAdzanStatusProvider.notifier)
+          .syncCity(cityName: current.cityName);
+      fcmConfigured = status.isConfigured;
+    }
+
+    final count = await ref
+        .read(prayerAlarmSchedulerProvider)
+        .syncAlarms(
+          now: DateTime.now(),
+          prefs: current,
+          forceLocalFallback: !fcmConfigured,
+        );
+    ref.invalidate(notificationDiagnosticProvider);
+    return count;
   }
 
   /// Menyinkronkan ulang status FCM tanpa mengubah preferensi.
   Future<FirebaseAdzanStatus> syncFcmNow() async {
     final current = state.asData?.value ?? await future;
-    return ref
+    final status = await ref
         .read(firebaseAdzanStatusProvider.notifier)
         .syncCity(cityName: current.cityName);
+    await ref
+        .read(prayerAlarmSchedulerProvider)
+        .syncAlarms(
+          now: DateTime.now(),
+          prefs: current,
+          forceLocalFallback: !status.isConfigured,
+        );
+    ref.invalidate(notificationDiagnosticProvider);
+    return status;
   }
 
   /// Mengganti kota dan koordinat lokasi sholat.

@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:personal_hub/core/config/secure_config_store.dart';
 import 'package:personal_hub/core/database/app_database.dart';
 import 'package:personal_hub/features/home/ui/home_screen.dart';
+import 'package:personal_hub/features/meetings/data/meetings_repository.dart';
 import 'package:personal_hub/features/vault/providers/vault_lock_controller.dart';
 import 'package:personal_hub/features/vault/providers/vault_providers.dart';
 import 'package:personal_hub/features/vault/services/clipboard_guard.dart';
@@ -45,7 +45,6 @@ class _FakeClipboardAdapter implements ClipboardAdapter {
 
 void main() {
   setUpAll(() {
-    GoogleFonts.config.allowRuntimeFetching = false;
     sqfliteFfiInit();
   });
 
@@ -216,5 +215,33 @@ void main() {
       FlutterError.onError = oldOnError;
       expect(capturedDetails, isNull);
     });
+
+    testWidgets(
+      'displays today local meeting stored in UTC near local midnight boundary',
+      (tester) async {
+        final appDb = await AppDatabase.open(
+          pathOverride: inMemoryDatabasePath,
+          factoryOverride: databaseFactoryFfiNoIsolate,
+        );
+        addTearDown(() async => appDb.close());
+
+        final clipboardGuard = ClipboardGuard(_FakeClipboardAdapter());
+        addTearDown(clipboardGuard.dispose);
+
+        final now = DateTime.now();
+        final earlyTodayLocal = DateTime(now.year, now.month, now.day, 0, 30);
+        await MeetingsRepository(appDb).createMeeting(
+          title: 'Standup Tengah Malam Lokal',
+          scheduledAt: earlyTodayLocal.toUtc(),
+        );
+
+        await tester.pumpWidget(
+          buildTestableHomeScreen(appDb: appDb, clipboardGuard: clipboardGuard),
+        );
+        await tester.pumpAndSettle();
+
+        expect(find.text('Standup Tengah Malam Lokal'), findsOneWidget);
+      },
+    );
   });
 }

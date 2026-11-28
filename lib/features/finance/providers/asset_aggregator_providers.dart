@@ -1,5 +1,9 @@
+import 'dart:async';
+import 'dart:convert';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:personal_hub/core/config/secure_config_store.dart';
+import 'package:personal_hub/core/storage/app_preferences_repository.dart';
 import 'package:personal_hub/features/finance/models/gold_price_models.dart';
 import 'package:personal_hub/features/finance/providers/finance_providers.dart';
 import 'package:personal_hub/features/finance/services/finance_asset_aggregator_service.dart';
@@ -67,7 +71,19 @@ final goldPriceBenchmarkProvider =
 /// Manages manual asset declarations (gold in grams, receivables, investments, debts).
 class ManualZakatAssetNotifier extends Notifier<ManualZakatAssetInput> {
   @override
-  ManualZakatAssetInput build() => const ManualZakatAssetInput();
+  ManualZakatAssetInput build() => ref.watch(initialManualZakatAssetProvider);
+
+  void _persist(ManualZakatAssetInput next) {
+    unawaited(
+      ref
+          .read(appPreferencesStoreProvider)
+          .setString(
+            AppPreferenceKeys.manualZakatAssets,
+            jsonEncode(next.toJson()),
+          )
+          .catchError((_) {}),
+    );
+  }
 
   void update({
     double? goldGrams,
@@ -76,17 +92,21 @@ class ManualZakatAssetNotifier extends Notifier<ManualZakatAssetInput> {
     double? otherAssets,
     double? shortTermDebts,
   }) {
-    state = state.copyWith(
+    final next = state.copyWith(
       goldGrams: goldGrams,
       receivables: receivables,
       investments: investments,
       otherAssets: otherAssets,
       shortTermDebts: shortTermDebts,
     );
+    state = next;
+    _persist(next);
   }
 
   void reset() {
-    state = const ManualZakatAssetInput();
+    const next = ManualZakatAssetInput();
+    state = next;
+    _persist(next);
   }
 }
 
@@ -113,6 +133,8 @@ final financeAssetAggregatorServiceProvider =
 /// Provides the comprehensive [ZakatAssetBreakdown] aggregating real cash and manual assets.
 final financeAssetAggregatorProvider =
     FutureProvider<ZakatAssetBreakdown>((ref) async {
+  // Re-evaluate automatically when monthly transactions are invalidated.
+  await ref.watch(monthlyTransactionsProvider.future);
   final aggregatorService = ref.watch(financeAssetAggregatorServiceProvider);
   final manualAssets = ref.watch(manualZakatAssetInputProvider);
   final benchmark = await ref.watch(goldPriceBenchmarkProvider.future);

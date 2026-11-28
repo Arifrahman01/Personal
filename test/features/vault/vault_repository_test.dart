@@ -69,6 +69,8 @@ void main() {
         final serializedRow = rows.first.values
             .map((v) => v?.toString() ?? '')
             .join(' ');
+        expect(serializedRow, isNot(contains('Bank Utama')));
+        expect(serializedRow, isNot(contains('budi@example.com')));
         expect(serializedRow, isNot(contains(secretPassword)));
         expect(serializedRow, isNot(contains(secretUrl)));
         expect(serializedRow, isNot(contains(secretNotes)));

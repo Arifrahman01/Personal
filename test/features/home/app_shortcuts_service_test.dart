@@ -184,15 +184,16 @@ void main() {
       expect(prayer.title, equals('Jadwal Sholat & Kiblat'));
       expect(prayer.iconName, equals('compass'));
       expect(prayer.targetRoute, equals('/prayer_schedule'));
-      expect(prayer.targetTabIndex, equals(0));
+      expect(prayer.targetTabIndex, equals(1));
       expect(prayer.payload['action'], equals('prayer_schedule'));
+      expect(prayer.payload['agendaSection'], equals(2));
 
       // 3. new_note: "Catatan Baru"
       final newNote = shortcuts.firstWhere((s) => s.id == 'new_note');
       expect(newNote.title, equals('Catatan Baru'));
       expect(newNote.iconName, equals('notebook_pen'));
       expect(newNote.targetRoute, equals('/notes/new'));
-      expect(newNote.targetTabIndex, equals(1)); // Notes tab in MainNavigationShell
+      expect(newNote.targetTabIndex, equals(2)); // Notes tab in MainNavigationShell
       expect(newNote.payload['action'], equals('new_note'));
 
       // 4. new_transaction: "Catat Pengeluaran"
@@ -200,7 +201,7 @@ void main() {
       expect(newTx.title, equals('Catat Pengeluaran'));
       expect(newTx.iconName, equals('receipt'));
       expect(newTx.targetRoute, equals('/finance/new'));
-      expect(newTx.targetTabIndex, equals(0));
+      expect(newTx.targetTabIndex, equals(3));
       expect(newTx.payload['action'], equals('new_transaction'));
     });
 
@@ -333,13 +334,14 @@ void main() {
       expect(result.isFallback, isFalse);
     });
 
-    test('handles "prayer_schedule" -> tab 0, route "/prayer_schedule"', () {
+    test('handles "prayer_schedule" -> tab 1 (Agenda -> Sholat), route "/prayer_schedule"', () {
       final result = service.handleShortcutIntent('prayer_schedule');
 
       expect(result.shortcutId, equals('prayer_schedule'));
-      expect(result.tabIndex, equals(0));
+      expect(result.tabIndex, equals(1));
       expect(result.route, equals('/prayer_schedule'));
       expect(result.payload['action'], equals('prayer_schedule'));
+      expect(result.payload['agendaSection'], equals(2));
       expect(result.isRecognized, isTrue);
       expect(result.isFallback, isFalse);
     });
@@ -348,18 +350,18 @@ void main() {
       final result = service.handleShortcutIntent('new_note');
 
       expect(result.shortcutId, equals('new_note'));
-      expect(result.tabIndex, equals(1)); // Catatan tab
+      expect(result.tabIndex, equals(2)); // Catatan tab
       expect(result.route, equals('/notes/new'));
       expect(result.payload['action'], equals('new_note'));
       expect(result.isRecognized, isTrue);
       expect(result.isFallback, isFalse);
     });
 
-    test('handles "new_transaction" -> tab 0, route "/finance/new"', () {
+    test('handles "new_transaction" -> tab 3, route "/finance/new"', () {
       final result = service.handleShortcutIntent('new_transaction');
 
       expect(result.shortcutId, equals('new_transaction'));
-      expect(result.tabIndex, equals(0));
+      expect(result.tabIndex, equals(3));
       expect(result.route, equals('/finance/new'));
       expect(result.payload['action'], equals('new_transaction'));
       expect(result.payload['type'], equals('expense'));
@@ -371,7 +373,7 @@ void main() {
       final result = service.handleShortcutIntent('personalhub://shortcut/new_note');
 
       expect(result.shortcutId, equals('new_note'));
-      expect(result.tabIndex, equals(1));
+      expect(result.tabIndex, equals(2));
       expect(result.route, equals('/notes/new'));
       expect(result.isRecognized, isTrue);
       expect(result.isFallback, isFalse);
@@ -452,12 +454,12 @@ void main() {
       final result = notifier.processShortcutIntent('new_note');
 
       expect(result.shortcutId, equals('new_note'));
-      expect(result.tabIndex, equals(1));
+      expect(result.tabIndex, equals(2));
       expect(result.route, equals('/notes/new'));
 
       // Check reactive providers
       expect(container.read(activeShortcutIntentProvider)?.shortcutId, equals('new_note'));
-      expect(container.read(activeShortcutDestinationTabIndexProvider), equals(1));
+      expect(container.read(activeShortcutDestinationTabIndexProvider), equals(2));
       expect(container.read(activeShortcutRouteProvider), equals('/notes/new'));
 
       // Clear intent

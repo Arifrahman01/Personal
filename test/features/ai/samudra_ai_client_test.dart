@@ -380,5 +380,37 @@ void main() {
         }
       },
     );
+
+    test(
+      'uses configurable primary and fallback models from SecureConfigStore',
+      () async {
+        final store = _makeStore();
+        await store.setPrimaryModel('custom-primary-model');
+        await store.setFallbackModel('custom-fallback-model');
+
+        final requestedModels = <String>[];
+        final mockClient = MockClient((request) async {
+          final body = jsonDecode(request.body) as Map<String, dynamic>;
+          requestedModels.add(body['model'] as String);
+          if (requestedModels.length == 1) {
+            return http.Response('rate limit', 429);
+          }
+          return http.Response(_chatCompletionJson('OK custom fallback'), 200);
+        });
+
+        final client = SamudraAiClient(mockClient, store);
+        final response = await client.chat(
+          messages: const [AiMessage(role: 'user', content: 'Tes')],
+        );
+
+        expect(requestedModels, [
+          'custom-primary-model',
+          'custom-fallback-model',
+        ]);
+        expect(response.usedModel, 'custom-fallback-model');
+        expect(response.didFallback, isTrue);
+        expect(response.content, 'OK custom fallback');
+      },
+    );
   });
 }

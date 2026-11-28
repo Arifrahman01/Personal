@@ -117,5 +117,41 @@ void main() {
         expect(emptyResults, isEmpty);
       },
     );
+
+    test(
+      'finds financial transactions older than 3 months (all-time history search)',
+      () async {
+        final db = await AppDatabase.open(
+          pathOverride: inMemoryDatabasePath,
+          factoryOverride: databaseFactoryFfi,
+        );
+        addTearDown(() async => db.close());
+
+        final notesRepo = NotesRepository(db);
+        final meetingsRepo = MeetingsRepository(db);
+        final tasksRepo = TasksRepository(db);
+        final financeRepo = FinanceRepository(db);
+
+        await financeRepo.addTransaction(
+          type: TransactionType.expense,
+          amount: 1250000,
+          category: 'Pajak',
+          note: 'Audit Pajak Lama',
+          occurredAt: DateTime.now().subtract(const Duration(days: 200)),
+        );
+
+        final service = GlobalSearchService(
+          notesRepo,
+          meetingsRepo,
+          tasksRepo,
+          financeRepo,
+        );
+
+        final results = await service.search('Pajak Lama');
+        expect(results, hasLength(1));
+        expect(results.single.category, GlobalSearchCategory.transaction);
+        expect(results.single.subtitle, 'Audit Pajak Lama');
+      },
+    );
   });
 }

@@ -1,27 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:intl/intl.dart';
 import 'package:personal_hub/core/errors/app_exceptions.dart';
 import 'package:personal_hub/core/theme/app_tokens.dart';
 import 'package:personal_hub/core/theme/hub_widgets.dart';
 import 'package:personal_hub/features/tasks/models/task_models.dart';
 import 'package:personal_hub/features/tasks/providers/tasks_providers.dart';
+import 'package:personal_hub/features/tasks/ui/widgets/habit_card.dart';
+import 'package:personal_hub/features/tasks/ui/widgets/habit_form_sheet.dart';
+import 'package:personal_hub/features/tasks/ui/widgets/task_card.dart';
+import 'package:personal_hub/features/tasks/ui/widgets/task_form_sheet.dart';
+import 'package:personal_hub/features/tasks/ui/widgets/tasks_shared_widgets.dart';
 
 enum _TasksSection { tasks, habits }
-
-class _StarterHabitPreset {
-  const _StarterHabitPreset({
-    required this.title,
-    required this.category,
-    required this.targetPerDay,
-    required this.icon,
-  });
-
-  final String title;
-  final String category;
-  final int targetPerDay;
-  final IconData icon;
-}
 
 /// Daily Tasks & Habit/Ibadah Tracker screen in Material 3 (Bahasa Indonesia).
 class TasksHabitsScreen extends ConsumerStatefulWidget {
@@ -34,26 +24,26 @@ class TasksHabitsScreen extends ConsumerStatefulWidget {
 }
 
 class _TasksHabitsScreenState extends ConsumerState<TasksHabitsScreen> {
-  static const List<_StarterHabitPreset> _starterPresets = [
-    _StarterHabitPreset(
+  static const List<StarterHabitPreset> _starterPresets = [
+    StarterHabitPreset(
       title: 'Sholat Tepat Waktu',
       category: 'Ibadah',
       targetPerDay: 5,
       icon: Icons.explore_outlined,
     ),
-    _StarterHabitPreset(
+    StarterHabitPreset(
       title: 'Baca Al-Quran',
       category: 'Ibadah',
       targetPerDay: 1,
       icon: Icons.menu_book_rounded,
     ),
-    _StarterHabitPreset(
+    StarterHabitPreset(
       title: 'Olahraga',
       category: 'Kesehatan',
       targetPerDay: 1,
       icon: Icons.fitness_center_rounded,
     ),
-    _StarterHabitPreset(
+    StarterHabitPreset(
       title: 'Baca Buku',
       category: 'Belajar',
       targetPerDay: 1,
@@ -118,450 +108,42 @@ class _TasksHabitsScreenState extends ConsumerState<TasksHabitsScreen> {
   }
 
   Future<void> _openEditTaskSheet(PersonalTask task) async {
-    final titleController = TextEditingController(text: task.title);
-    var selectedPriority = task.priority;
-    var selectedDueDate = task.dueDate;
-    String? errorText;
-
     final updated = await showModalBottomSheet<bool>(
       context: context,
       isScrollControlled: true,
       useSafeArea: true,
-      builder: (sheetContext) {
-        return StatefulBuilder(
-          builder: (context, setSheetState) {
-            final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
-            return SafeArea(
-              top: false,
-              child: SingleChildScrollView(
-                padding: EdgeInsets.fromLTRB(20, 12, 20, 20 + bottomInset),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        'Edit Tugas',
-                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                              fontWeight: FontWeight.w700,
-                            ),
-                      ),
-                      IconButton(
-                        icon: const Icon(Icons.close_rounded),
-                        onPressed: () => Navigator.of(sheetContext).pop(false),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  TextField(
-                    key: const Key('edit_task_title_field'),
-                    controller: titleController,
-                    autofocus: true,
-                    textInputAction: TextInputAction.done,
-                    decoration: InputDecoration(
-                      labelText: 'Judul tugas',
-                      errorText: errorText,
-                      prefixIcon: const Icon(Icons.check_box_outlined),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    'Prioritas',
-                    style: Theme.of(context).textTheme.labelLarge,
-                  ),
-                  const SizedBox(height: 8),
-                  SegmentedButton<TaskPriority>(
-                    showSelectedIcon: false,
-                    segments: [
-                      for (final priority in TaskPriority.values)
-                        ButtonSegment<TaskPriority>(
-                          value: priority,
-                          label: Text(
-                            priority.label,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                    ],
-                    selected: {selectedPriority},
-                    onSelectionChanged: (selection) {
-                      setSheetState(() {
-                        selectedPriority = selection.first;
-                      });
-                    },
-                  ),
-                  const SizedBox(height: 16),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: OutlinedButton.icon(
-                          icon: const Icon(Icons.calendar_month_rounded),
-                          label: Text(
-                            selectedDueDate == null
-                                ? 'Pilih tenggat (opsional)'
-                                : DateFormat('d MMM yyyy')
-                                    .format(selectedDueDate!),
-                          ),
-                          onPressed: () async {
-                            final now = DateTime.now();
-                            final picked = await showDatePicker(
-                              context: context,
-                              initialDate: selectedDueDate ?? now,
-                              firstDate: DateTime(now.year - 1),
-                              lastDate: DateTime(now.year + 5),
-                            );
-                            if (picked != null) {
-                              setSheetState(() {
-                                selectedDueDate = picked;
-                              });
-                            }
-                          },
-                        ),
-                      ),
-                      if (selectedDueDate != null) ...[
-                        const SizedBox(width: 8),
-                        IconButton(
-                          tooltip: 'Hapus tenggat',
-                          onPressed: () {
-                            setSheetState(() {
-                              selectedDueDate = null;
-                            });
-                          },
-                          icon: const Icon(Icons.close_rounded),
-                        ),
-                      ],
-                    ],
-                  ),
-                  const SizedBox(height: 20),
-                  FilledButton(
-                    key: const Key('save_edit_task_button'),
-                    onPressed: () async {
-                      final newTitle = titleController.text.trim();
-                      if (newTitle.isEmpty) {
-                        setSheetState(() {
-                          errorText = 'Judul tugas tidak boleh kosong.';
-                        });
-                        return;
-                      }
-                      try {
-                        await ref.read(tasksProvider.notifier).deleteTask(task.id);
-                        final created = await ref.read(tasksProvider.notifier).createTask(
-                          title: newTitle,
-                          dueDate: selectedDueDate,
-                          priority: selectedPriority,
-                          sourceMeetingId: task.sourceMeetingId,
-                        );
-                        if (task.isDone) {
-                          await ref.read(tasksProvider.notifier).toggleTaskDone(created.id);
-                        }
-                        if (sheetContext.mounted) {
-                          Navigator.of(sheetContext).pop(true);
-                        }
-                      } on ValidationException catch (error) {
-                        setSheetState(() {
-                          errorText = error.message;
-                        });
-                      }
-                    },
-                    child: const Text('Simpan Perubahan'),
-                  ),
-                ],
-              ),
-              ),
-            );
-          },
-        );
-      },
+      builder: (_) => TaskFormSheet(existing: task),
     );
-
-    titleController.dispose();
     if (updated == true) {
       _showSnack('Tugas berhasil diperbarui.');
     }
   }
 
   Future<void> _openCreateTaskSheet() async {
-    final titleController = TextEditingController();
-    var selectedPriority = TaskPriority.medium;
-    DateTime? selectedDueDate;
-    String? errorText;
-
     final created = await showModalBottomSheet<bool>(
       context: context,
       isScrollControlled: true,
       useSafeArea: true,
-      builder: (sheetContext) {
-        return StatefulBuilder(
-          builder: (context, setSheetState) {
-            final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
-            return SafeArea(
-              top: false,
-              child: SingleChildScrollView(
-                padding: EdgeInsets.fromLTRB(20, 12, 20, 20 + bottomInset),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                  Text(
-                    'Tambah Tugas Baru',
-                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                          fontWeight: FontWeight.w700,
-                        ),
-                  ),
-                  const SizedBox(height: 16),
-                  TextField(
-                    controller: titleController,
-                    autofocus: true,
-                    textInputAction: TextInputAction.done,
-                    decoration: InputDecoration(
-                      labelText: 'Judul tugas',
-                      hintText: 'Misal: Kirim laporan mingguan',
-                      errorText: errorText,
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    'Prioritas',
-                    style: Theme.of(context).textTheme.labelLarge,
-                  ),
-                  const SizedBox(height: 8),
-                  SegmentedButton<TaskPriority>(
-                    showSelectedIcon: false,
-                    segments: [
-                      for (final priority in TaskPriority.values)
-                        ButtonSegment<TaskPriority>(
-                          value: priority,
-                          label: Text(
-                            priority.label,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                    ],
-                    selected: {selectedPriority},
-                    onSelectionChanged: (selection) {
-                      setSheetState(() {
-                        selectedPriority = selection.first;
-                      });
-                    },
-                  ),
-                  const SizedBox(height: 16),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: OutlinedButton.icon(
-                          icon: const Icon(Icons.calendar_month_rounded),
-                          label: Text(
-                            selectedDueDate == null
-                                ? 'Pilih tenggat (opsional)'
-                                : DateFormat('d MMM yyyy')
-                                    .format(selectedDueDate!),
-                          ),
-                          onPressed: () async {
-                            final now = DateTime.now();
-                            final picked = await showDatePicker(
-                              context: context,
-                              initialDate: selectedDueDate ?? now,
-                              firstDate: DateTime(now.year - 1),
-                              lastDate: DateTime(now.year + 5),
-                            );
-                            if (picked != null) {
-                              setSheetState(() {
-                                selectedDueDate = picked;
-                              });
-                            }
-                          },
-                        ),
-                      ),
-                      if (selectedDueDate != null) ...[
-                        const SizedBox(width: 8),
-                        IconButton(
-                          tooltip: 'Hapus tenggat',
-                          onPressed: () {
-                            setSheetState(() {
-                              selectedDueDate = null;
-                            });
-                          },
-                          icon: const Icon(Icons.close_rounded),
-                        ),
-                      ],
-                    ],
-                  ),
-                  const SizedBox(height: 20),
-                  FilledButton(
-                    onPressed: () async {
-                      try {
-                        await ref.read(tasksProvider.notifier).createTask(
-                              title: titleController.text,
-                              dueDate: selectedDueDate,
-                              priority: selectedPriority,
-                            );
-                        if (sheetContext.mounted) {
-                          Navigator.of(sheetContext).pop(true);
-                        }
-                      } on ValidationException catch (error) {
-                        setSheetState(() {
-                          errorText = error.message;
-                        });
-                      }
-                    },
-                    child: const Text('Simpan Tugas'),
-                  ),
-                ],
-              ),
-              ),
-            );
-          },
-        );
-      },
+      builder: (_) => const TaskFormSheet(),
     );
-
-    titleController.dispose();
     if (created == true) {
       _showSnack('Tugas berhasil ditambahkan.');
     }
   }
 
   Future<void> _openCreateHabitSheet() async {
-    final titleController = TextEditingController();
-    const categories = ['Ibadah', 'Kesehatan', 'Belajar', 'Umum'];
-    var selectedCategory = 'Ibadah';
-    var targetPerDay = 1;
-    String? errorText;
-
     final created = await showModalBottomSheet<bool>(
       context: context,
       isScrollControlled: true,
       useSafeArea: true,
-      builder: (sheetContext) {
-        return StatefulBuilder(
-          builder: (context, setSheetState) {
-            final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
-            return SafeArea(
-              top: false,
-              child: SingleChildScrollView(
-                padding: EdgeInsets.fromLTRB(20, 12, 20, 20 + bottomInset),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                  Text(
-                    'Tambah Habit & Ibadah',
-                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                          fontWeight: FontWeight.w700,
-                        ),
-                  ),
-                  const SizedBox(height: 16),
-                  TextField(
-                    controller: titleController,
-                    autofocus: true,
-                    textInputAction: TextInputAction.done,
-                    decoration: InputDecoration(
-                      labelText: 'Nama habit / ibadah',
-                      hintText: 'Misal: Dzikir Pagi & Petang',
-                      errorText: errorText,
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    'Kategori',
-                    style: Theme.of(context).textTheme.labelLarge,
-                  ),
-                  const SizedBox(height: 8),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: [
-                      for (final category in categories)
-                        ChoiceChip(
-                          label: Text(category),
-                          selected: selectedCategory == category,
-                          onSelected: (_) {
-                            setSheetState(() {
-                              selectedCategory = category;
-                            });
-                          },
-                        ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        'Target per hari',
-                        style: Theme.of(context).textTheme.labelLarge,
-                      ),
-                      Row(
-                        children: [
-                          IconButton.outlined(
-                            tooltip: 'Kurangi target',
-                            onPressed: targetPerDay > 1
-                                ? () => setSheetState(() => targetPerDay--)
-                                : null,
-                            icon: const Icon(Icons.remove_rounded),
-                          ),
-                          Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 14),
-                            child: Text(
-                              '$targetPerDay',
-                              style: HubTypography.tabular(
-                                Theme.of(context).textTheme.titleMedium?.copyWith(
-                                      fontWeight: FontWeight.w700,
-                                    ) ??
-                                    const TextStyle(fontWeight: FontWeight.w700),
-                              ),
-                            ),
-                          ),
-                          IconButton.outlined(
-                            tooltip: 'Tambah target',
-                            onPressed: targetPerDay < 20
-                                ? () => setSheetState(() => targetPerDay++)
-                                : null,
-                            icon: const Icon(Icons.add_rounded),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 20),
-                  FilledButton(
-                    onPressed: () async {
-                      try {
-                        await ref.read(habitsProvider.notifier).createHabit(
-                              title: titleController.text,
-                              category: selectedCategory,
-                              targetPerDay: targetPerDay,
-                            );
-                        if (sheetContext.mounted) {
-                          Navigator.of(sheetContext).pop(true);
-                        }
-                      } on ValidationException catch (error) {
-                        setSheetState(() {
-                          errorText = error.message;
-                        });
-                      }
-                    },
-                    child: const Text('Simpan Habit'),
-                  ),
-                ],
-              ),
-              ),
-            );
-          },
-        );
-      },
+      builder: (_) => const HabitFormSheet(),
     );
-
-    titleController.dispose();
     if (created == true) {
       _showSnack('Habit berhasil ditambahkan.');
     }
   }
 
-  Future<void> _addStarterPreset(_StarterHabitPreset preset) async {
+  Future<void> _addStarterPreset(StarterHabitPreset preset) async {
     final existing = ref.read(habitsProvider).asData?.value ?? const <Habit>[];
     final alreadyExists = existing.any(
       (habit) => habit.title.toLowerCase() == preset.title.toLowerCase(),
@@ -688,13 +270,17 @@ class _TasksHabitsScreenState extends ConsumerState<TasksHabitsScreen> {
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
               child: HubCard(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
+                borderRadius: HubRadius.rPill,
+                borderColor: AppTokens.primary(context).withValues(alpha: 0.25),
+                padding: const EdgeInsets.fromLTRB(14, 4, 6, 4),
                 child: Row(
                   children: [
-                    Icon(
-                      Icons.add_circle_outline_rounded,
+                    LuxeIconMedallion(
+                      icon: Icons.add_task_rounded,
                       color: AppTokens.primary(context),
-                      size: 20,
+                      size: 32,
+                      iconSize: 17,
+                      borderRadius: 10,
                     ),
                     const SizedBox(width: 10),
                     Expanded(
@@ -705,16 +291,25 @@ class _TasksHabitsScreenState extends ConsumerState<TasksHabitsScreen> {
                         onSubmitted: _handleQuickTaskSubmit,
                         decoration: const InputDecoration(
                           hintText: '+ Tambah tugas baru...',
+                          filled: false,
                           border: InputBorder.none,
+                          enabledBorder: InputBorder.none,
+                          focusedBorder: InputBorder.none,
                           isDense: true,
                         ),
                       ),
                     ),
-                    IconButton(
+                    IconButton.filled(
                       key: const Key('quick_task_submit_button'),
-                      icon: const Icon(Icons.arrow_upward_rounded, size: 20),
+                      style: IconButton.styleFrom(
+                        backgroundColor: AppTokens.primary(context),
+                        foregroundColor: Theme.of(context).colorScheme.onPrimary,
+                        minimumSize: const Size(40, 40),
+                      ),
+                      icon: const Icon(Icons.arrow_upward_rounded, size: 18),
                       tooltip: 'Tambah tugas',
-                      onPressed: () => _handleQuickTaskSubmit(_quickTaskController.text),
+                      onPressed: () =>
+                          _handleQuickTaskSubmit(_quickTaskController.text),
                     ),
                   ],
                 ),
@@ -751,7 +346,7 @@ class _TasksHabitsScreenState extends ConsumerState<TasksHabitsScreen> {
             const SizedBox(height: 8),
             Expanded(
               child: visibleTasks.isEmpty
-                  ? _EmptyStateView(
+                  ? TasksEmptyStateView(
                       icon: Icons.check_box_outlined,
                       title: 'Belum ada tugas',
                       subtitle: _showCompletedTasks
@@ -766,7 +361,7 @@ class _TasksHabitsScreenState extends ConsumerState<TasksHabitsScreen> {
                       separatorBuilder: (_, _) => const SizedBox(height: 10),
                       itemBuilder: (context, index) {
                         final task = visibleTasks[index];
-                        return _TaskCard(
+                        return TaskCard(
                           task: task,
                           onToggle: () => ref
                               .read(tasksProvider.notifier)
@@ -869,7 +464,7 @@ class _TasksHabitsScreenState extends ConsumerState<TasksHabitsScreen> {
             ),
             const SizedBox(height: 16),
             if (habits.isEmpty)
-              _EmptyStateView(
+              TasksEmptyStateView(
                 icon: Icons.local_fire_department_rounded,
                 title: 'Belum ada habit atau ibadah',
                 subtitle:
@@ -879,7 +474,7 @@ class _TasksHabitsScreenState extends ConsumerState<TasksHabitsScreen> {
               )
             else
               for (final habit in habits) ...[
-                _HabitCard(
+                HabitCard(
                   habit: habit,
                   stats: statsMap[habit.id] ??
                       const HabitDailyStats(todayCount: 0, streak: 0),
@@ -897,364 +492,6 @@ class _TasksHabitsScreenState extends ConsumerState<TasksHabitsScreen> {
           ],
         );
       },
-    );
-  }
-}
-
-class _TaskCard extends StatelessWidget {
-  const _TaskCard({
-    required this.task,
-    required this.onToggle,
-    required this.onEdit,
-    required this.onDelete,
-  });
-
-  final PersonalTask task;
-  final VoidCallback onToggle;
-  final VoidCallback onEdit;
-  final VoidCallback onDelete;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final priorityColors = _priorityPalette(theme.colorScheme, task.priority);
-
-    return HubCard(
-      onTap: onEdit,
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Checkbox(
-            value: task.isDone,
-            onChanged: (_) => onToggle(),
-          ),
-          Expanded(
-            child: Padding(
-              padding: const EdgeInsets.only(top: 8),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    task.title,
-                    style: theme.textTheme.titleMedium?.copyWith(
-                      decoration:
-                          task.isDone ? TextDecoration.lineThrough : null,
-                      color: task.isDone
-                          ? theme.colorScheme.onSurfaceVariant
-                          : theme.colorScheme.onSurface,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 6,
-                    children: [
-                      _BadgePill(
-                        label: task.priority.label,
-                        backgroundColor: priorityColors.background,
-                        foregroundColor: priorityColors.foreground,
-                      ),
-                      if (task.dueDate != null)
-                        _BadgePill(
-                          icon: Icons.calendar_month_rounded,
-                          label: _formatDueLabel(task.dueDate!),
-                          backgroundColor:
-                              theme.colorScheme.surfaceContainerHighest,
-                          foregroundColor: theme.colorScheme.onSurfaceVariant,
-                        ),
-                      if (task.sourceMeetingId != null)
-                        _BadgePill(
-                          icon: Icons.groups_rounded,
-                          label: 'Dari Meeting',
-                          backgroundColor: theme.colorScheme.primaryContainer,
-                          foregroundColor:
-                              theme.colorScheme.onPrimaryContainer,
-                        ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ),
-          IconButton(
-            tooltip: 'Edit tugas',
-            onPressed: onEdit,
-            icon: const Icon(Icons.edit_rounded, size: 18),
-          ),
-          IconButton(
-            tooltip: 'Hapus tugas',
-            onPressed: onDelete,
-            icon: const Icon(Icons.delete_outline_rounded, size: 18),
-          ),
-        ],
-      ),
-    );
-  }
-
-  ({Color background, Color foreground}) _priorityPalette(
-    ColorScheme scheme,
-    TaskPriority priority,
-  ) {
-    return switch (priority) {
-      TaskPriority.high => (
-        background: scheme.errorContainer,
-        foreground: scheme.onErrorContainer,
-      ),
-      TaskPriority.medium => (
-        background: scheme.tertiaryContainer,
-        foreground: scheme.onTertiaryContainer,
-      ),
-      TaskPriority.low => (
-        background: scheme.secondaryContainer,
-        foreground: scheme.onSecondaryContainer,
-      ),
-    };
-  }
-
-  String _formatDueLabel(DateTime dueDate) {
-    final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
-    final dueDay = DateTime(dueDate.year, dueDate.month, dueDate.day);
-    final diff = dueDay.difference(today).inDays;
-
-    if (diff == 0) return 'Hari ini';
-    if (diff == 1) return 'Besok';
-    if (diff == -1) return 'Kemarin';
-    return DateFormat('d MMM yyyy').format(dueDate);
-  }
-}
-
-class _HabitCard extends StatelessWidget {
-  const _HabitCard({
-    required this.habit,
-    required this.stats,
-    required this.onIncrement,
-    required this.onDecrement,
-    required this.onDelete,
-  });
-
-  final Habit habit;
-  final HabitDailyStats stats;
-  final VoidCallback onIncrement;
-  final VoidCallback onDecrement;
-  final VoidCallback onDelete;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final progress = (stats.todayCount / habit.targetPerDay).clamp(0.0, 1.0);
-    final isGoalReached = stats.todayCount >= habit.targetPerDay;
-
-    return HubCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      habit.title,
-                      style: theme.textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 6,
-                      children: [
-                        _BadgePill(
-                          label: habit.category,
-                          backgroundColor:
-                              theme.colorScheme.secondaryContainer,
-                          foregroundColor:
-                              theme.colorScheme.onSecondaryContainer,
-                        ),
-                        _BadgePill(
-                          icon: Icons.local_fire_department_rounded,
-                          label: '${stats.streak} hari streak',
-                          tabular: true,
-                          backgroundColor: stats.streak > 0
-                              ? theme.colorScheme.tertiaryContainer
-                              : theme.colorScheme.surfaceContainerHighest,
-                          foregroundColor: stats.streak > 0
-                              ? theme.colorScheme.onTertiaryContainer
-                              : theme.colorScheme.onSurfaceVariant,
-                        ),
-                        if (isGoalReached)
-                          _BadgePill(
-                            icon: Icons.check_circle_outline_rounded,
-                            label: 'Tercapai',
-                            backgroundColor:
-                                theme.colorScheme.primaryContainer,
-                            foregroundColor:
-                                theme.colorScheme.onPrimaryContainer,
-                          ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-              IconButton(
-                tooltip: 'Hapus habit',
-                onPressed: onDelete,
-                icon: const Icon(Icons.delete_outline_rounded, size: 18),
-              ),
-            ],
-          ),
-          const SizedBox(height: 14),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(8),
-            child: LinearProgressIndicator(
-              value: progress,
-              minHeight: 8,
-            ),
-          ),
-          const SizedBox(height: 12),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                'Hari ini: ${stats.todayCount} / ${habit.targetPerDay}',
-                style: HubTypography.tabular(
-                  theme.textTheme.bodyMedium?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
-                    fontWeight: FontWeight.w600,
-                  ) ?? const TextStyle(),
-                ),
-              ),
-              Row(
-                children: [
-                  IconButton.outlined(
-                    tooltip: 'Kurangi hitungan',
-                    onPressed: stats.todayCount > 0 ? onDecrement : null,
-                    icon: const Icon(Icons.remove_rounded, size: 16),
-                  ),
-                  const SizedBox(width: 8),
-                  FilledButton.tonalIcon(
-                    onPressed: onIncrement,
-                    style: FilledButton.styleFrom(
-                      minimumSize: const Size(0, 48),
-                    ),
-                    icon: const Icon(Icons.add_rounded, size: 16),
-                    label: const Text('Catat'),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _BadgePill extends StatelessWidget {
-  const _BadgePill({
-    this.icon,
-    required this.label,
-    required this.backgroundColor,
-    required this.foregroundColor,
-    this.tabular = false,
-  });
-
-  final IconData? icon;
-  final String label;
-  final Color backgroundColor;
-  final Color foregroundColor;
-  final bool tabular;
-
-  @override
-  Widget build(BuildContext context) {
-    final baseStyle = Theme.of(context).textTheme.labelMedium?.copyWith(
-          color: foregroundColor,
-          fontWeight: FontWeight.w600,
-        );
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-      decoration: BoxDecoration(
-        color: backgroundColor,
-        borderRadius: BorderRadius.circular(999),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          if (icon != null) ...[
-            Icon(icon, size: 14, color: foregroundColor),
-            const SizedBox(width: 4),
-          ],
-          Text(
-            label,
-            style: tabular && baseStyle != null
-                ? HubTypography.tabular(baseStyle)
-                : baseStyle,
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _EmptyStateView extends StatelessWidget {
-  const _EmptyStateView({
-    required this.icon,
-    required this.title,
-    required this.subtitle,
-    required this.actionLabel,
-    required this.onAction,
-  });
-
-  final IconData icon;
-  final String title;
-  final String subtitle;
-  final String actionLabel;
-  final VoidCallback onAction;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            CircleAvatar(
-              radius: 32,
-              backgroundColor: theme.colorScheme.primaryContainer,
-              foregroundColor: theme.colorScheme.onPrimaryContainer,
-              child: Icon(icon, size: 32),
-            ),
-            const SizedBox(height: 16),
-            Text(
-              title,
-              style: theme.textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.w700,
-              ),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 8),
-            Text(
-              subtitle,
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
-              ),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 20),
-            FilledButton.icon(
-              onPressed: onAction,
-              icon: const Icon(Icons.add_rounded),
-              label: Text(actionLabel),
-            ),
-          ],
-        ),
-      ),
     );
   }
 }

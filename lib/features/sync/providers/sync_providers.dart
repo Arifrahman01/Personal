@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:personal_hub/core/database/app_database.dart';
+import 'package:personal_hub/core/errors/app_exceptions.dart';
 import 'package:personal_hub/features/finance/providers/finance_providers.dart';
 import 'package:personal_hub/features/meetings/providers/meetings_providers.dart';
 import 'package:personal_hub/features/notes/providers/notes_providers.dart';
@@ -142,37 +143,16 @@ class SyncNotifier extends AsyncNotifier<SyncState> {
     }
   }
 
-  /// Triggers an immediate export cycle of pending changes using [passphrase],
-  /// updating [lastSyncTime] and clearing exported deltas.
+  /// Cloud HTTP/WebDAV transport is not implemented yet. Fails honestly rather
+  /// than silently discarding pending deltas and claiming success.
   Future<void> syncNow({required String passphrase}) async {
     final current = state.value ?? const SyncState();
-    state = AsyncData(current.copyWith(isSyncing: true, clearError: true));
-
-    try {
-      final engine = ref.read(syncEngineProvider);
-      await engine.createSyncBundle(
-        passphrase: passphrase,
-        clearPendingAfter: true,
-      );
-
-      await refreshPendingCount();
-
-      state = AsyncData(
-        current.copyWith(
-          isSyncing: false,
-          lastSyncTime: DateTime.now().toUtc(),
-          pendingCount: 0,
-        ),
-      );
-    } catch (e) {
-      state = AsyncData(
-        current.copyWith(
-          isSyncing: false,
-          errorMessage: e.toString(),
-        ),
-      );
-      rethrow;
-    }
+    const message =
+        'Transport sinkronisasi cloud belum tersedia. Gunakan Ekspor/Impor Backup (.phub).';
+    state = AsyncData(
+      current.copyWith(isSyncing: false, errorMessage: message),
+    );
+    throw const SyncException(message);
   }
 
   /// Convenience method to sync with optional or empty passphrase.

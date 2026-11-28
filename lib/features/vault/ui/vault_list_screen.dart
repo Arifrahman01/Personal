@@ -1,13 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:personal_hub/app.dart';
-import 'package:personal_hub/core/errors/app_exceptions.dart';
 import 'package:personal_hub/core/theme/app_tokens.dart';
 import 'package:personal_hub/core/theme/hub_widgets.dart';
 import 'package:personal_hub/features/settings/ui/pages/security_vault_settings_page.dart';
 import 'package:personal_hub/features/vault/models/vault_entry.dart';
 import 'package:personal_hub/features/vault/providers/vault_providers.dart';
-import 'package:personal_hub/features/vault/services/password_generator.dart';
+import 'package:personal_hub/features/vault/ui/widgets/vault_account_detail_sheet.dart';
+import 'package:personal_hub/features/vault/ui/widgets/vault_compact_card.dart';
+import 'package:personal_hub/features/vault/ui/widgets/vault_entry_form_sheet.dart';
 
 /// Unlocked password vault screen with category filtering, 1-tap copy,
 /// account detail sheet, and security settings.
@@ -33,66 +34,6 @@ class _VaultListScreenState extends ConsumerState<VaultListScreen> {
   void dispose() {
     _searchController.dispose();
     super.dispose();
-  }
-
-  static String resolveEntryCategory(VaultEntry entry) {
-    final combined =
-        '${entry.title} ${entry.url} ${entry.username} ${entry.notes}'
-            .toLowerCase();
-
-    if (combined.contains('bank') ||
-        combined.contains('bca') ||
-        combined.contains('mandiri') ||
-        combined.contains('paypal') ||
-        combined.contains('crypto') ||
-        combined.contains('finance') ||
-        combined.contains('wallet') ||
-        combined.contains('kartu') ||
-        combined.contains('bni') ||
-        combined.contains('bri') ||
-        combined.contains('jenius') ||
-        combined.contains('jago') ||
-        combined.contains('ovo') ||
-        combined.contains('gopay') ||
-        combined.contains('dana') ||
-        combined.contains('bibit') ||
-        combined.contains('ajaib') ||
-        combined.contains('saham')) {
-      return 'Keuangan';
-    }
-
-    if (combined.contains('google') ||
-        combined.contains('github') ||
-        combined.contains('work') ||
-        combined.contains('slack') ||
-        combined.contains('jira') ||
-        combined.contains('office') ||
-        combined.contains('gitlab') ||
-        combined.contains('dev') ||
-        combined.contains('aws') ||
-        combined.contains('cloud') ||
-        combined.contains('trello') ||
-        combined.contains('zoom') ||
-        combined.contains('teams') ||
-        combined.contains('linkedin') ||
-        combined.contains('kerja')) {
-      return 'Kerja';
-    }
-
-    return 'Pribadi';
-  }
-
-  static Color getCategoryColor(String category, BuildContext context) {
-    final colors = HubColors.of(context);
-    switch (category) {
-      case 'Kerja':
-        return colors.info;
-      case 'Keuangan':
-        return colors.primary;
-      case 'Pribadi':
-      default:
-        return Theme.of(context).colorScheme.tertiary;
-    }
   }
 
   Future<void> _copyWithGuard(String secret, {required String label}) async {
@@ -127,7 +68,7 @@ class _VaultListScreenState extends ConsumerState<VaultListScreen> {
       useSafeArea: true,
       showDragHandle: true,
       builder: (sheetContext) {
-        return _VaultEntryFormSheet(existing: existing);
+        return VaultEntryFormSheet(existing: existing);
       },
     );
   }
@@ -139,7 +80,7 @@ class _VaultListScreenState extends ConsumerState<VaultListScreen> {
       useSafeArea: true,
       showDragHandle: true,
       builder: (sheetContext) {
-        return _VaultAccountDetailSheet(
+        return VaultAccountDetailSheet(
           entry: entry,
           onCopyPassword: () => _copyWithGuard(
             entry.password,
@@ -220,33 +161,56 @@ class _VaultListScreenState extends ConsumerState<VaultListScreen> {
     final isDecoy = vaultLock.isDecoyMode;
     final primary = AppTokens.primary(context);
 
-    return Scaffold(
-      backgroundColor: AppTokens.canvas(context),
-      appBar: AppBar(
-        title: const Text('Brankas Kata Sandi'),
-        backgroundColor: AppTokens.canvas(context),
-        centerTitle: false,
-        elevation: 0,
-        actions: [
-          IconButton(
-            tooltip: 'AI Copilot',
-            icon: const Icon(Icons.auto_awesome_outlined),
-            onPressed: () => MainNavigationShell.openAiChat(context),
+    return LuxeAmbientBackground(
+      child: Scaffold(
+        backgroundColor: Colors.transparent,
+        appBar: AppBar(
+          title: Row(
+            children: [
+              LuxeIconMedallion(
+                icon: Icons.verified_user_rounded,
+                color: primary,
+                size: 34,
+                iconSize: 18,
+                borderRadius: 10,
+              ),
+              const SizedBox(width: 10),
+              const Expanded(
+                child: Text(
+                  'Brankas Kata Sandi',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(fontWeight: FontWeight.w800),
+                ),
+              ),
+            ],
           ),
-          IconButton(
-            tooltip: 'Pengaturan Brankas & Duress PIN',
-            icon: const Icon(Icons.verified_user_outlined),
-            onPressed: _openSecuritySettings,
-          ),
-          IconButton(
-            tooltip: 'Kunci brankas sekarang',
-            icon: const Icon(Icons.lock_outline_rounded),
-            onPressed: () {
-              ref.read(vaultLockControllerProvider).lock();
-            },
-          ),
-        ],
-      ),
+          backgroundColor: Colors.transparent,
+          centerTitle: false,
+          elevation: 0,
+          actions: [
+            LuxeHeaderIconButton(
+              tooltip: 'AI Copilot',
+              icon: Icons.auto_awesome_rounded,
+              accentColor: HubColors.of(context).accentAi,
+              onPressed: () => MainNavigationShell.openAiChat(context),
+            ),
+            LuxeHeaderIconButton(
+              tooltip: 'Pengaturan Brankas & Duress PIN',
+              icon: Icons.verified_user_outlined,
+              onPressed: _openSecuritySettings,
+            ),
+            LuxeHeaderIconButton(
+              tooltip: 'Kunci brankas sekarang',
+              icon: Icons.lock_outline_rounded,
+              accentColor: HubColors.of(context).accentGold,
+              onPressed: () {
+                ref.read(vaultLockControllerProvider).lock();
+              },
+            ),
+            const SizedBox(width: 4),
+          ],
+        ),
       floatingActionButton: FloatingActionButton.extended(
         icon: const Icon(Icons.add_rounded, size: 20),
         label: const Text(
@@ -412,7 +376,11 @@ class _VaultListScreenState extends ConsumerState<VaultListScreen> {
                   final entries = _selectedCategory == 'Semua'
                       ? allEntries
                       : allEntries
-                          .where((e) => resolveEntryCategory(e) == _selectedCategory)
+                          .where(
+                            (e) =>
+                                resolveVaultEntryCategory(e) ==
+                                _selectedCategory,
+                          )
                           .toList();
 
                   if (entries.isEmpty) {
@@ -470,10 +438,10 @@ class _VaultListScreenState extends ConsumerState<VaultListScreen> {
                     separatorBuilder: (_, _) => const SizedBox(height: 10),
                     itemBuilder: (context, index) {
                       final entry = entries[index];
-                      final category = resolveEntryCategory(entry);
-                      final catColor = getCategoryColor(category, context);
+                      final category = resolveVaultEntryCategory(entry);
+                      final catColor = getVaultCategoryColor(category, context);
 
-                      return _VaultCompactCard(
+                      return VaultCompactCard(
                         entry: entry,
                         category: category,
                         categoryColor: catColor,
@@ -491,697 +459,7 @@ class _VaultListScreenState extends ConsumerState<VaultListScreen> {
           ],
         ),
       ),
-    );
-  }
-}
-
-/// Compact tactile Vault Account Card with 1 main copy button (48x48dp).
-class _VaultCompactCard extends StatelessWidget {
-  const _VaultCompactCard({
-    required this.entry,
-    required this.category,
-    required this.categoryColor,
-    required this.onTap,
-    required this.onCopyPassword,
-  });
-
-  final VaultEntry entry;
-  final String category;
-  final Color categoryColor;
-  final VoidCallback onTap;
-  final VoidCallback onCopyPassword;
-
-  @override
-  Widget build(BuildContext context) {
-    final initial = entry.title.trim().isNotEmpty
-        ? entry.title.trim().characters.first.toUpperCase()
-        : '?';
-
-    return HubCard(
-      padding: const EdgeInsets.all(12),
-      onTap: onTap,
-      child: Row(
-        children: [
-          // Initial Avatar
-          CircleAvatar(
-            radius: 20,
-            backgroundColor: categoryColor.withValues(alpha: 0.15),
-            foregroundColor: categoryColor,
-            child: Text(
-              initial,
-              style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 16),
-            ),
-          ),
-          const SizedBox(width: 12),
-
-          // Title & Username
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Row(
-                  children: [
-                    Flexible(
-                      child: Text(
-                        entry.title,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          fontWeight: FontWeight.w700,
-                          fontSize: 15,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 6),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: categoryColor.withValues(alpha: 0.12),
-                        borderRadius: HubRadius.rPill,
-                      ),
-                      child: Text(
-                        category,
-                        style: TextStyle(
-                          fontSize: 10,
-                          fontWeight: FontWeight.w700,
-                          color: categoryColor,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 3),
-                Text(
-                  entry.username.isNotEmpty ? entry.username : '••••••••••••',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: AppTokens.textSecondary(context),
-                  ),
-                ),
-              ],
-            ),
-          ),
-
-          // 1 Main Action Button: Salin Sandi (48x48dp)
-          IconButton(
-            constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
-            tooltip: 'Salin kata sandi',
-            icon: const Icon(Icons.copy_rounded, size: 20),
-            color: AppTokens.primary(context),
-            onPressed: onCopyPassword,
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-/// Detail Sheet Akun: displays full details, temporary password reveal,
-/// copy actions, edit and delete options.
-class _VaultAccountDetailSheet extends StatefulWidget {
-  const _VaultAccountDetailSheet({
-    required this.entry,
-    required this.onCopyPassword,
-    this.onCopyUsername,
-    this.onCopyUrl,
-    required this.onEdit,
-    required this.onDelete,
-  });
-
-  final VaultEntry entry;
-  final VoidCallback onCopyPassword;
-  final VoidCallback? onCopyUsername;
-  final VoidCallback? onCopyUrl;
-  final VoidCallback onEdit;
-  final VoidCallback onDelete;
-
-  @override
-  State<_VaultAccountDetailSheet> createState() =>
-      _VaultAccountDetailSheetState();
-}
-
-class _VaultAccountDetailSheetState extends State<_VaultAccountDetailSheet> {
-  bool _isPasswordRevealed = false;
-
-  @override
-  Widget build(BuildContext context) {
-    final entry = widget.entry;
-    final category = _VaultListScreenState.resolveEntryCategory(entry);
-    final catColor = _VaultListScreenState.getCategoryColor(category, context);
-    final colors = HubColors.of(context);
-    final colorScheme = Theme.of(context).colorScheme;
-    final primary = colors.primary;
-
-    return SafeArea(
-      top: false,
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(
-          HubSpacing.xl,
-          HubSpacing.xs,
-          HubSpacing.xl,
-          HubSpacing.xxl,
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-          // Header
-          Row(
-            children: [
-              CircleAvatar(
-                radius: 22,
-                backgroundColor: catColor.withValues(alpha: 0.15),
-                foregroundColor: catColor,
-                child: Text(
-                  entry.title.isNotEmpty
-                      ? entry.title.characters.first.toUpperCase()
-                      : '?',
-                  style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 18),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      entry.title,
-                      style: const TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      category,
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        color: catColor,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              IconButton(
-                tooltip: 'Tutup',
-                icon: const Icon(Icons.close_rounded, size: 20),
-                onPressed: () => Navigator.of(context).pop(),
-              ),
-            ],
-          ),
-          const SizedBox(height: 20),
-
-          // Username Field
-          if (entry.username.isNotEmpty) ...[
-            Text(
-              'Username / Email',
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-                color: AppTokens.textSecondary(context),
-              ),
-            ),
-            const SizedBox(height: 6),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-              decoration: BoxDecoration(
-                color: AppTokens.canvas(context),
-                borderRadius: HubRadius.rSm,
-                border: Border.all(color: AppTokens.border(context)),
-              ),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: SelectableText(
-                      entry.username,
-                      style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
-                    ),
-                  ),
-                  if (widget.onCopyUsername != null)
-                    IconButton(
-                      tooltip: 'Salin username',
-                      constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
-                      icon: const Icon(Icons.copy_rounded, size: 18),
-                      onPressed: widget.onCopyUsername,
-                    ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 14),
-          ],
-
-          // Password Field
-          Text(
-            'Kata Sandi',
-            style: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-              color: AppTokens.textSecondary(context),
-            ),
-          ),
-          const SizedBox(height: 6),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-            decoration: BoxDecoration(
-              color: AppTokens.canvas(context),
-              borderRadius: HubRadius.rSm,
-              border: Border.all(color: AppTokens.border(context)),
-            ),
-            child: Row(
-              children: [
-                Expanded(
-                  child: SelectableText(
-                    _isPasswordRevealed ? entry.password : '••••••••••••',
-                    style: TextStyle(
-                      fontFamily: 'monospace',
-                      fontSize: 15,
-                      letterSpacing: _isPasswordRevealed ? 0.5 : 2.5,
-                      fontWeight:
-                          _isPasswordRevealed ? FontWeight.w600 : FontWeight.w400,
-                      color: _isPasswordRevealed ? primary : null,
-                    ),
-                  ),
-                ),
-                IconButton(
-                  tooltip: _isPasswordRevealed ? 'Sembunyikan sandi' : 'Tampilkan sandi',
-                  constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
-                  icon: Icon(
-                    _isPasswordRevealed
-                        ? Icons.visibility_off_outlined
-                        : Icons.visibility_outlined,
-                    size: 18,
-                  ),
-                  onPressed: () {
-                    setState(() {
-                      _isPasswordRevealed = !_isPasswordRevealed;
-                    });
-                  },
-                ),
-                IconButton(
-                  tooltip: 'Salin kata sandi',
-                  constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
-                  icon: const Icon(Icons.copy_rounded, size: 18),
-                  onPressed: widget.onCopyPassword,
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 14),
-
-          // URL Field
-          if (entry.url.isNotEmpty) ...[
-            Text(
-              'Alamat Website / URL',
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-                color: AppTokens.textSecondary(context),
-              ),
-            ),
-            const SizedBox(height: 6),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-              decoration: BoxDecoration(
-                color: AppTokens.canvas(context),
-                borderRadius: HubRadius.rSm,
-                border: Border.all(color: AppTokens.border(context)),
-              ),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: SelectableText(
-                      entry.url,
-                      maxLines: 1,
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: AppTokens.info(context),
-                      ),
-                    ),
-                  ),
-                  if (widget.onCopyUrl != null)
-                    IconButton(
-                      tooltip: 'Salin URL',
-                      constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
-                      icon: const Icon(Icons.copy_rounded, size: 18),
-                      onPressed: widget.onCopyUrl,
-                    ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 14),
-          ],
-
-          // Notes Field
-          if (entry.notes.isNotEmpty) ...[
-            Text(
-              'Catatan Tambahan',
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-                color: AppTokens.textSecondary(context),
-              ),
-            ),
-            const SizedBox(height: 6),
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-              decoration: BoxDecoration(
-                color: AppTokens.canvas(context),
-                borderRadius: HubRadius.rSm,
-                border: Border.all(color: AppTokens.border(context)),
-              ),
-              child: SelectableText(
-                entry.notes,
-                style: const TextStyle(fontSize: 13, height: 1.35),
-              ),
-            ),
-            const SizedBox(height: 18),
-          ],
-
-          // Action Buttons: Edit and Delete
-          Row(
-            children: [
-              Expanded(
-                child: OutlinedButton.icon(
-                  style: OutlinedButton.styleFrom(
-                    minimumSize: const Size.fromHeight(46),
-                    shape: RoundedRectangleBorder(borderRadius: HubRadius.rSm),
-                  ),
-                  icon: const Icon(Icons.edit_rounded, size: 16),
-                  label: const Text('Edit Akun'),
-                  onPressed: widget.onEdit,
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: FilledButton.icon(
-                  style: FilledButton.styleFrom(
-                    backgroundColor: colorScheme.error,
-                    foregroundColor: colorScheme.onError,
-                    minimumSize: const Size.fromHeight(48),
-                    shape: RoundedRectangleBorder(borderRadius: HubRadius.rSm),
-                  ),
-                  icon: const Icon(Icons.delete_outline_rounded, size: 16),
-                  label: const Text('Hapus Akun'),
-                  onPressed: widget.onDelete,
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-      ),
-    );
-  }
-}
-
-/// Form sheet for creating or updating a VaultEntry.
-class _VaultEntryFormSheet extends ConsumerStatefulWidget {
-  const _VaultEntryFormSheet({this.existing});
-
-  final VaultEntry? existing;
-
-  @override
-  ConsumerState<_VaultEntryFormSheet> createState() =>
-      _VaultEntryFormSheetState();
-}
-
-class _VaultEntryFormSheetState extends ConsumerState<_VaultEntryFormSheet> {
-  final _formKey = GlobalKey<FormState>();
-  late final TextEditingController _titleController;
-  late final TextEditingController _usernameController;
-  late final TextEditingController _passwordController;
-  late final TextEditingController _urlController;
-  late final TextEditingController _notesController;
-
-  bool _obscurePassword = true;
-  bool _isSaving = false;
-  String? _errorMessage;
-
-  @override
-  void initState() {
-    super.initState();
-    _titleController =
-        TextEditingController(text: widget.existing?.title ?? '');
-    _usernameController =
-        TextEditingController(text: widget.existing?.username ?? '');
-    _passwordController =
-        TextEditingController(text: widget.existing?.password ?? '');
-    _urlController = TextEditingController(text: widget.existing?.url ?? '');
-    _notesController =
-        TextEditingController(text: widget.existing?.notes ?? '');
-  }
-
-  @override
-  void dispose() {
-    _titleController.dispose();
-    _usernameController.dispose();
-    _passwordController.dispose();
-    _urlController.dispose();
-    _notesController.dispose();
-    super.dispose();
-  }
-
-  void _generatePassword() {
-    final generated = PasswordGenerator.generate(
-      length: 16,
-      upper: true,
-      lower: true,
-      digits: true,
-      symbols: true,
-    );
-    setState(() {
-      _passwordController.text = generated;
-      _obscurePassword = false;
-    });
-  }
-
-  Future<void> _handleSave() async {
-    if (!_formKey.currentState!.validate()) return;
-
-    setState(() {
-      _isSaving = true;
-      _errorMessage = null;
-    });
-
-    try {
-      final notifier = ref.read(vaultEntriesProvider.notifier);
-      if (widget.existing != null) {
-        await notifier.updateEntry(
-          widget.existing!.copyWith(
-            title: _titleController.text.trim(),
-            username: _usernameController.text.trim(),
-            password: _passwordController.text,
-            url: _urlController.text.trim(),
-            notes: _notesController.text.trim(),
-          ),
-        );
-      } else {
-        await notifier.createEntry(
-          title: _titleController.text.trim(),
-          username: _usernameController.text.trim(),
-          password: _passwordController.text,
-          url: _urlController.text.trim(),
-          notes: _notesController.text.trim(),
-        );
-      }
-
-      if (mounted) {
-        Navigator.of(context).pop();
-      }
-    } on ValidationException catch (e) {
-      if (mounted) {
-        setState(() {
-          _errorMessage = e.message;
-        });
-      }
-    } catch (_) {
-      if (mounted) {
-        setState(() {
-          _errorMessage = 'Gagal menyimpan entri brankas. Coba lagi.';
-        });
-      }
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isSaving = false;
-        });
-      }
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final isEditing = widget.existing != null;
-    final colorScheme = Theme.of(context).colorScheme;
-    final primary = AppTokens.primary(context);
-
-    return SafeArea(
-      top: false,
-      child: Padding(
-        padding: EdgeInsets.only(
-          bottom: MediaQuery.viewInsetsOf(context).bottom,
-          left: HubSpacing.xl,
-          right: HubSpacing.xl,
-          top: HubSpacing.xs,
-        ),
-        child: Form(
-          key: _formKey,
-          child: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-              Row(
-                children: [
-                  Icon(
-                    isEditing
-                        ? Icons.edit_rounded
-                        : Icons.add_circle_outline_rounded,
-                    size: 22,
-                    color: primary,
-                  ),
-                  const SizedBox(width: 10),
-                  Text(
-                    isEditing ? 'Edit Akun' : 'Tambah Akun Baru',
-                    style: const TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16),
-              TextFormField(
-                controller: _titleController,
-                decoration: const InputDecoration(
-                  labelText: 'Judul Akun *',
-                  hintText: 'Misal: GitHub, Email Kantor, dsb.',
-                  prefixIcon: Icon(Icons.label_outline_rounded),
-                ),
-                validator: (val) {
-                  if (val == null || val.trim().isEmpty) {
-                    return 'Judul akun tidak boleh kosong.';
-                  }
-                  return null;
-                },
-              ),
-              const SizedBox(height: 12),
-              TextFormField(
-                controller: _usernameController,
-                decoration: const InputDecoration(
-                  labelText: 'Username / Email',
-                  hintText: 'user@example.com',
-                  prefixIcon: Icon(Icons.person_outline_rounded),
-                ),
-              ),
-              const SizedBox(height: 12),
-              TextFormField(
-                controller: _passwordController,
-                obscureText: _obscurePassword,
-                decoration: InputDecoration(
-                  labelText: 'Kata Sandi *',
-                  hintText: 'Sandi rahasia',
-                  prefixIcon: const Icon(Icons.lock_outline_rounded),
-                  suffixIcon: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      IconButton(
-                        tooltip: 'Buat sandi acak kuat',
-                        icon: const Icon(Icons.auto_awesome_rounded, size: 18),
-                        onPressed: _generatePassword,
-                      ),
-                      IconButton(
-                        tooltip: _obscurePassword
-                            ? 'Tampilkan sandi'
-                            : 'Sembunyikan sandi',
-                        icon: Icon(
-                          _obscurePassword
-                              ? Icons.visibility_outlined
-                              : Icons.visibility_off_outlined,
-                          size: 18,
-                        ),
-                        onPressed: () {
-                          setState(() {
-                            _obscurePassword = !_obscurePassword;
-                          });
-                        },
-                      ),
-                    ],
-                  ),
-                ),
-                validator: (val) {
-                  if (val == null || val.isEmpty) {
-                    return 'Kata sandi tidak boleh kosong.';
-                  }
-                  return null;
-                },
-              ),
-              const SizedBox(height: 12),
-              TextFormField(
-                controller: _urlController,
-                keyboardType: TextInputType.url,
-                decoration: const InputDecoration(
-                  labelText: 'Alamat Website / URL',
-                  hintText: 'https://...',
-                  prefixIcon: Icon(Icons.language_rounded),
-                ),
-              ),
-              const SizedBox(height: 12),
-              TextFormField(
-                controller: _notesController,
-                maxLines: 2,
-                decoration: const InputDecoration(
-                  labelText: 'Catatan (Opsional)',
-                  hintText: 'Pertanyaan keamanan, nomor pemulihan, dsb.',
-                  prefixIcon: Icon(Icons.description_outlined),
-                ),
-              ),
-              if (_errorMessage != null) ...[
-                const SizedBox(height: 12),
-                Text(
-                  _errorMessage!,
-                  style: TextStyle(
-                    color: AppTokens.error(context),
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ],
-              const SizedBox(height: 20),
-              FilledButton.icon(
-                style: FilledButton.styleFrom(
-                  backgroundColor: colorScheme.primary,
-                  foregroundColor: colorScheme.onPrimary,
-                  minimumSize: const Size.fromHeight(48),
-                  shape: RoundedRectangleBorder(borderRadius: HubRadius.rSm),
-                ),
-                onPressed: _isSaving ? null : _handleSave,
-                icon: _isSaving
-                    ? SizedBox(
-                        width: 18,
-                        height: 18,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: colorScheme.onPrimary,
-                        ),
-                      )
-                    : const Icon(Icons.check_rounded, size: 18),
-                label: Text(
-                  isEditing ? 'Simpan Perubahan' : 'Simpan ke Brankas',
-                  style: const TextStyle(fontWeight: FontWeight.w700),
-                ),
-              ),
-              const SizedBox(height: 16),
-            ],
-          ),
-        ),
-      ),
-      ),
+    ),
     );
   }
 }

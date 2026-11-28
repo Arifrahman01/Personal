@@ -8,46 +8,54 @@ import 'package:personal_hub/features/vault/providers/vault_lock_controller.dart
 import 'package:personal_hub/features/vault/services/clipboard_guard.dart';
 import 'package:personal_hub/features/vault/services/vault_crypto_service.dart';
 
-/// Static realistic decoy entries shown when the vault is unlocked in decoy mode (via Duress PIN).
-final List<VaultEntry> decoyVaultEntries = [
-  VaultEntry(
-    id: 'decoy-1',
-    title: 'Wi-Fi Tamu',
-    username: 'Tamu-Rumah-5G',
-    password: 'KopiHangatPagi123!',
-    url: '',
-    notes: 'Koneksi Wi-Fi ruang tamu',
-    createdAt: DateTime.utc(2025, 1, 1),
-    updatedAt: DateTime.utc(2025, 1, 1),
-  ),
-  VaultEntry(
-    id: 'decoy-2',
-    title: 'Akun Media Sosial Baca',
-    username: 'bacaan_harian',
-    password: 'AmanSandi@2025',
-    url: 'https://instagram.com',
-    notes: 'Akun publik untuk browsing artikel dan buku',
-    createdAt: DateTime.utc(2025, 2, 1),
-    updatedAt: DateTime.utc(2025, 2, 1),
-  ),
-  VaultEntry(
-    id: 'decoy-3',
-    title: 'Wi-Fi Kafe Langganan',
-    username: 'KopiSantai_Guest',
-    password: 'ManualBrew2025!',
-    url: '',
-    notes: 'Password Wi-Fi kafe sudut jalan',
-    createdAt: DateTime.utc(2025, 2, 15),
-    updatedAt: DateTime.utc(2025, 2, 15),
-  ),
-];
+/// Generates realistic decoy entries with recent timestamps when the vault is
+/// unlocked in decoy mode (via Duress PIN).
+List<VaultEntry> createDefaultDecoyEntries([DateTime? nowUtc]) {
+  final now = (nowUtc ?? DateTime.now()).toUtc();
+  return [
+    VaultEntry(
+      id: 'decoy-1',
+      title: 'Wi-Fi Tamu',
+      username: 'Tamu-Rumah-5G',
+      password: 'KopiHangatPagi123!',
+      url: '',
+      notes: 'Koneksi Wi-Fi ruang tamu',
+      createdAt: now.subtract(const Duration(days: 45)),
+      updatedAt: now.subtract(const Duration(days: 12)),
+    ),
+    VaultEntry(
+      id: 'decoy-2',
+      title: 'Akun Media Sosial Baca',
+      username: 'bacaan_harian',
+      password: 'AmanSandi@2025',
+      url: 'https://instagram.com',
+      notes: 'Akun publik untuk browsing artikel dan buku',
+      createdAt: now.subtract(const Duration(days: 30)),
+      updatedAt: now.subtract(const Duration(days: 7)),
+    ),
+    VaultEntry(
+      id: 'decoy-3',
+      title: 'Wi-Fi Kafe Langganan',
+      username: 'KopiSantai_Guest',
+      password: 'ManualBrew2025!',
+      url: '',
+      notes: 'Password Wi-Fi kafe sudut jalan',
+      createdAt: now.subtract(const Duration(days: 14)),
+      updatedAt: now.subtract(const Duration(days: 2)),
+    ),
+  ];
+}
 
-List<VaultEntry> filterDecoyEntries(String query) {
+List<VaultEntry> filterDecoyEntries(
+  String query, {
+  List<VaultEntry>? entries,
+}) {
+  final source = entries ?? createDefaultDecoyEntries();
   final q = query.trim().toLowerCase();
   if (q.isEmpty) {
-    return List.unmodifiable(decoyVaultEntries);
+    return List.unmodifiable(source);
   }
-  return decoyVaultEntries
+  return source
       .where(
         (e) =>
             e.title.toLowerCase().contains(q) ||
@@ -116,6 +124,41 @@ final vaultSearchQueryProvider =
       VaultSearchQueryNotifier.new,
     );
 
+class _VaultDecoySessionStore {
+  List<VaultEntry>? _entries;
+
+  List<VaultEntry> get entries =>
+      _entries ??= List<VaultEntry>.from(createDefaultDecoyEntries());
+
+  void clear() {
+    _entries = null;
+  }
+
+  void addEntry(VaultEntry entry) {
+    entries.add(entry);
+  }
+
+  void updateEntry(VaultEntry entry) {
+    final list = entries;
+    final idx = list.indexWhere((e) => e.id == entry.id);
+    if (idx >= 0) {
+      list[idx] = entry.copyWith(updatedAt: DateTime.now().toUtc());
+    }
+  }
+
+  void deleteEntry(String id) {
+    entries.removeWhere((e) => e.id == id);
+  }
+}
+
+final _vaultDecoySessionStoreProvider = Provider<_VaultDecoySessionStore>((
+  ref,
+) {
+  final store = _VaultDecoySessionStore();
+  ref.onDispose(store.clear);
+  return store;
+});
+
 /// Manages decrypted [VaultEntry] items while the vault is unlocked.
 class VaultEntriesNotifier extends AsyncNotifier<List<VaultEntry>> {
   VaultLockController? _subscribedLockController;
@@ -126,8 +169,12 @@ class VaultEntriesNotifier extends AsyncNotifier<List<VaultEntry>> {
     final lockController = _subscribedLockController;
     if (lockController == null) return;
     if (!lockController.isUnlocked) {
+      ref.read(_vaultDecoySessionStoreProvider).clear();
       state = const AsyncData([]);
     } else {
+      if (!lockController.isDecoyMode) {
+        ref.read(_vaultDecoySessionStoreProvider).clear();
+      }
       ref.invalidateSelf();
     }
   }
@@ -169,7 +216,8 @@ class VaultEntriesNotifier extends AsyncNotifier<List<VaultEntry>> {
 
     if (lockController.isDecoyMode) {
       final query = ref.watch(vaultSearchQueryProvider);
-      return filterDecoyEntries(query);
+      final decoyEntries = ref.read(_vaultDecoySessionStoreProvider).entries;
+      return filterDecoyEntries(query, entries: decoyEntries);
     }
 
     final query = ref.watch(vaultSearchQueryProvider);
@@ -186,23 +234,20 @@ class VaultEntriesNotifier extends AsyncNotifier<List<VaultEntry>> {
   Future<void> refresh() async {
     final lockController = ref.read(vaultLockControllerProvider);
     if (!lockController.isUnlocked) {
+      ref.read(_vaultDecoySessionStoreProvider).clear();
       state = const AsyncData([]);
       return;
     }
-    if (lockController.isDecoyMode) {
-      final query = ref.read(vaultSearchQueryProvider);
-      state = AsyncData(filterDecoyEntries(query));
-      return;
+    ref.invalidateSelf();
+    try {
+      await future;
+    } catch (_) {
+      // State already holds AsyncError when build() fails.
     }
-    state = const AsyncLoading();
-    state = await AsyncValue.guard(() async {
-      final query = ref.read(vaultSearchQueryProvider);
-      return ref.read(vaultRepositoryProvider).getEntries(query: query);
-    });
   }
 
   /// Encrypts and inserts a new vault entry, then refreshes the list.
-  /// In decoy mode, database write is prevented to maintain vault isolation.
+  /// In decoy mode, updates only ephemeral in-memory decoy entries without touching SQLite.
   Future<void> createEntry({
     required String title,
     required String username,
@@ -212,6 +257,20 @@ class VaultEntriesNotifier extends AsyncNotifier<List<VaultEntry>> {
   }) async {
     final lockController = ref.read(vaultLockControllerProvider);
     if (lockController.isDecoyMode) {
+      final now = DateTime.now().toUtc();
+      ref.read(_vaultDecoySessionStoreProvider).addEntry(
+            VaultEntry(
+              id: 'decoy-${now.microsecondsSinceEpoch}',
+              title: title.trim(),
+              username: username.trim(),
+              password: password,
+              url: url.trim(),
+              notes: notes,
+              createdAt: now,
+              updatedAt: now,
+            ),
+          );
+      await refresh();
       return;
     }
     await ref
@@ -227,10 +286,12 @@ class VaultEntriesNotifier extends AsyncNotifier<List<VaultEntry>> {
   }
 
   /// Encrypts and updates an existing vault entry, then refreshes the list.
-  /// In decoy mode, database write is prevented to maintain vault isolation.
+  /// In decoy mode, updates only ephemeral in-memory decoy entries without touching SQLite.
   Future<void> updateEntry(VaultEntry entry) async {
     final lockController = ref.read(vaultLockControllerProvider);
     if (lockController.isDecoyMode) {
+      ref.read(_vaultDecoySessionStoreProvider).updateEntry(entry);
+      await refresh();
       return;
     }
     await ref.read(vaultRepositoryProvider).updateEntry(entry);
@@ -238,10 +299,12 @@ class VaultEntriesNotifier extends AsyncNotifier<List<VaultEntry>> {
   }
 
   /// Deletes a vault entry by [id], then refreshes the list.
-  /// In decoy mode, database write is prevented to maintain vault isolation.
+  /// In decoy mode, updates only ephemeral in-memory decoy entries without touching SQLite.
   Future<void> deleteEntry(String id) async {
     final lockController = ref.read(vaultLockControllerProvider);
     if (lockController.isDecoyMode) {
+      ref.read(_vaultDecoySessionStoreProvider).deleteEntry(id);
+      await refresh();
       return;
     }
     await ref.read(vaultRepositoryProvider).deleteEntry(id);

@@ -66,30 +66,47 @@ class MonthSwitcherCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = HubColors.of(context);
     return HubCard(
+      borderRadius: HubRadius.rPill,
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       child: Row(
         children: [
           IconButton(
             tooltip: 'Bulan sebelumnya',
             onPressed: onPrevious,
-            icon: const Icon(Icons.chevron_left_rounded),
+            icon: Icon(Icons.chevron_left_rounded, color: colors.textPrimary),
           ),
           Expanded(
-            child: Text(
-              month.label,
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w700,
-                color: AppTokens.textPrimary(context),
-              ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  Icons.calendar_month_rounded,
+                  size: 16,
+                  color: colors.primary,
+                ),
+                const SizedBox(width: 8),
+                Flexible(
+                  child: Text(
+                    month.label,
+                    textAlign: TextAlign.center,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 15.5,
+                      fontWeight: FontWeight.w800,
+                      color: colors.textPrimary,
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
           IconButton(
             tooltip: 'Bulan berikutnya',
             onPressed: onNext,
-            icon: const Icon(Icons.chevron_right_rounded),
+            icon: Icon(Icons.chevron_right_rounded, color: colors.textPrimary),
           ),
         ],
       ),

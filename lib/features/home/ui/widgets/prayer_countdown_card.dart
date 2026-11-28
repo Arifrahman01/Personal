@@ -4,9 +4,9 @@ import 'package:personal_hub/core/theme/app_tokens.dart';
 import 'package:personal_hub/core/theme/hub_widgets.dart';
 import 'package:personal_hub/features/prayer/models/prayer_models.dart';
 
-/// Card displaying the upcoming prayer countdown with accurate interval ratio:
-/// `(now - prevPrayer) / (nextPrayer - prevPrayer)`.
-/// Built with Material 3 Icons and tactile hairline border.
+/// Celestial Next Prayer Hero Card for Sanctuary Luxe v4.0.
+/// Features time-of-day gradient sky, geometric vector art, glowing progress bar,
+/// and 5-prayer quick indicator bar.
 class PrayerCountdownCard extends StatelessWidget {
   const PrayerCountdownCard({
     super.key,
@@ -61,89 +61,187 @@ class PrayerCountdownCard extends StatelessWidget {
     return '$minutes mnt lagi';
   }
 
+  LinearGradient _skyGradientForPrayer(PrayerName? name) {
+    return switch (name) {
+      PrayerName.subuh => const LinearGradient(
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+        colors: [Color(0xFF0E1B3A), Color(0xFF0F3C4C), Color(0xFF0B5C54)],
+      ),
+      PrayerName.dzuhur => const LinearGradient(
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+        colors: [Color(0xFF064E3B), Color(0xFF0B6E5B), Color(0xFF145369)],
+      ),
+      PrayerName.ashar => const LinearGradient(
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+        colors: [Color(0xFF0D4D4A), Color(0xFF175E54), Color(0xFF704B17)],
+      ),
+      PrayerName.maghrib => const LinearGradient(
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+        colors: [Color(0xFF3A1536), Color(0xFF5D2340), Color(0xFF8C3C2A)],
+      ),
+      PrayerName.isya || null => const LinearGradient(
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+        colors: [Color(0xFF0B132B), Color(0xFF102A43), Color(0xFF0B4F46)],
+      ),
+    };
+  }
+
+  IconData _iconForPrayer(PrayerName? name) {
+    return switch (name) {
+      PrayerName.subuh => Icons.wb_twilight_rounded,
+      PrayerName.dzuhur => Icons.wb_sunny_rounded,
+      PrayerName.ashar => Icons.sunny_snowing,
+      PrayerName.maghrib => Icons.nights_stay_outlined,
+      PrayerName.isya || null => Icons.bedtime_rounded,
+    };
+  }
+
   @override
   Widget build(BuildContext context) {
     final ratio = _computeIntervalRatio();
     final timeFmt = DateFormat('HH:mm');
+    final colors = HubColors.of(context);
+    final skyGradient = _skyGradientForPrayer(nextPrayer?.name);
 
-    return HubCard(
+    return LuxeHeroCard(
       onTap: onTap,
-      padding: const EdgeInsets.all(16),
+      gradient: skyGradient,
+      glowColor: colors.primary,
+      padding: const EdgeInsets.all(18),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // Location and Hijri Date row
-          Row(
+          // Top Metadata & Countdown Pill
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            alignment: WrapAlignment.spaceBetween,
+            crossAxisAlignment: WrapCrossAlignment.center,
             children: [
-              Icon(
-                Icons.place_outlined,
-                size: 14,
-                color: AppTokens.textSecondary(context),
-              ),
-              const SizedBox(width: 6),
-              Expanded(
-                child: Text(
-                  '$cityName • $hijriDate',
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w500,
-                    color: AppTokens.textSecondary(context),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 5,
+                ),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.12),
+                  borderRadius: HubRadius.rPill,
+                  border: Border.all(
+                    color: Colors.white.withValues(alpha: 0.16),
                   ),
-                  overflow: TextOverflow.ellipsis,
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(
+                      Icons.place_rounded,
+                      size: 13,
+                      color: Color(0xFFF5C451),
+                    ),
+                    const SizedBox(width: 5),
+                    Flexible(
+                      child: Text(
+                        '$cityName • $hijriDate',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
               if (nextPrayer != null)
-                Flexible(
-                  flex: 0,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                    decoration: BoxDecoration(
-                      color: AppTokens.primary(context).withValues(alpha: 0.12),
-                      borderRadius: HubRadius.rPill,
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 5,
+                  ),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF5C451).withValues(alpha: 0.22),
+                    borderRadius: HubRadius.rPill,
+                    border: Border.all(
+                      color: const Color(0xFFF5C451).withValues(alpha: 0.55),
                     ),
-                    child: Text(
-                      _formatRemaining(nextPrayer!.remaining),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: HubTypography.tabular(
-                        TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                          color: AppTokens.primary(context),
-                        ),
+                  ),
+                  child: Text(
+                    _formatRemaining(nextPrayer!.remaining),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: HubTypography.tabular(
+                      const TextStyle(
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w800,
+                        color: Color(0xFFFDE68A),
                       ),
                     ),
                   ),
                 ),
             ],
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 16),
 
-          // Main Prayer Name and Big Time
+          // Main Prayer Name & Big Time
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            crossAxisAlignment: CrossAxisAlignment.baseline,
-            textBaseline: TextBaseline.alphabetic,
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               Expanded(
                 child: Row(
                   children: [
-                    Icon(
-                      Icons.wb_sunny_outlined,
-                      size: 22,
-                      color: AppTokens.primary(context),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        nextPrayer?.name.label ?? 'Sholat',
-                        style: TextStyle(
-                          fontSize: 22,
-                          fontWeight: FontWeight.w700,
-                          letterSpacing: -0.5,
-                          color: AppTokens.textPrimary(context),
+                    Container(
+                      width: 44,
+                      height: 44,
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.14),
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(
+                          color: Colors.white.withValues(alpha: 0.22),
                         ),
-                        overflow: TextOverflow.ellipsis,
+                      ),
+                      child: Icon(
+                        _iconForPrayer(nextPrayer?.name),
+                        size: 22,
+                        color: const Color(0xFFFDE68A),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'SHOLAT BERIKUTNYA',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w700,
+                              letterSpacing: 1.0,
+                              color: Colors.white.withValues(alpha: 0.72),
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            nextPrayer?.name.label ?? 'Sholat',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontSize: 23,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: -0.5,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ],
@@ -154,43 +252,53 @@ class PrayerCountdownCard extends StatelessWidget {
                 Text(
                   timeFmt.format(nextPrayer!.time),
                   style: HubTypography.tabular(
-                    TextStyle(
-                      fontSize: 26,
+                    const TextStyle(
+                      fontSize: 32,
                       fontWeight: FontWeight.w800,
-                      color: AppTokens.primary(context),
+                      letterSpacing: -0.8,
+                      color: Colors.white,
                     ),
                   ),
                 ),
             ],
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 16),
 
-          // Progress bar with accurate interval ratio
-          ClipRRect(
-            borderRadius: HubRadius.rPill,
-            child: LinearProgressIndicator(
-              value: ratio,
-              minHeight: 6,
-              backgroundColor: AppTokens.border(context),
-              valueColor: AlwaysStoppedAnimation<Color>(AppTokens.primary(context)),
+          // Glowing Progress Bar
+          LuxeGlowingProgressBar(
+            value: ratio,
+            height: 7,
+            trackColor: Colors.white.withValues(alpha: 0.16),
+            glowColor: const Color(0xFFF5C451),
+            gradient: const LinearGradient(
+              colors: [Color(0xFF34D399), Color(0xFFF5C451)],
             ),
           ),
           const SizedBox(height: 14),
 
-          // 5 Times Row
+          // 5 Times Row inside translucent dark pill bar
           if (prayerTimes != null)
-            Row(
-              children: [
-                for (final prayer in PrayerName.values) ...[
-                  Expanded(
-                    child: _PrayerMiniPill(
-                      name: prayer.label,
-                      time: timeFmt.format(prayerTimes!.timeFor(prayer)),
-                      isNext: nextPrayer?.name == prayer,
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
+              decoration: BoxDecoration(
+                color: Colors.black.withValues(alpha: 0.22),
+                borderRadius: HubRadius.rMd,
+                border: Border.all(
+                  color: Colors.white.withValues(alpha: 0.10),
+                ),
+              ),
+              child: Row(
+                children: [
+                  for (final prayer in PrayerName.values)
+                    Expanded(
+                      child: _PrayerMiniPill(
+                        name: prayer.label,
+                        time: timeFmt.format(prayerTimes!.timeFor(prayer)),
+                        isNext: nextPrayer?.name == prayer,
+                      ),
                     ),
-                  ),
                 ],
-              ],
+              ),
             ),
         ],
       ),
@@ -211,36 +319,48 @@ class _PrayerMiniPill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      children: [
-        Text(
-          name,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: TextStyle(
-            fontSize: 11,
-            fontWeight: isNext ? FontWeight.w700 : FontWeight.w500,
-            color: isNext
-                ? AppTokens.primary(context)
-                : AppTokens.textSecondary(context),
-          ),
-        ),
-        const SizedBox(height: 2),
-        Text(
-          time,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: HubTypography.tabular(
-            TextStyle(
-              fontSize: 11,
-              fontWeight: isNext ? FontWeight.w700 : FontWeight.w400,
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 5),
+      decoration: isNext
+          ? BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.18),
+              borderRadius: HubRadius.rSm,
+              border: Border.all(
+                color: const Color(0xFFF5C451).withValues(alpha: 0.55),
+              ),
+            )
+          : null,
+      child: Column(
+        children: [
+          Text(
+            name,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              fontSize: 10.5,
+              fontWeight: isNext ? FontWeight.w800 : FontWeight.w500,
               color: isNext
-                  ? AppTokens.primary(context)
-                  : AppTokens.textPrimary(context),
+                  ? const Color(0xFFFDE68A)
+                  : Colors.white.withValues(alpha: 0.72),
             ),
           ),
-        ),
-      ],
+          const SizedBox(height: 2),
+          Text(
+            time,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: HubTypography.tabular(
+              TextStyle(
+                fontSize: 11.5,
+                fontWeight: isNext ? FontWeight.w800 : FontWeight.w600,
+                color: isNext
+                    ? Colors.white
+                    : Colors.white.withValues(alpha: 0.90),
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

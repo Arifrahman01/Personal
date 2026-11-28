@@ -8,31 +8,37 @@ void main() {
       const light = HubColors.light;
       const dark = HubColors.dark;
 
-      expect(light.canvas, const Color(0xFFF6F7F9));
+      expect(light.canvas, const Color(0xFFF4F2ED));
       expect(light.surfaceCard, const Color(0xFFFFFFFF));
-      expect(light.surfaceSubtle, const Color(0xFFEEF1F4));
-      expect(light.borderHairline, const Color(0xFFE5E7EB));
-      expect(light.textPrimary, const Color(0xFF111827));
-      expect(light.textSecondary, const Color(0xFF4B5563));
-      expect(light.primary, const Color(0xFF0D6E66));
-      expect(light.primarySoft, const Color(0xFFE6F4F2));
+      expect(light.surfaceSubtle, const Color(0xFFECE9E2));
+      expect(light.surfaceElevated, const Color(0xFFFFFFFF));
+      expect(light.borderHairline, const Color(0xFFE2DDD3));
+      expect(light.textPrimary, const Color(0xFF0F172A));
+      expect(light.textSecondary, const Color(0xFF57534E));
+      expect(light.primary, const Color(0xFF0B6E5B));
+      expect(light.primarySoft, const Color(0xFFE1F5EF));
+      expect(light.accentGold, const Color(0xFFC98A1A));
+      expect(light.accentAi, const Color(0xFF5B5FEF));
       expect(light.success, const Color(0xFF15803D));
       expect(light.warning, const Color(0xFFB45309));
-      expect(light.danger, const Color(0xFFDC2626));
-      expect(light.info, const Color(0xFF1D4ED8));
+      expect(light.danger, const Color(0xFFE11D48));
+      expect(light.info, const Color(0xFF2563EB));
 
-      expect(dark.canvas, const Color(0xFF0D1117));
-      expect(dark.surfaceCard, const Color(0xFF161B22));
-      expect(dark.surfaceSubtle, const Color(0xFF1E2530));
-      expect(dark.borderHairline, const Color(0xFF2B3340));
-      expect(dark.textPrimary, const Color(0xFFF1F5F9));
+      expect(dark.canvas, const Color(0xFF07090F));
+      expect(dark.surfaceCard, const Color(0xFF101521));
+      expect(dark.surfaceSubtle, const Color(0xFF182032));
+      expect(dark.surfaceElevated, const Color(0xFF141B2B));
+      expect(dark.borderHairline, const Color(0xFF243047));
+      expect(dark.textPrimary, const Color(0xFFF8FAFC));
       expect(dark.textSecondary, const Color(0xFF94A3B8));
-      expect(dark.primary, const Color(0xFF2DD4BF));
-      expect(dark.primarySoft, const Color(0xFF123532));
+      expect(dark.primary, const Color(0xFF10D9A3));
+      expect(dark.primarySoft, const Color(0xFF0C2E29));
+      expect(dark.accentGold, const Color(0xFFF5C451));
+      expect(dark.accentAi, const Color(0xFF818CF8));
       expect(dark.success, const Color(0xFF34D399));
       expect(dark.warning, const Color(0xFFFBBF24));
-      expect(dark.danger, const Color(0xFFF87171));
-      expect(dark.info, const Color(0xFF60A5FA));
+      expect(dark.danger, const Color(0xFFFB7185));
+      expect(dark.info, const Color(0xFF38BDF8));
     });
 
     test('HubColors copyWith and lerp operate cleanly', () {

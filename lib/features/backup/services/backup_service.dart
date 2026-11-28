@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
+import 'package:personal_hub/core/config/secure_config_store.dart';
 import 'package:personal_hub/core/database/app_database.dart';
 import 'package:personal_hub/core/errors/app_exceptions.dart';
 import 'package:personal_hub/features/backup/services/backup_crypto_service.dart';
@@ -64,7 +65,12 @@ class BackupRestoreReport {
 
 /// Exports and restores passphrase-encrypted `.phub` snapshots across all 9 SQLite tables.
 class BackupService {
-  BackupService(this._db, this._vaultRepo, this._crypto);
+  BackupService(
+    this._db,
+    this._vaultRepo,
+    this._crypto, [
+    this._configStore,
+  ]);
 
   static const String _vaultEntriesKey = 'vault_entries';
 
@@ -146,13 +152,25 @@ class BackupService {
   final AppDatabase _db;
   final VaultRepository _vaultRepo;
   final BackupCryptoService _crypto;
+  final SecureConfigStore? _configStore;
 
   /// Exports all 9 SQLite tables (with Vault entries decrypted inside the encrypted payload)
   /// as `.phub` encrypted bytes protected by [passphrase].
+  ///
+  /// Throws [VaultDecryptionException] if the Vault has a configured PIN and its
+  /// master key is currently locked.
   Future<Uint8List> exportEncryptedBytes({required String passphrase}) async {
     if (passphrase.length < BackupCryptoService.minPassphraseLength) {
       throw const ValidationException(
         'Passphrase backup minimal harus 6 karakter.',
+      );
+    }
+
+    if (_configStore != null &&
+        await _configStore.hasPin() &&
+        !_configStore.hasUnlockedMasterKey) {
+      throw const VaultDecryptionException(
+        'Buka kunci Brankas terlebih dahulu untuk mengekspor cadangan terenkripsi.',
       );
     }
 
@@ -202,6 +220,27 @@ class BackupService {
     );
     final parsed = _parseAndValidateSnapshot(jsonString);
 
+    // Pre-encrypt all vault entries BEFORE modifying SQLite so an encryption
+    // or master-key failure can never leave the database partially restored or wiped.
+    final encryptedVaultRows = <Map<String, Object?>>[];
+    for (final vaultEntry in parsed.vaultEntries) {
+      encryptedVaultRows.add(
+        await _vaultRepo.encryptEntryForStorage(vaultEntry),
+      );
+    }
+
+    // Sanitize orphaned foreign-key references from legacy backups.
+    final restoredMeetingIds = parsed.nonVaultTables['meetings']!
+        .map((row) => row['id'])
+        .whereType<String>()
+        .toSet();
+    for (final taskRow in parsed.nonVaultTables['tasks']!) {
+      final sourceId = taskRow['source_meeting_id'];
+      if (sourceId is String && !restoredMeetingIds.contains(sourceId)) {
+        taskRow['source_meeting_id'] = null;
+      }
+    }
+
     await _db.db.transaction((txn) async {
       for (final table in _nonVaultTableColumns.keys) {
         await txn.delete(table);
@@ -217,11 +256,15 @@ class BackupService {
           );
         }
       }
-    });
 
-    for (final vaultEntry in parsed.vaultEntries) {
-      await _vaultRepo.upsertEntry(vaultEntry);
-    }
+      for (final vaultRow in encryptedVaultRows) {
+        await txn.insert(
+          'vault_items',
+          vaultRow,
+          conflictAlgorithm: ConflictAlgorithm.replace,
+        );
+      }
+    });
 
     return BackupRestoreReport(
       notesCount: parsed.nonVaultTables['notes']!.length,

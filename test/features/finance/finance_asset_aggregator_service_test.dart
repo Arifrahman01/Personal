@@ -123,6 +123,16 @@ void main() {
       final nisab = await service.getNisabThreshold();
       expect(nisab, 1450000.0 * 85.0); // 123,250,000 IDR
     });
+
+    test(
+      'updateFromRemoteFeed without priceOverride throws ValidationException instead of faking feed',
+      () async {
+        await expectLater(
+          service.updateFromRemoteFeed(),
+          throwsA(isA<ValidationException>()),
+        );
+      },
+    );
   });
 
   group('FinanceAssetAggregatorService - Liquid Balance Calculation', () {

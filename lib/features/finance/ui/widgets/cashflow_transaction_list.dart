@@ -191,17 +191,15 @@ class _TransactionTile extends StatelessWidget {
     final sign = isIncome ? '+' : '-';
 
     return HubCard(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
       child: Row(
         children: [
-          CircleAvatar(
-            radius: 18,
-            backgroundColor: color.withValues(alpha: 0.12),
-            foregroundColor: color,
-            child: Icon(
-              isIncome ? Icons.south_west_rounded : Icons.north_east_rounded,
-              size: 16,
-            ),
+          LuxeIconMedallion(
+            icon: isIncome ? Icons.south_west_rounded : Icons.north_east_rounded,
+            color: color,
+            size: 38,
+            iconSize: 17,
+            borderRadius: 11,
           ),
           const SizedBox(width: 12),
           Expanded(

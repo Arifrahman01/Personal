@@ -158,13 +158,13 @@ void main() {
           throwsA(isA<ValidationException>()),
         );
 
-        // Successfully configure duress pin
-        await controller.setupDuressPin('9999');
+        // Successfully configure duress pin (verified with primary PIN)
+        await controller.setupDuressPin('9999', currentPin: '1111');
         expect(await controller.hasDuressPin(), isTrue);
 
         // Rejects primary pin re-setup matching existing duress pin
         await expectLater(
-          controller.setupPin('9999'),
+          controller.setupPin('9999', currentPin: '1111'),
           throwsA(isA<ValidationException>()),
         );
 
@@ -313,6 +313,126 @@ void main() {
       await secondController.loadAutoLockTimeout();
       expect(secondController.autoLockTimeout, AutoLockTimeout.minutes5);
     });
+
+    test('enforces 4 to 8 digit PIN length bounds', () async {
+      final configStore = SecureConfigStore(_InMemorySecureStorage());
+      final controller = VaultLockController(
+        configStore,
+        VaultCryptoService(),
+        _FakeBiometricAdapter(),
+      );
+      addTearDown(controller.dispose);
+
+      await expectLater(
+        controller.setupPin('123'),
+        throwsA(isA<ValidationException>()),
+      );
+      await expectLater(
+        controller.setupPin('123456789'),
+        throwsA(isA<ValidationException>()),
+      );
+
+      await controller.setupPin('12345678');
+      expect(await controller.hasPin(), isTrue);
+      expect(await controller.unlockWithPin('12345678'), isTrue);
+    });
+
+    test(
+      'enforces persistent exponential lockout after 5 wrong PIN attempts across reloads',
+      () async {
+        var simulatedNow = DateTime.utc(2026, 6, 1, 12, 0, 0);
+        final configStore = SecureConfigStore(_InMemorySecureStorage());
+        final controller = VaultLockController(
+          configStore,
+          VaultCryptoService(),
+          _FakeBiometricAdapter(),
+          clock: () => simulatedNow,
+        );
+        addTearDown(controller.dispose);
+
+        await controller.setupPin('2468');
+        for (var i = 0; i < 5; i++) {
+          expect(await controller.unlockWithPin('0000'), isFalse);
+        }
+
+        expect(controller.failedAttempts, 5);
+        expect(controller.isLockedOut, isTrue);
+
+        // Reload in a brand new controller instance backed by the same storage
+        final reloaded = VaultLockController(
+          configStore,
+          VaultCryptoService(),
+          _FakeBiometricAdapter(),
+          clock: () => simulatedNow,
+        );
+        addTearDown(reloaded.dispose);
+        await reloaded.loadBruteforceState();
+
+        expect(reloaded.failedAttempts, 5);
+        expect(reloaded.isLockedOut, isTrue);
+        // Even correct PIN is rejected while locked out
+        expect(await reloaded.unlockWithPin('2468'), isFalse);
+
+        // Advance clock past 30s initial exponential lockout
+        simulatedNow = simulatedNow.add(const Duration(seconds: 31));
+        expect(reloaded.isLockedOut, isFalse);
+        expect(await reloaded.unlockWithPin('2468'), isTrue);
+        expect(reloaded.failedAttempts, 0);
+      },
+    );
+
+    test(
+      'prevents PIN change, Duress PIN setup, and Auto-Lock change while locked or in decoy without auth',
+      () async {
+        final configStore = SecureConfigStore(_InMemorySecureStorage());
+        final controller = VaultLockController(
+          configStore,
+          VaultCryptoService(),
+          _FakeBiometricAdapter(available: false, shouldSucceed: false),
+        );
+        addTearDown(controller.dispose);
+
+        await controller.setupPin('1234');
+        await controller.setupDuressPin('9999', currentPin: '1234');
+        expect(controller.isUnlocked, isFalse);
+
+        // Blocked while locked without currentPin
+        await expectLater(
+          controller.setupPin('5678'),
+          throwsA(isA<ValidationException>()),
+        );
+        await expectLater(
+          controller.setupDuressPin('8888'),
+          throwsA(isA<ValidationException>()),
+        );
+        await expectLater(
+          controller.setAutoLockTimeout(AutoLockTimeout.minutes5),
+          throwsA(isA<ValidationException>()),
+        );
+
+        // Also blocked in decoy mode without primary auth
+        expect(await controller.unlockWithPin('9999'), isTrue);
+        expect(controller.isDecoyMode, isTrue);
+        await expectLater(
+          controller.setupDuressPin('7777'),
+          throwsA(isA<ValidationException>()),
+        );
+        await expectLater(
+          controller.setAutoLockTimeout(AutoLockTimeout.seconds30),
+          throwsA(isA<ValidationException>()),
+        );
+
+        // Authorized with primary currentPin succeeds
+        await controller.setAutoLockTimeout(
+          AutoLockTimeout.minutes5,
+          currentPin: '1234',
+        );
+        expect(controller.autoLockTimeout, AutoLockTimeout.minutes5);
+        await controller.setupPin('5678', currentPin: '1234');
+        expect(await controller.unlockWithPin('5678'), isTrue);
+        expect(controller.isDecoyMode, isFalse);
+      },
+    );
   });
 
   group('vaultEntriesProvider lock/unlock and Decoy Mode isolation', () {
@@ -408,7 +528,7 @@ void main() {
 
         final lockController = container.read(vaultLockControllerProvider);
         await lockController.setupPin('1234');
-        await lockController.setupDuressPin('9999');
+        await lockController.setupDuressPin('9999', currentPin: '1234');
 
         // Insert real sensitive entry into repository
         final repo = container.read(vaultRepositoryProvider);
@@ -451,17 +571,20 @@ void main() {
         // Clear query
         container.read(vaultSearchQueryProvider.notifier).setQuery('');
 
-        // Attempting create/update/delete in decoy mode does not modify real DB
+        // Attempting create/update/delete in decoy mode updates only session decoy entries
+        // and does NOT touch SQLite or unlock the real master key.
         await container.read(vaultEntriesProvider.notifier).createEntry(
               title: 'Decoy Attempt',
               username: 'hacker',
               password: 'fake',
             );
-        final realDbEntries = await repo.getEntries();
-        expect(realDbEntries, hasLength(1));
-        expect(realDbEntries.single.title, 'Private Crypto Wallet');
+        expect(configStore.hasUnlockedMasterKey, isFalse);
+        final rawRowsInDb = await db.db.query('vault_items');
+        expect(rawRowsInDb, hasLength(1));
+        final decoyAfterAdd = await container.read(vaultEntriesProvider.future);
+        expect(decoyAfterAdd.any((e) => e.title == 'Decoy Attempt'), isTrue);
 
-        // 2. Lock vault
+        // 2. Lock vault (clears session decoy entries too)
         lockController.lock();
         expect(lockController.isUnlocked, isFalse);
         expect(lockController.isDecoyMode, isFalse);
@@ -476,8 +599,9 @@ void main() {
         expect(realList, hasLength(1));
         expect(realList.single.title, 'Private Crypto Wallet');
         expect(realList.single.password, 'UltraSecretSeedPhrase12345!');
-        // Decoy entries MUST NOT appear in real list!
+        // Decoy entries (including session-added decoy) MUST NOT appear in real list!
         expect(realList.any((e) => e.title == 'Wi-Fi Tamu'), isFalse);
+        expect(realList.any((e) => e.title == 'Decoy Attempt'), isFalse);
       },
     );
 

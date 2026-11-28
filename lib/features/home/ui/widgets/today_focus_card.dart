@@ -27,6 +27,7 @@ class TodayFocusCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = HubColors.of(context);
     final timeFmt = DateFormat('HH:mm');
     final activeTasks = tasks.where((t) => !t.isDone).toList()
       ..sort((a, b) => b.priority.index.compareTo(a.priority.index));
@@ -39,71 +40,74 @@ class TodayFocusCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // Header
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Expanded(
-                child: Text(
-                  'FOKUS HARI INI',
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: 0.8,
-                    color: AppTokens.textSecondary(context),
-                  ),
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-              const SizedBox(width: 8),
-              InkWell(
+          // Editorial Header
+          LuxeSectionLabel(
+            title: 'FOKUS HARI INI',
+            dotColor: colors.info,
+            trailing: Material(
+              type: MaterialType.transparency,
+              child: InkWell(
                 onTap: onSeeAllAgenda,
-                borderRadius: HubRadius.rXs,
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                borderRadius: HubRadius.rPill,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 5,
+                  ),
+                  decoration: BoxDecoration(
+                    color: colors.primarySoft,
+                    borderRadius: HubRadius.rPill,
+                    border: Border.all(
+                      color: colors.primary.withValues(alpha: 0.25),
+                    ),
+                  ),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Text(
                         'Lihat Agenda',
                         style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                          color: AppTokens.primary(context),
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w700,
+                          color: colors.primary,
                         ),
                       ),
                       const SizedBox(width: 4),
                       Icon(
                         Icons.arrow_forward_rounded,
-                        size: 14,
-                        color: AppTokens.primary(context),
+                        size: 13,
+                        color: colors.primary,
                       ),
                     ],
                   ),
                 ),
               ),
-            ],
+            ),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 14),
 
           if (isEmpty) ...[
             Padding(
-              padding: const EdgeInsets.symmetric(vertical: 12),
+              padding: const EdgeInsets.symmetric(vertical: 14),
               child: Center(
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(
-                      Icons.check_circle_outline_rounded,
-                      size: 28,
-                      color: AppTokens.textSecondary(context).withValues(alpha: 0.5),
+                    LuxeIconMedallion(
+                      icon: Icons.check_circle_outline_rounded,
+                      color: colors.success,
+                      size: 46,
+                      iconSize: 24,
+                      borderRadius: 14,
                     ),
-                    const SizedBox(height: 6),
+                    const SizedBox(height: 10),
                     Text(
                       'Semua fokus hari ini sudah selesai!',
+                      textAlign: TextAlign.center,
                       style: TextStyle(
                         fontSize: 13,
-                        color: AppTokens.textSecondary(context),
+                        fontWeight: FontWeight.w600,
+                        color: colors.textSecondary,
                       ),
                     ),
                   ],
@@ -112,51 +116,59 @@ class TodayFocusCard extends StatelessWidget {
             ),
           ],
 
-          // Closest meeting row
+          // Closest meeting row with left accent stripe
           if (closestMeeting != null) ...[
             InkWell(
               onTap: () => onOpenMeeting(closestMeeting.id),
               borderRadius: HubRadius.rSm,
               child: Container(
-                padding: const EdgeInsets.all(10),
+                padding: const EdgeInsets.all(11),
                 decoration: BoxDecoration(
-                  color: AppTokens.canvas(context),
+                  color: colors.info.withValues(alpha: 0.06),
                   borderRadius: HubRadius.rSm,
-                  border: Border.all(color: AppTokens.border(context)),
+                  border: Border.all(
+                    color: colors.info.withValues(alpha: 0.24),
+                  ),
                 ),
                 child: Row(
                   children: [
                     Container(
-                      padding: const EdgeInsets.all(6),
+                      width: 3.5,
+                      height: 30,
                       decoration: BoxDecoration(
-                        color: AppTokens.info(context).withValues(alpha: 0.12),
-                        borderRadius: HubRadius.rXs,
-                      ),
-                      child: Icon(
-                        Icons.calendar_month_rounded,
-                        size: 16,
-                        color: AppTokens.info(context),
+                        color: colors.info,
+                        borderRadius: HubRadius.rPill,
                       ),
                     ),
                     const SizedBox(width: 10),
-                    Text(
-                      timeFmt.format(closestMeeting.scheduledAt),
-                      style: HubTypography.tabular(
-                        TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w700,
-                          color: AppTokens.textPrimary(context),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 4,
+                      ),
+                      decoration: BoxDecoration(
+                        color: colors.info.withValues(alpha: 0.14),
+                        borderRadius: HubRadius.rXs,
+                      ),
+                      child: Text(
+                        timeFmt.format(closestMeeting.scheduledAt),
+                        style: HubTypography.tabular(
+                          TextStyle(
+                            fontSize: 12.5,
+                            fontWeight: FontWeight.w800,
+                            color: colors.info,
+                          ),
                         ),
                       ),
                     ),
-                    const SizedBox(width: 8),
+                    const SizedBox(width: 10),
                     Expanded(
                       child: Text(
                         closestMeeting.title,
                         style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w500,
-                          color: AppTokens.textPrimary(context),
+                          fontSize: 13.5,
+                          fontWeight: FontWeight.w700,
+                          color: colors.textPrimary,
                         ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
@@ -164,8 +176,8 @@ class TodayFocusCard extends StatelessWidget {
                     ),
                     Icon(
                       Icons.chevron_right_rounded,
-                      size: 16,
-                      color: AppTokens.textSecondary(context),
+                      size: 18,
+                      color: colors.textSecondary,
                     ),
                   ],
                 ),
@@ -177,9 +189,14 @@ class TodayFocusCard extends StatelessWidget {
             const SizedBox(height: 10),
 
           // Active to-dos (max 3 priority active tasks)
-          for (final task in displayTasks) ...[
+          for (var i = 0; i < displayTasks.length; i++) ...[
+            if (i > 0)
+              Divider(
+                height: 1,
+                color: colors.borderHairline.withValues(alpha: 0.65),
+              ),
             InkWell(
-              onTap: () => onToggleTask(task.id),
+              onTap: () => onToggleTask(displayTasks[i].id),
               borderRadius: HubRadius.rXs,
               child: ConstrainedBox(
                 constraints: const BoxConstraints(minHeight: 48),
@@ -191,26 +208,26 @@ class TodayFocusCard extends StatelessWidget {
                         width: 32,
                         height: 32,
                         child: Checkbox(
-                          value: task.isDone,
-                          onChanged: (_) => onToggleTask(task.id),
+                          value: displayTasks[i].isDone,
+                          onChanged: (_) => onToggleTask(displayTasks[i].id),
                           materialTapTargetSize:
                               MaterialTapTargetSize.shrinkWrap,
                           shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(4),
+                            borderRadius: BorderRadius.circular(6),
                           ),
                         ),
                       ),
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
-                          task.title,
+                          displayTasks[i].title,
                           style: TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w500,
-                            color: task.isDone
-                                ? AppTokens.textSecondary(context)
-                                : AppTokens.textPrimary(context),
-                            decoration: task.isDone
+                            fontSize: 13.5,
+                            fontWeight: FontWeight.w600,
+                            color: displayTasks[i].isDone
+                                ? colors.textSecondary
+                                : colors.textPrimary,
+                            decoration: displayTasks[i].isDone
                                 ? TextDecoration.lineThrough
                                 : TextDecoration.none,
                           ),
@@ -218,21 +235,27 @@ class TodayFocusCard extends StatelessWidget {
                           overflow: TextOverflow.ellipsis,
                         ),
                       ),
-                      if (task.priority == TaskPriority.high) ...[
+                      if (displayTasks[i].priority == TaskPriority.high) ...[
                         const SizedBox(width: 6),
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 3,
+                          ),
                           decoration: BoxDecoration(
-                            color: AppTokens.error(context).withValues(alpha: 0.12),
-                            borderRadius: HubRadius.rXs,
+                            color: colors.danger.withValues(alpha: 0.12),
+                            borderRadius: HubRadius.rPill,
+                            border: Border.all(
+                              color: colors.danger.withValues(alpha: 0.30),
+                            ),
                           ),
                           child: Text(
                             'Tinggi',
                             maxLines: 1,
                             style: TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.w600,
-                              color: AppTokens.error(context),
+                              fontSize: 10.5,
+                              fontWeight: FontWeight.w700,
+                              color: colors.danger,
                             ),
                           ),
                         ),

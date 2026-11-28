@@ -19,6 +19,8 @@ class AiSettingsPage extends ConsumerStatefulWidget {
 class _AiSettingsPageState extends ConsumerState<AiSettingsPage> {
   String? _maskedApiKey;
   String _baseUrl = AiConstants.defaultBaseUrl;
+  String _primaryModel = AiConstants.freeModel;
+  String _fallbackModel = AiConstants.fallbackModel;
   bool _isTestingAi = false;
   String? _aiTestStatus;
   bool _aiTestSuccess = false;
@@ -33,11 +35,14 @@ class _AiSettingsPageState extends ConsumerState<AiSettingsPage> {
     final config = ref.read(secureConfigStoreProvider);
     final apiKey = await config.getApiKey();
     final baseUrl = await config.getBaseUrl();
-
+    final primaryModel = await config.getPrimaryModel();
+    final fallbackModel = await config.getFallbackModel();
     if (!mounted) return;
     setState(() {
       _maskedApiKey = _maskSecret(apiKey);
       _baseUrl = baseUrl;
+      _primaryModel = primaryModel;
+      _fallbackModel = fallbackModel;
     });
   }
 
@@ -132,7 +137,7 @@ class _AiSettingsPageState extends ConsumerState<AiSettingsPage> {
             controller: controller,
             decoration: const InputDecoration(
               labelText: 'Base URL',
-              hintText: 'https://api.samudra.ai/v1',
+              hintText: AiConstants.defaultBaseUrl,
             ),
           ),
           actions: [
@@ -167,6 +172,75 @@ class _AiSettingsPageState extends ConsumerState<AiSettingsPage> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Base URL AI berhasil diperbarui.')),
+      );
+    }
+  }
+
+  Future<void> _editModel({required bool isPrimary}) async {
+    final config = ref.read(secureConfigStoreProvider);
+    final current = isPrimary
+        ? await config.getPrimaryModel()
+        : await config.getFallbackModel();
+    final defaultModel = isPrimary
+        ? AiConstants.freeModel
+        : AiConstants.fallbackModel;
+    if (!mounted) return;
+
+    final controller = TextEditingController(text: current);
+    final saved = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: Text(isPrimary ? 'Model Utama AI' : 'Model Cadangan AI'),
+          content: TextField(
+            controller: controller,
+            decoration: InputDecoration(
+              labelText: isPrimary ? 'Model Utama' : 'Model Cadangan',
+              hintText: defaultModel,
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                controller.text = defaultModel;
+              },
+              child: const Text('Reset Default'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              child: const Text('Batal'),
+            ),
+            FilledButton(
+              onPressed: () async {
+                if (isPrimary) {
+                  await config.setPrimaryModel(controller.text);
+                } else {
+                  await config.setFallbackModel(controller.text);
+                }
+                if (dialogContext.mounted) {
+                  Navigator.of(dialogContext).pop(true);
+                }
+              },
+              child: const Text('Simpan'),
+            ),
+          ],
+        );
+      },
+    );
+
+    controller.dispose();
+
+    if (saved == true && mounted) {
+      await _loadState();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            isPrimary
+                ? 'Model utama AI berhasil diperbarui.'
+                : 'Model cadangan AI berhasil diperbarui.',
+          ),
+        ),
       );
     }
   }
@@ -260,11 +334,77 @@ class _AiSettingsPageState extends ConsumerState<AiSettingsPage> {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'Aplikasi selalu mengutamakan model gratis (${AiConstants.freeModel}) dan otomatis beralih ke (${AiConstants.fallbackModel}) saat kuota model gratis terbatas.',
+                  'Aplikasi mengutamakan model utama ($_primaryModel) dan otomatis beralih ke ($_fallbackModel) saat kuota model utama terbatas.',
                   style: theme.textTheme.bodySmall?.copyWith(
                     color: AppTokens.textSecondary(context),
                     height: 1.35,
                   ),
+                ),
+                const Divider(height: 20),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'Model Utama',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            _primaryModel,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: AppTokens.textSecondary(context),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    OutlinedButton(
+                      onPressed: () => _editModel(isPrimary: true),
+                      child: const Text('Ubah'),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'Model Cadangan',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            _fallbackModel,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: AppTokens.textSecondary(context),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    OutlinedButton(
+                      onPressed: () => _editModel(isPrimary: false),
+                      child: const Text('Ubah'),
+                    ),
+                  ],
                 ),
               ],
             ),

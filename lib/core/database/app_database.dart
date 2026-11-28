@@ -10,7 +10,7 @@ import 'package:sqflite_common_ffi_web/sqflite_ffi_web.dart';
 class AppDatabase {
   AppDatabase._(this._db);
 
-  static const int schemaVersion = 1;
+  static const int schemaVersion = 2;
   static const String _databaseFileName = 'personal_hub.db';
 
   final Database _db;
@@ -125,7 +125,15 @@ class AppDatabase {
 
   static Future<void> _applyMigration(Database db, int targetVersion) async {
     switch (targetVersion) {
-      // Future incremental schema migrations will be added here.
+      case 2:
+        await db.execute('''
+          CREATE TABLE IF NOT EXISTS app_preferences (
+            key TEXT PRIMARY KEY,
+            value TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+          )
+        ''');
+        break;
       default:
         break;
     }
@@ -134,14 +142,14 @@ class AppDatabase {
   static Future<void> _createSchemaV1(Database db) async {
     final batch = db.batch();
 
-    for (final ddl in _schemaV1Statements) {
+    for (final ddl in _schemaStatements) {
       batch.execute(ddl);
     }
 
     await batch.commit(noResult: true);
   }
 
-  static const List<String> _schemaV1Statements = [
+  static const List<String> _schemaStatements = [
     '''
     CREATE TABLE notes (
       id TEXT PRIMARY KEY,
@@ -211,7 +219,8 @@ class AppDatabase {
       is_done INTEGER NOT NULL DEFAULT 0,
       source_meeting_id TEXT,
       created_at TEXT NOT NULL,
-      updated_at TEXT NOT NULL
+      updated_at TEXT NOT NULL,
+      FOREIGN KEY(source_meeting_id) REFERENCES meetings(id) ON DELETE SET NULL
     )
     ''',
     '''
@@ -229,7 +238,8 @@ class AppDatabase {
       habit_id TEXT NOT NULL,
       log_date TEXT NOT NULL,
       completed_count INTEGER NOT NULL DEFAULT 1,
-      UNIQUE(habit_id, log_date)
+      UNIQUE(habit_id, log_date),
+      FOREIGN KEY(habit_id) REFERENCES habits(id) ON DELETE CASCADE
     )
     ''',
     '''
@@ -241,6 +251,13 @@ class AppDatabase {
       note TEXT NOT NULL DEFAULT '',
       occurred_at TEXT NOT NULL,
       created_at TEXT NOT NULL
+    )
+    ''',
+    '''
+    CREATE TABLE IF NOT EXISTS app_preferences (
+      key TEXT PRIMARY KEY,
+      value TEXT NOT NULL,
+      updated_at TEXT NOT NULL
     )
     ''',
     'CREATE INDEX idx_notes_pinned_updated ON notes(is_pinned DESC, updated_at DESC)',

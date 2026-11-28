@@ -1,14 +1,12 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:personal_hub/core/notifications/app_notification_center.dart';
 import 'package:personal_hub/features/prayer/models/prayer_models.dart';
-import 'package:personal_hub/features/prayer/services/firebase_adzan_service.dart';
 import 'package:personal_hub/features/prayer/services/prayer_time_service.dart';
-import 'package:timezone/data/latest.dart' as tz_data;
-import 'package:timezone/timezone.dart' as tz;
 
 /// Batas rentang ID alarm lokal khusus jadwal sholat agar tidak menghapus alarm modul lain.
-const int prayerAlarmIdMin = 7000;
-const int prayerAlarmIdMax = 7999;
+const int prayerAlarmIdMin = NotificationIdRanges.prayerMin;
+const int prayerAlarmIdMax = NotificationIdRanges.prayerMax;
 
 /// Representasi satu alarm notifikasi lokal sholat yang direncanakan.
 @immutable
@@ -40,53 +38,28 @@ abstract class LocalAlarmGateway {
   });
 }
 
-/// Implementasi [LocalAlarmGateway] menggunakan `flutter_local_notifications` dan `timezone`.
+/// Implementasi [LocalAlarmGateway] terpusat melalui [AppNotificationCenter]
+/// dengan dukungan Android, iOS, macOS, zona waktu lokal riil, dan fallback inexact.
 class FlutterLocalNotificationsAlarmGateway implements LocalAlarmGateway {
   FlutterLocalNotificationsAlarmGateway({
+    AppNotificationCenter? notificationCenter,
     FlutterLocalNotificationsPlugin? plugin,
-  }) : _plugin = plugin ?? FlutterLocalNotificationsPlugin();
+  }) : _notificationCenter =
+            notificationCenter ?? AppNotificationCenter(plugin: plugin);
 
-  final FlutterLocalNotificationsPlugin _plugin;
-  bool _initialized = false;
-  static bool _timeZonesInitialized = false;
+  final AppNotificationCenter _notificationCenter;
 
   @override
   Future<void> initialize() async {
-    if (!_timeZonesInitialized) {
-      tz_data.initializeTimeZones();
-      _timeZonesInitialized = true;
-    }
-    if (_initialized ||
-        kIsWeb ||
-        (defaultTargetPlatform != TargetPlatform.android &&
-            defaultTargetPlatform != TargetPlatform.iOS)) {
-      _initialized = true;
-      return;
-    }
-
-    await _plugin.initialize(
-      settings: const InitializationSettings(
-        android: AndroidInitializationSettings('@mipmap/ic_launcher'),
-        iOS: DarwinInitializationSettings(),
-      ),
-    );
-    await ensureAdzanNotificationChannel(_plugin);
-    _initialized = true;
+    await _notificationCenter.initialize();
   }
 
   @override
   Future<void> cancelAllPrayerAlarms() async {
-    if (kIsWeb ||
-        (defaultTargetPlatform != TargetPlatform.android &&
-            defaultTargetPlatform != TargetPlatform.iOS)) {
-      return;
-    }
-    final pending = await _plugin.pendingNotificationRequests();
-    for (final request in pending) {
-      if (request.id >= prayerAlarmIdMin && request.id <= prayerAlarmIdMax) {
-        await _plugin.cancel(id: request.id);
-      }
-    }
+    await _notificationCenter.cancelInRange(
+      prayerAlarmIdMin,
+      prayerAlarmIdMax,
+    );
   }
 
   @override
@@ -94,30 +67,32 @@ class FlutterLocalNotificationsAlarmGateway implements LocalAlarmGateway {
     ScheduledPrayerAlarm alarm, {
     required bool soundEnabled,
   }) async {
-    if (kIsWeb ||
-        (defaultTargetPlatform != TargetPlatform.android &&
-            defaultTargetPlatform != TargetPlatform.iOS)) {
-      return;
-    }
-
-    final tzScheduled = tz.TZDateTime.from(alarm.scheduledAt, tz.local);
-    await _plugin.zonedSchedule(
+    await _notificationCenter.scheduleZoned(
       id: alarm.id,
       title: alarm.title,
       body: alarm.body,
-      scheduledDate: tzScheduled,
+      scheduledAt: alarm.scheduledAt,
+      preferExact: true,
       notificationDetails: NotificationDetails(
         android: AndroidNotificationDetails(
-          adzanChannelId,
-          adzanChannelName,
-          channelDescription: adzanChannelDescription,
+          NotificationChannels.adzanId,
+          NotificationChannels.adzanName,
+          channelDescription: NotificationChannels.adzanDescription,
           importance: Importance.max,
           priority: Priority.high,
           playSound: soundEnabled,
         ),
-        iOS: DarwinNotificationDetails(presentSound: soundEnabled),
+        iOS: DarwinNotificationDetails(
+          presentAlert: true,
+          presentBadge: true,
+          presentSound: soundEnabled,
+        ),
+        macOS: DarwinNotificationDetails(
+          presentAlert: true,
+          presentBadge: true,
+          presentSound: soundEnabled,
+        ),
       ),
-      androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
     );
   }
 }
@@ -127,7 +102,12 @@ class PrayerAlarmScheduler {
   PrayerAlarmScheduler({
     this.prayerTimeService = const PrayerTimeService(),
     LocalAlarmGateway? gateway,
-  }) : _gateway = gateway ?? FlutterLocalNotificationsAlarmGateway();
+    AppNotificationCenter? notificationCenter,
+  }) : _gateway =
+           gateway ??
+           FlutterLocalNotificationsAlarmGateway(
+             notificationCenter: notificationCenter,
+           );
 
   final PrayerTimeService prayerTimeService;
   final LocalAlarmGateway _gateway;
@@ -200,24 +180,28 @@ class PrayerAlarmScheduler {
     return alarms;
   }
 
-  /// Menyinkronkan alarm lokal sesuai [prefs.notificationMode].
-  Future<void> syncAlarms({
+  /// Menyinkronkan alarm lokal sesuai [prefs.notificationMode] atau [forceLocalFallback].
+  /// Mengembalikan jumlah alarm yang dijadwalkan.
+  Future<int> syncAlarms({
     required DateTime now,
     required PrayerAlarmPrefs prefs,
+    bool forceLocalFallback = false,
   }) async {
     await _gateway.initialize();
     await _gateway.cancelAllPrayerAlarms();
 
     final shouldScheduleLocal =
+        forceLocalFallback ||
         prefs.notificationMode == AdzanNotificationMode.localOffline ||
         prefs.notificationMode == AdzanNotificationMode.both;
     if (!shouldScheduleLocal) {
-      return;
+      return 0;
     }
 
     final plan = buildSchedulePlan(now: now, prefs: prefs);
     for (final alarm in plan) {
       await _gateway.scheduleAlarm(alarm, soundEnabled: prefs.soundEnabled);
     }
+    return plan.length;
   }
 }

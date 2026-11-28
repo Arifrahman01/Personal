@@ -60,12 +60,11 @@ class GlobalSearchService {
       return const [];
     }
     final q = trimmed.toLowerCase();
-    final now = DateTime.now();
 
     final notesFuture = _notesRepository.getNotes();
     final meetingsFuture = _meetingsRepository.getMeetings();
     final tasksFuture = _tasksRepository.getTasks();
-    final financeFuture = _loadRecentTransactions(now);
+    final financeFuture = _financeRepository.getAllTransactions();
 
     final notes = await notesFuture;
     final meetings = await meetingsFuture;
@@ -156,25 +155,5 @@ class GlobalSearchService {
     }
 
     return results;
-  }
-
-  Future<List<FinanceTransaction>> _loadRecentTransactions(DateTime now) async {
-    final current = FinanceMonth(year: now.year, month: now.month);
-    final months = [current, current.previous(), current.previous().previous()];
-    final seenIds = <String>{};
-    final all = <FinanceTransaction>[];
-
-    for (final month in months) {
-      final list = await _financeRepository.getTransactionsForMonth(
-        month.year,
-        month.month,
-      );
-      for (final tx in list) {
-        if (seenIds.add(tx.id)) {
-          all.add(tx);
-        }
-      }
-    }
-    return all;
   }
 }

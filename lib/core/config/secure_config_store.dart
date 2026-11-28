@@ -43,9 +43,15 @@ class SecureConfigStore {
 
   static const String _apiKeyStorageKey = 'ai_api_key';
   static const String _baseUrlStorageKey = 'ai_base_url';
+  static const String _aiPrimaryModelStorageKey = 'ai_primary_model';
+  static const String _aiFallbackModelStorageKey = 'ai_fallback_model';
   static const String _vaultMasterKeyStorageKey = 'vault_master_key';
+  static const String _vaultBiometricMasterKeyStorageKey =
+      'vault_biometric_master_key';
   static const String _vaultPinHashStorageKey = 'vault_pin_hash';
   static const String _vaultDuressPinHashStorageKey = 'vault_duress_pin_hash';
+  static const String _vaultFailedAttemptsStorageKey = 'vault_failed_attempts';
+  static const String _vaultLockedUntilMsStorageKey = 'vault_locked_until_ms';
   static const String _autoLockTimeoutStorageKey =
       'vault_auto_lock_timeout_seconds';
   static const int _vaultMasterKeyLength = 32;
@@ -55,6 +61,9 @@ class SecureConfigStore {
   final VaultCryptoService _crypto;
 
   List<int>? _unlockedMasterKey;
+
+  /// Whether a decrypted vault master key is currently cached in memory.
+  bool get hasUnlockedMasterKey => _unlockedMasterKey != null;
 
   /// Normalizes a pasted API key by trimming whitespace, matching outer quotes,
   /// and any accidental `Bearer ` prefix.
@@ -118,6 +127,40 @@ class SecureConfigStore {
     await _storage.write(_baseUrlStorageKey, normalized);
   }
 
+  Future<String> getPrimaryModel() async {
+    final stored = await _storage.read(_aiPrimaryModelStorageKey);
+    if (stored == null || stored.trim().isEmpty) {
+      return AiConstants.freeModel;
+    }
+    return stored.trim();
+  }
+
+  Future<void> setPrimaryModel(String model) async {
+    final trimmed = model.trim();
+    if (trimmed.isEmpty) {
+      await _storage.delete(_aiPrimaryModelStorageKey);
+      return;
+    }
+    await _storage.write(_aiPrimaryModelStorageKey, trimmed);
+  }
+
+  Future<String> getFallbackModel() async {
+    final stored = await _storage.read(_aiFallbackModelStorageKey);
+    if (stored == null || stored.trim().isEmpty) {
+      return AiConstants.fallbackModel;
+    }
+    return stored.trim();
+  }
+
+  Future<void> setFallbackModel(String model) async {
+    final trimmed = model.trim();
+    if (trimmed.isEmpty) {
+      await _storage.delete(_aiFallbackModelStorageKey);
+      return;
+    }
+    await _storage.write(_aiFallbackModelStorageKey, trimmed);
+  }
+
   /// Retrieves the existing vault master key or generates and stores a new one.
   ///
   /// If the master key was encrypted with a KEK, either [kek] or [pin] must be provided
@@ -149,7 +192,7 @@ class SecureConfigStore {
       );
     }
 
-    _unlockedMasterKey = masterKey;
+    _unlockedMasterKey = List<int>.from(masterKey);
 
     List<int>? effectiveKek = kek;
     String? salt;
@@ -183,6 +226,46 @@ class SecureConfigStore {
     required List<int> kek,
   }) => storeVaultMasterKey(masterKey, kek: kek);
 
+  /// Stores a biometric-accessible copy of [masterKey] in platform secure storage.
+  Future<void> storeBiometricMasterKey(List<int> masterKey) async {
+    if (masterKey.length != _vaultMasterKeyLength) {
+      throw const VaultDecryptionException(
+        'Kunci master brankas harus berukuran 32 byte.',
+      );
+    }
+    await _storage.write(
+      _vaultBiometricMasterKeyStorageKey,
+      base64Encode(masterKey),
+    );
+  }
+
+  /// Unlocks and caches the master key after biometric OS authentication.
+  ///
+  /// Returns `null` if the master key is KEK-encrypted and no biometric copy has
+  /// been stored yet (requiring one PIN unlock to authorize biometric wrapping).
+  Future<List<int>?> unlockMasterKeyForBiometrics() async {
+    final encoded = await _storage.read(_vaultBiometricMasterKeyStorageKey);
+    if (encoded != null && encoded.trim().isNotEmpty) {
+      try {
+        final decoded = base64Decode(encoded.trim());
+        if (decoded.length == _vaultMasterKeyLength) {
+          _unlockedMasterKey = List<int>.from(decoded);
+          return decoded;
+        }
+      } on FormatException {
+        // Fall through to check legacy key format
+      }
+    }
+    if (!(await isVaultMasterKeyEncrypted())) {
+      return getOrCreateVaultMasterKey();
+    }
+    return null;
+  }
+
+  /// Removes any biometric-stored copy of the vault master key.
+  Future<void> clearBiometricMasterKey() =>
+      _storage.delete(_vaultBiometricMasterKeyStorageKey);
+
   /// Returns whether a vault master key is stored in encrypted form using KEK.
   Future<bool> isVaultMasterKeyEncrypted() async {
     final stored = await _storage.read(_vaultMasterKeyStorageKey);
@@ -191,8 +274,12 @@ class SecureConfigStore {
     return trimmed.startsWith('{') && trimmed.endsWith('}');
   }
 
-  /// Clears in-memory unlocked master key (e.g. when locking vault).
+  /// Zeroes out and clears the in-memory unlocked master key (e.g. when locking vault).
   void clearUnlockedMasterKey() {
+    final existing = _unlockedMasterKey;
+    if (existing != null) {
+      existing.fillRange(0, existing.length, 0);
+    }
     _unlockedMasterKey = null;
   }
 
@@ -219,12 +306,12 @@ class SecureConfigStore {
 
         if (effectiveKek != null) {
           final key = await _crypto.decryptMasterKey(payload, effectiveKek);
-          _unlockedMasterKey = key;
+          _unlockedMasterKey = List<int>.from(key);
           return key;
         }
 
         if (_unlockedMasterKey != null) {
-          return _unlockedMasterKey!;
+          return List<int>.from(_unlockedMasterKey!);
         }
 
         throw const VaultDecryptionException(
@@ -243,7 +330,7 @@ class SecureConfigStore {
     try {
       final decoded = base64Decode(trimmed);
       if (decoded.length == _vaultMasterKeyLength) {
-        _unlockedMasterKey = decoded;
+        _unlockedMasterKey = List<int>.from(decoded);
         // If kek or pin was supplied, optionally re-encrypt in storage
         if (kek != null || pin != null) {
           await storeVaultMasterKey(decoded, kek: kek, pin: pin);
@@ -335,6 +422,50 @@ class SecureConfigStore {
 
   Future<void> setAutoLockTimeoutSeconds(int seconds) async {
     await _storage.write(_autoLockTimeoutStorageKey, seconds.toString());
+  }
+
+  Future<int> getVaultFailedAttempts() async {
+    final raw = await _storage.read(_vaultFailedAttemptsStorageKey);
+    if (raw == null || raw.trim().isEmpty) {
+      return 0;
+    }
+    return int.tryParse(raw.trim()) ?? 0;
+  }
+
+  Future<void> setVaultFailedAttempts(int count) async {
+    if (count <= 0) {
+      await _storage.delete(_vaultFailedAttemptsStorageKey);
+      return;
+    }
+    await _storage.write(_vaultFailedAttemptsStorageKey, count.toString());
+  }
+
+  Future<DateTime?> getVaultLockedUntil() async {
+    final raw = await _storage.read(_vaultLockedUntilMsStorageKey);
+    if (raw == null || raw.trim().isEmpty) {
+      return null;
+    }
+    final ms = int.tryParse(raw.trim());
+    if (ms == null || ms <= 0) {
+      return null;
+    }
+    return DateTime.fromMillisecondsSinceEpoch(ms, isUtc: true);
+  }
+
+  Future<void> setVaultLockedUntil(DateTime? lockedUntil) async {
+    if (lockedUntil == null) {
+      await _storage.delete(_vaultLockedUntilMsStorageKey);
+      return;
+    }
+    await _storage.write(
+      _vaultLockedUntilMsStorageKey,
+      lockedUntil.toUtc().millisecondsSinceEpoch.toString(),
+    );
+  }
+
+  Future<void> resetVaultBruteforceState() async {
+    await _storage.delete(_vaultFailedAttemptsStorageKey);
+    await _storage.delete(_vaultLockedUntilMsStorageKey);
   }
 
   static const String _syncProviderStorageKey = 'sync_provider';

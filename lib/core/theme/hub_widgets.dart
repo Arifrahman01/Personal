@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:personal_hub/core/theme/app_tokens.dart';
 
-/// Reusable tactile card component built on Material 3 [Card.outlined].
-/// Uses solid tonal surfaces with 0 BackdropFilter.
+export 'package:personal_hub/core/theme/luxe_components.dart';
+
+/// Reusable Sanctuary Luxe tactile card component with layered ambient depth
+/// and subtle sheen. Uses 0 BackdropFilter for 60fps scrolling performance.
 class HubCard extends StatelessWidget {
   final Widget child;
   final EdgeInsetsGeometry padding;
@@ -12,6 +14,9 @@ class HubCard extends StatelessWidget {
   final double borderWidth;
   final BorderRadius? borderRadius;
   final VoidCallback? onTap;
+  final Gradient? gradient;
+  final List<BoxShadow>? shadows;
+  final Color? elevationGlowColor;
 
   const HubCard({
     super.key,
@@ -23,30 +28,72 @@ class HubCard extends StatelessWidget {
     this.borderWidth = 1.0,
     this.borderRadius,
     this.onTap,
+    this.gradient,
+    this.shadows,
+    this.elevationGlowColor,
   });
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final colors = HubColors.of(context);
     final cardBg = backgroundColor ?? colors.surfaceCard;
     final border = borderColor ?? colors.borderHairline;
     final radius = borderRadius ?? HubRadius.rMd;
 
-    return Card.outlined(
-      clipBehavior: Clip.antiAlias,
-      color: cardBg,
-      margin: margin,
-      shape: RoundedRectangleBorder(
-        borderRadius: radius,
-        side: BorderSide(color: border, width: borderWidth),
-      ),
-      child: onTap != null
-          ? InkWell(
+    final effectiveGradient =
+        gradient ??
+        (backgroundColor == null && isDark
+            ? LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  colors.surfaceElevated,
+                  colors.surfaceCard,
+                ],
+              )
+            : null);
+
+    final effectiveShadows =
+        shadows ??
+        [
+          BoxShadow(
+            color: (elevationGlowColor ?? Colors.black).withValues(
+              alpha: elevationGlowColor != null
+                  ? (isDark ? 0.16 : 0.08)
+                  : (isDark ? 0.28 : 0.045),
+            ),
+            blurRadius: isDark ? 18 : 16,
+            offset: const Offset(0, 6),
+          ),
+        ];
+
+    final inner = onTap != null
+        ? Material(
+            type: MaterialType.transparency,
+            child: InkWell(
               borderRadius: radius,
               onTap: onTap,
               child: Padding(padding: padding, child: child),
-            )
-          : Padding(padding: padding, child: child),
+            ),
+          )
+        : Padding(padding: padding, child: child);
+
+    return Padding(
+      padding: margin,
+      child: Container(
+        decoration: BoxDecoration(
+          color: effectiveGradient == null ? cardBg : null,
+          gradient: effectiveGradient,
+          borderRadius: radius,
+          border: Border.all(color: border, width: borderWidth),
+          boxShadow: effectiveShadows,
+        ),
+        child: ClipRRect(
+          borderRadius: radius,
+          child: inner,
+        ),
+      ),
     );
   }
 }
@@ -142,7 +189,8 @@ class HubAppBar extends StatelessWidget implements PreferredSizeWidget {
       effectiveTitle = Text(
         title as String,
         style: theme.textTheme.titleLarge?.copyWith(
-          fontWeight: FontWeight.w700,
+          fontWeight: FontWeight.w800,
+          letterSpacing: -0.3,
           color: colors.textPrimary,
         ),
       );
@@ -174,7 +222,8 @@ class HubAppBar extends StatelessWidget implements PreferredSizeWidget {
         effectiveTitle = Text(
           titleText!,
           style: theme.textTheme.titleLarge?.copyWith(
-            fontWeight: FontWeight.w700,
+            fontWeight: FontWeight.w800,
+            letterSpacing: -0.3,
             color: colors.textPrimary,
           ),
         );
@@ -194,7 +243,7 @@ class HubAppBar extends StatelessWidget implements PreferredSizeWidget {
   }
 }
 
-/// Section header using Material 3 [TextTheme.labelLarge] and optional trailing widget.
+/// Editorial section header with accent dot and optional trailing widget.
 class HubSectionHeader extends StatelessWidget {
   final String title;
   final Widget? trailing;
@@ -220,13 +269,27 @@ class HubSectionHeader extends StatelessWidget {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(
-            title,
-            style: theme.textTheme.labelLarge?.copyWith(
-              fontWeight: FontWeight.w700,
-              letterSpacing: 0.8,
-              color: colors.textSecondary,
-            ),
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 6,
+                height: 6,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: colors.primary,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                title,
+                style: theme.textTheme.labelLarge?.copyWith(
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 0.9,
+                  color: colors.textSecondary,
+                ),
+              ),
+            ],
           ),
           ?trailing,
         ],
@@ -285,13 +348,13 @@ class HubStatusBadge extends StatelessWidget {
         children: [
           if (icon != null) ...[
             Icon(icon, size: 14, color: primary),
-            const SizedBox(width: 4),
+            const SizedBox(width: 5),
           ],
           Text(
             label,
             style: (textTheme.labelSmall ?? const TextStyle()).copyWith(
               fontSize: 12,
-              fontWeight: FontWeight.w600,
+              fontWeight: FontWeight.w700,
               color: primary,
             ),
           ),
@@ -302,7 +365,9 @@ class HubStatusBadge extends StatelessWidget {
     return Material(
       type: MaterialType.canvas,
       color: bg,
-      shape: const StadiumBorder(),
+      shape: StadiumBorder(
+        side: BorderSide(color: primary.withValues(alpha: 0.25)),
+      ),
       clipBehavior: Clip.antiAlias,
       child: onTap != null
           ? InkWell(
@@ -315,7 +380,7 @@ class HubStatusBadge extends StatelessWidget {
   }
 }
 
-/// Friendly, uncluttered empty state component using M3 [ColorScheme] and [FilledButton].
+/// Friendly, uncluttered empty state component with layered Sanctuary Luxe halo rings.
 class HubEmptyState extends StatelessWidget {
   final IconData icon;
   final String title;
@@ -337,7 +402,6 @@ class HubEmptyState extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
     final colors = HubColors.of(context);
 
     return Center(
@@ -348,16 +412,31 @@ class HubEmptyState extends StatelessWidget {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Container(
-              width: 64,
-              height: 64,
+              width: 84,
+              height: 84,
               decoration: BoxDecoration(
-                color: colorScheme.primaryContainer,
                 shape: BoxShape.circle,
+                color: colors.primary.withValues(alpha: 0.06),
+                border: Border.all(
+                  color: colors.primary.withValues(alpha: 0.12),
+                ),
               ),
-              child: Icon(
-                icon,
-                size: 30,
-                color: colorScheme.onPrimaryContainer,
+              alignment: Alignment.center,
+              child: Container(
+                width: 60,
+                height: 60,
+                decoration: BoxDecoration(
+                  color: colors.primarySoft,
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: colors.primary.withValues(alpha: 0.28),
+                  ),
+                ),
+                child: Icon(
+                  icon,
+                  size: 28,
+                  color: colors.primary,
+                ),
               ),
             ),
             const SizedBox(height: HubSpacing.lg),
@@ -365,7 +444,8 @@ class HubEmptyState extends StatelessWidget {
               title,
               textAlign: TextAlign.center,
               style: theme.textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.w700,
+                fontWeight: FontWeight.w800,
+                letterSpacing: -0.2,
                 color: colors.textPrimary,
               ),
             ),
@@ -376,6 +456,7 @@ class HubEmptyState extends StatelessWidget {
                 textAlign: TextAlign.center,
                 style: theme.textTheme.bodyMedium?.copyWith(
                   fontSize: 13,
+                  height: 1.45,
                   color: colors.textSecondary,
                 ),
               ),
@@ -419,7 +500,7 @@ class HubPill extends StatelessWidget {
     final colors = HubColors.of(context);
     final textTheme = Theme.of(context).textTheme;
     final primary = color ?? colors.primary;
-    final bg = isSelected ? primary.withValues(alpha: 0.15) : colors.surfaceCard;
+    final bg = isSelected ? primary.withValues(alpha: 0.16) : colors.surfaceCard;
     final border = isSelected ? primary : colors.borderHairline;
     final textColor = isSelected ? primary : colors.textPrimary;
 
@@ -428,7 +509,7 @@ class HubPill extends StatelessWidget {
         label,
         style: (textTheme.labelSmall ?? const TextStyle()).copyWith(
           fontSize: 12,
-          fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
+          fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
           color: textColor,
         ),
       ),
@@ -436,11 +517,11 @@ class HubPill extends StatelessWidget {
       selected: isSelected,
       showCheckmark: false,
       color: WidgetStatePropertyAll(bg),
-      side: BorderSide(color: border, width: 1),
+      side: BorderSide(color: border, width: isSelected ? 1.2 : 1.0),
       shape: RoundedRectangleBorder(borderRadius: HubRadius.rPill),
       visualDensity: VisualDensity.compact,
       materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       onSelected: onTap != null ? (_) => onTap!() : null,
     );
   }

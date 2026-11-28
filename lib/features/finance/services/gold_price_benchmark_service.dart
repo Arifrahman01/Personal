@@ -84,8 +84,13 @@ class GoldPriceBenchmarkService {
     DateTime? updatedAt,
     bool shouldThrowOnFailure = false,
   }) async {
+    if (priceOverride == null) {
+      throw const ValidationException(
+        'Feed harga emas online belum tersedia. Masukkan harga emas secara manual.',
+      );
+    }
     try {
-      final price = priceOverride ?? kDefaultGoldPricePerGram;
+      final price = priceOverride;
       if (price <= 0) {
         throw const ValidationException('Harga emas feed tidak valid.');
       }

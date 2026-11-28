@@ -1,7 +1,11 @@
+import 'dart:io';
+import 'dart:typed_data';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:personal_hub/features/backup/providers/gfs_backup_providers.dart';
 import 'package:personal_hub/features/backup/services/gfs_backup_service.dart';
+import 'package:personal_hub/features/backup/services/local_gfs_backup_storage.dart';
 
 void main() {
   group('GfsBackupPolicy - Tier Classification', () {
@@ -406,6 +410,56 @@ void main() {
       final summary = container.read(gfsRetentionSummaryProvider);
       expect(summary.totalSnapshots, 2);
       expect(summary.keptCount, 2);
+    });
+  });
+
+  group('LocalGfsBackupStorage', () {
+    test('saves, reads, and prunes real .phub snapshot files on disk', () async {
+      final tempDir = await Directory.systemTemp.createTemp('gfs_storage_');
+      addTearDown(() async {
+        if (await tempDir.exists()) {
+          await tempDir.delete(recursive: true);
+        }
+      });
+
+      const gfsService = GfsBackupService();
+      final storage = LocalGfsBackupStorage(directoryOverride: tempDir);
+      final bytes = Uint8List.fromList([10, 20, 30, 40]);
+
+      // Write 9 daily non-Sunday, non-1st dates so daily retention (7) prunes 2 oldest files.
+      final dailyDates = [
+        DateTime.utc(2026, 2, 2, 9, 0),
+        DateTime.utc(2026, 2, 3, 9, 0),
+        DateTime.utc(2026, 2, 4, 9, 0),
+        DateTime.utc(2026, 2, 5, 9, 0),
+        DateTime.utc(2026, 2, 6, 9, 0),
+        DateTime.utc(2026, 2, 7, 9, 0),
+        DateTime.utc(2026, 2, 9, 9, 0),
+        DateTime.utc(2026, 2, 10, 9, 0),
+        DateTime.utc(2026, 2, 11, 9, 0),
+      ];
+      for (final date in dailyDates) {
+        await storage.writeSnapshot(
+          bytes: bytes,
+          createdAt: date,
+          gfsService: gfsService,
+        );
+      }
+
+      final stored = await storage.listSnapshots(gfsService);
+      expect(stored.length, 7);
+
+      final diskFiles = tempDir
+          .listSync()
+          .whereType<File>()
+          .where((f) => f.path.endsWith('.phub'))
+          .toList();
+      expect(diskFiles.length, 7);
+
+      final loadedBytes = await File(
+        '${tempDir.path}/${stored.first.fileName}',
+      ).readAsBytes();
+      expect(loadedBytes, equals(bytes));
     });
   });
 }

@@ -26,6 +26,14 @@ void main() {
         final db = await openTestDb();
         final repo = TasksRepository(db);
 
+        await db.db.insert('meetings', {
+          'id': 'meeting-42',
+          'title': 'Weekly Sync',
+          'scheduled_at': DateTime.utc(2026, 11, 24, 10).toIso8601String(),
+          'created_at': DateTime.utc(2026, 11, 24, 9).toIso8601String(),
+          'updated_at': DateTime.utc(2026, 11, 24, 9).toIso8601String(),
+        });
+
         final due = DateTime(2026, 11, 25, 10, 0);
         final task1 = await repo.createTask(
           title: 'Kirim notulensi rapat',
@@ -104,6 +112,107 @@ void main() {
         );
         await expectLater(
           repo.createHabit(title: 'Baca Al-Quran', targetPerDay: -2),
+          throwsA(isA<ValidationException>()),
+        );
+      },
+    );
+
+    test(
+      'updates task in place while preserving id, isDone, sourceMeetingId, and createdAt',
+      () async {
+        final db = await openTestDb();
+        final repo = TasksRepository(db);
+
+        await db.db.insert('meetings', {
+          'id': 'meeting-99',
+          'title': 'Planning Session',
+          'scheduled_at': DateTime.utc(2026, 11, 24, 10).toIso8601String(),
+          'created_at': DateTime.utc(2026, 11, 24, 9).toIso8601String(),
+          'updated_at': DateTime.utc(2026, 11, 24, 9).toIso8601String(),
+        });
+
+        final initialDue = DateTime(2026, 11, 25, 9, 0);
+        final created = await repo.createTask(
+          title: 'Siapkan draft agenda',
+          dueDate: initialDue,
+          priority: TaskPriority.low,
+          sourceMeetingId: 'meeting-99',
+        );
+        final toggled = await repo.toggleTaskDone(created.id);
+        expect(toggled.isDone, isTrue);
+
+        await Future<void>.delayed(const Duration(milliseconds: 5));
+
+        final updatedDue = DateTime(2026, 11, 27, 15, 30);
+        final updated = await repo.updateTask(
+          id: created.id,
+          title: 'Finalisasi draft agenda rapat',
+          dueDate: updatedDue,
+          priority: TaskPriority.high,
+        );
+
+        expect(updated.id, created.id);
+        expect(updated.title, 'Finalisasi draft agenda rapat');
+        expect(updated.dueDate, updatedDue);
+        expect(updated.priority, TaskPriority.high);
+        expect(updated.isDone, isTrue);
+        expect(updated.sourceMeetingId, 'meeting-99');
+        expect(updated.createdAt, created.createdAt);
+        expect(updated.updatedAt.isAfter(created.createdAt), isTrue);
+
+        var persisted = await repo.getTasks();
+        expect(persisted, hasLength(1));
+        expect(persisted.single.id, created.id);
+        expect(persisted.single.title, 'Finalisasi draft agenda rapat');
+        expect(persisted.single.dueDate, updatedDue);
+        expect(persisted.single.priority, TaskPriority.high);
+        expect(persisted.single.isDone, isTrue);
+        expect(persisted.single.sourceMeetingId, 'meeting-99');
+        expect(persisted.single.createdAt, created.createdAt);
+
+        final clearedDue = await repo.updateTask(
+          id: created.id,
+          title: 'Finalisasi draft agenda rapat',
+          dueDate: null,
+          priority: TaskPriority.medium,
+        );
+        expect(clearedDue.dueDate, isNull);
+        expect(clearedDue.priority, TaskPriority.medium);
+        expect(clearedDue.isDone, isTrue);
+        expect(clearedDue.sourceMeetingId, 'meeting-99');
+
+        persisted = await repo.getTasks();
+        expect(persisted, hasLength(1));
+        expect(persisted.single.dueDate, isNull);
+        expect(persisted.single.priority, TaskPriority.medium);
+        expect(persisted.single.isDone, isTrue);
+      },
+    );
+
+    test(
+      'updateTask throws ValidationException on blank title or missing task id',
+      () async {
+        final db = await openTestDb();
+        final repo = TasksRepository(db);
+        final task = await repo.createTask(
+          title: 'Tugas awal',
+          priority: TaskPriority.medium,
+        );
+
+        await expectLater(
+          repo.updateTask(
+            id: task.id,
+            title: '   ',
+            priority: TaskPriority.high,
+          ),
+          throwsA(isA<ValidationException>()),
+        );
+        await expectLater(
+          repo.updateTask(
+            id: 'missing-task-id',
+            title: 'Judul baru',
+            priority: TaskPriority.high,
+          ),
           throwsA(isA<ValidationException>()),
         );
       },

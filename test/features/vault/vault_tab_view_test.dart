@@ -112,6 +112,10 @@ class _InMemoryVaultRepository implements VaultRepository {
     }
     return entry;
   }
+
+  @override
+  Future<Map<String, Object?>> encryptEntryForStorage(VaultEntry entry) async =>
+      {};
 }
 
 void main() {

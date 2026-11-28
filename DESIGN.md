@@ -1,12 +1,12 @@
-# Sistem Desain "Calm Clarity v3.0"
+# Sistem Desain "Sanctuary Luxe v4.0"
 
-Dokumen panduan sistem desain, token, komponen antarmuka, dan prinsip UX untuk aplikasi **Personal Hub**.
+Dokumen panduan sistem desain, token, komponen antarmuka, dan prinsip UX untuk aplikasi **Personal Hub** (berevolusi dari Calm Clarity v3.0 menuju estetika editorial atmosferik Sanctuary Luxe v4.0).
 
 ---
 
 ## 1. Filosofi & Prinsip UX
 
-Desain Personal Hub v3.0 dirancang dengan pendekatan **Calm Clarity** yang berpusat pada kenyamanan penggunaan harian tanpa kebingungan antarmuka (*Anti-Bingung*).
+Desain Personal Hub v4.0 dirancang dengan pendekatan **Sanctuary Luxe** yang menggabungkan kejelasan penggunaan harian (*Anti-Bingung*) dengan kedalaman visual editorial, palet Warm Alabaster (Terang) & Obsidian Velvet (Gelap), serta aksen Emerald-Gold & Indigo AI.
 
 ### A. Aturan 3 Detik (*The 3-Second Rule*)
 Setiap layar harus dapat menjawab dua pertanyaan utama dalam tempo ≤ 3 detik:
@@ -30,28 +30,31 @@ Setiap layar harus dapat menjawab dua pertanyaan utama dalam tempo ≤ 3 detik:
 
 ## 2. Palet Token Warna (WCAG AA/AAA)
 
-Semua token warna terdaftar di [`lib/core/theme/app_tokens.dart`](file:///D:/Mobile/Scribd/lib/core/theme/app_tokens.dart) dan mendukung kontras adaptif.
+Semua token warna terdaftar di [`lib/core/theme/app_tokens.dart`](lib/core/theme/app_tokens.dart) dan mendukung kontras adaptif.
 
 | Token Semantik | Mode Terang (Light) | Mode Gelap (Dark) | Peruntukan Utama |
 | :--- | :--- | :--- | :--- |
-| `canvas` | `#F6F7F9` | `#0D1117` | Latar Scaffold utama |
-| `surfaceCard` | `#FFFFFF` | `#161B22` | Permukaan kartu interaktif (`HubCard`) |
-| `surfaceSubtle` | `#EEF1F4` | `#1E2530` | Latar kolom input, pill latar, container sekunder |
-| `borderHairline` | `#E5E7EB` | `#2B3340` | Border halus 1px kartu dan garis pemisah |
-| `textPrimary` | `#111827` | `#F1F5F9` | Judul, angka utama, teks body utama |
-| `textSecondary` | `#4B5563` | `#94A3B8` | Subtitle, metadata tanggal/jam, label bantuan |
-| `primary` | `#0D6E66` | `#2DD4BF` | Tombol utama, tab aktif, indikator fokus |
-| `primarySoft` | `#E6F4F2` | `#123532` | Container tonal primer, background avatar aktif |
+| `canvas` | `#F4F2ED` | `#07090F` | Latar Scaffold utama |
+| `surfaceCard` | `#FFFFFF` | `#101521` | Permukaan kartu interaktif (`HubCard`) |
+| `surfaceSubtle` | `#ECE9E2` | `#182032` | Latar kolom input, pill latar, container sekunder |
+| `surfaceElevated` | `#FFFFFF` | `#141B2B` | Permukaan dock/sheet melayang |
+| `borderHairline` | `#E2DDD3` | `#243047` | Border halus 1px kartu dan garis pemisah |
+| `textPrimary` | `#0F172A` | `#F8FAFC` | Judul, angka utama, teks body utama |
+| `textSecondary` | `#57534E` | `#94A3B8` | Subtitle, metadata tanggal/jam, label bantuan |
+| `primary` | `#0B6E5B` | `#10D9A3` | Tombol utama, tab aktif, indikator fokus |
+| `primarySoft` | `#E1F5EF` | `#0C2E29` | Container tonal primer, background avatar aktif |
+| `accentGold` | `#C98A1A` | `#F5C451` | Aksen emas bullion, streak, sholat/nisab |
+| `accentAi` | `#5B5FEF` | `#818CF8` | Aksen indigo Samudra AI |
 | `success` | `#15803D` | `#34D399` | Pemasukan, kebiasaan tuntas, kiblat akurat (±5°) |
 | `warning` | `#B45309` | `#FBBF24` | Konflik sholat, pengingat, anomali ringan |
-| `danger` / `error` | `#DC2626` | `#F87171` | Pengeluaran, aksi hapus, indikator rekam aktif |
-| `info` | `#1D4ED8` | `#60A5FA` | Jadwal meeting, agenda, tautan informasi |
+| `danger` / `error` | `#E11D48` | `#FB7185` | Pengeluaran, aksi hapus, indikator rekam aktif |
+| `info` | `#2563EB` | `#38BDF8` | Jadwal meeting, agenda, tautan informasi |
 
 ---
 
 ## 3. Ukuran Radius & Jarak Spasi (*Tokens*)
 
-Tersedia di [`lib/core/theme/hub_widgets.dart`](file:///D:/Mobile/Scribd/lib/core/theme/hub_widgets.dart):
+Tersedia di [`lib/core/theme/hub_widgets.dart`](lib/core/theme/hub_widgets.dart):
 
 ### Radius Sudut (`HubRadius`)
 - `xs` = `8.0` (Chip kecil, badge mini)
@@ -95,7 +98,7 @@ Status kosong terpadu dengan ikon lembut dalam lingkaran, judul ringkas, kalimat
 
 ## 5. Format Mata Uang & Angka (`RupiahTextInputFormatter`)
 
-- Lokasi: [`lib/core/utils/currency_input_formatter.dart`](file:///D:/Mobile/Scribd/lib/core/utils/currency_input_formatter.dart)
+- Lokasi: [`lib/core/utils/currency_input_formatter.dart`](lib/core/utils/currency_input_formatter.dart)
 - Mengonversi ketikan angka secara langsung (misal: `25000000` menjadi `25.000.000`) sambil mempertahankan posisi kursor pengetikan.
 - Fungsi helper `formatDigitsToRupiah(String digits)` dan `parseRupiahDigits(String text)` untuk interoperabilitas database.
 

@@ -4,7 +4,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:personal_hub/core/theme/app_tokens.dart';
 import 'package:personal_hub/core/theme/hub_widgets.dart';
 import 'package:personal_hub/features/meetings/models/meeting.dart';
-import 'package:personal_hub/features/meetings/providers/calendar_sync_providers.dart';
 import 'package:personal_hub/features/meetings/providers/meetings_providers.dart';
 import 'package:personal_hub/features/meetings/providers/schedule_guardian_providers.dart';
 import 'package:personal_hub/features/meetings/ui/meeting_detail_screen.dart';

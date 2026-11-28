@@ -488,6 +488,106 @@ void main() {
         );
       },
     );
+
+    test(
+      'blocks export with VaultDecryptionException when Vault PIN is set and master key is locked',
+      () async {
+        final stack = await createStack('vault_gate');
+        final guardedService = BackupService(
+          stack.db,
+          stack.vaultRepo,
+          stack.crypto,
+          stack.configStore,
+        );
+
+        final salt = VaultCryptoService().generateSalt();
+        final hash = await VaultCryptoService().hashPin('1234', salt: salt);
+        await stack.configStore.setVaultPinHash(hash);
+        await stack.configStore.getOrCreateVaultMasterKey(pin: '1234');
+
+        // Lock in-memory master key
+        stack.configStore.clearUnlockedMasterKey();
+
+        await expectLater(
+          guardedService.exportEncryptedBytes(passphrase: 'backup-aman'),
+          throwsA(isA<VaultDecryptionException>()),
+        );
+
+        // Unlocking restores export capability
+        await stack.configStore.getOrCreateVaultMasterKey(pin: '1234');
+        final bytes = await guardedService.exportEncryptedBytes(
+          passphrase: 'backup-aman',
+        );
+        expect(bytes, isNotEmpty);
+      },
+    );
+
+    test(
+      'rolls back atomic restore without losing existing data on mid-transaction failure',
+      () async {
+        final target = await createStack('atomic_rollback');
+        await target.db.db.insert('notes', {
+          'id': 'keep-note',
+          'title': 'Existing Important Note',
+          'content': 'Must survive failed restore',
+          'tags': '[]',
+          'is_pinned': 0,
+          'created_at': '2026-06-01T00:00:00Z',
+          'updated_at': '2026-06-01T00:00:00Z',
+        });
+
+        final corruptPayload = jsonEncode({
+          'schemaVersion': AppDatabase.schemaVersion,
+          'exportedAt': '2026-06-02T00:00:00Z',
+          'tables': {
+            'notes': [
+              {
+                'id': 'new-note',
+                'title': 'Should Rollback',
+                'content': 'Transient',
+                'tags': '[]',
+                'is_pinned': 0,
+                'created_at': '2026-06-02T00:00:00Z',
+                'updated_at': '2026-06-02T00:00:00Z',
+              },
+            ],
+            'meetings': const <Object>[],
+            'chat_messages': const <Object>[],
+            'prayer_prefs': const <Object>[],
+            'tasks': [
+              // Missing NOT NULL 'title' triggers SQLite constraint error mid-transaction.
+              {
+                'id': 'bad-task',
+                'priority': 1,
+                'is_done': 0,
+                'created_at': '2026-06-02T00:00:00Z',
+                'updated_at': '2026-06-02T00:00:00Z',
+              },
+            ],
+            'habits': const <Object>[],
+            'habit_logs': const <Object>[],
+            'transactions': const <Object>[],
+            'vault_entries': const <Object>[],
+          },
+        });
+        final corruptBytes = await target.crypto.encryptSnapshot(
+          corruptPayload,
+          passphrase: 'backup-aman',
+        );
+
+        await expectLater(
+          target.backupService.importEncryptedBytes(
+            corruptBytes,
+            passphrase: 'backup-aman',
+          ),
+          throwsA(isA<DatabaseException>()),
+        );
+
+        final survivingNotes = await target.db.db.query('notes');
+        expect(survivingNotes, hasLength(1));
+        expect(survivingNotes.single['title'], 'Existing Important Note');
+      },
+    );
   });
 
   group('BackupSection UI', () {
@@ -506,6 +606,9 @@ void main() {
           ProviderScope(
             overrides: [
               backupServiceProvider.overrideWithValue(fakeService),
+              secureConfigStoreProvider.overrideWithValue(
+                SecureConfigStore(_InMemorySecureStorage()),
+              ),
             ],
             child: MaterialApp(
               home: Scaffold(
@@ -581,6 +684,9 @@ void main() {
           ProviderScope(
             overrides: [
               backupServiceProvider.overrideWithValue(fakeService),
+              secureConfigStoreProvider.overrideWithValue(
+                SecureConfigStore(_InMemorySecureStorage()),
+              ),
             ],
             child: MaterialApp(
               home: Scaffold(

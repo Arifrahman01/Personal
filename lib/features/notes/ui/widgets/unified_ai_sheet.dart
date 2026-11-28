@@ -370,7 +370,7 @@ class _UnifiedAiAssistantSheetState
                       const Icon(Icons.memory_rounded, size: 16),
                       const SizedBox(width: 8),
                       const Text(
-                        'Ringkas via AI Lokal (Offline)',
+                        'Ringkas Cepat (Offline)',
                         style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
                       ),
                       const SizedBox(width: 8),
@@ -410,7 +410,7 @@ class _UnifiedAiAssistantSheetState
                 Text(
                   _isCloudLoading
                       ? 'Meringkas via Samudra AI Cloud...'
-                      : 'Meringkas via SLM on-device (Offline)...',
+                      : 'Meringkas cepat secara offline...',
                   style: theme.textTheme.bodyMedium?.copyWith(
                     color: AppTokens.textPrimary(context),
                   ),
@@ -464,11 +464,13 @@ class _UnifiedAiAssistantSheetState
               children: [
                 Row(
                   children: [
-                    Text(
-                      'Ringkasan AI Lokal (Offline)',
-                      style: theme.textTheme.titleSmall?.copyWith(
-                        fontWeight: FontWeight.w700,
-                        color: AppTokens.textPrimary(context),
+                    Flexible(
+                      child: Text(
+                        'Ringkasan Cepat (Offline)',
+                        style: theme.textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.w700,
+                          color: AppTokens.textPrimary(context),
+                        ),
                       ),
                     ),
                     const SizedBox(width: HubSpacing.sm),
@@ -629,11 +631,13 @@ class _UnifiedAiAssistantSheetState
         children: [
           Row(
             children: [
-              Text(
-                'Ekstrak Tugas via SLM',
-                style: theme.textTheme.titleSmall?.copyWith(
-                  fontWeight: FontWeight.w700,
-                  color: AppTokens.textPrimary(context),
+              Flexible(
+                child: Text(
+                  'Ekstrak Tugas Cepat (Offline)',
+                  style: theme.textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.w700,
+                    color: AppTokens.textPrimary(context),
+                  ),
                 ),
               ),
               const SizedBox(width: HubSpacing.sm),
@@ -644,7 +648,7 @@ class _UnifiedAiAssistantSheetState
                   borderRadius: HubRadius.rPill,
                 ),
                 child: Text(
-                  'SLM On-Device',
+                  'Heuristik Offline',
                   style: TextStyle(
                     fontSize: 11,
                     fontWeight: FontWeight.w700,
@@ -682,7 +686,7 @@ class _UnifiedAiAssistantSheetState
                 ),
                 const SizedBox(width: HubSpacing.sm),
                 Text(
-                  'Mengekstrak tugas via on-device SLM...',
+                  'Mengekstrak tugas secara offline...',
                   style: theme.textTheme.bodyMedium?.copyWith(
                     color: AppTokens.textPrimary(context),
                   ),

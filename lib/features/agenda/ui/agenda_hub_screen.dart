@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:personal_hub/app.dart';
 import 'package:personal_hub/core/theme/app_tokens.dart';
+import 'package:personal_hub/core/theme/hub_widgets.dart';
 import 'package:personal_hub/features/meetings/models/meeting.dart';
 import 'package:personal_hub/features/meetings/ui/meeting_form_screen.dart';
 import 'package:personal_hub/features/meetings/ui/meetings_screen.dart';
@@ -74,7 +75,9 @@ class _AgendaHubScreenState extends ConsumerState<AgendaHubScreen> {
       setState(() {
         _selectedSection = newSection.clamp(0, 2);
       });
-      ref.read(agendaSelectedSectionProvider.notifier).setSection(_selectedSection);
+      ref
+          .read(agendaSelectedSectionProvider.notifier)
+          .setSection(_selectedSection);
     }
   }
 
@@ -122,19 +125,21 @@ class _AgendaHubScreenState extends ConsumerState<AgendaHubScreen> {
                   children: [
                     Row(
                       children: [
-                        Icon(
-                          Icons.check_box_outlined,
+                        LuxeIconMedallion(
+                          icon: Icons.check_box_outlined,
                           color: AppTokens.primary(context),
-                          size: 20,
+                          size: 36,
+                          iconSize: 18,
+                          borderRadius: 10,
                         ),
-                        const SizedBox(width: HubSpacing.sm),
+                        const SizedBox(width: HubSpacing.md),
                         Text(
                           'Tambah Tugas Baru',
                           style: Theme.of(context)
                               .textTheme
                               .titleMedium
                               ?.copyWith(
-                                fontWeight: FontWeight.w700,
+                                fontWeight: FontWeight.w800,
                                 color: AppTokens.textPrimary(context),
                               ),
                         ),
@@ -172,15 +177,27 @@ class _AgendaHubScreenState extends ConsumerState<AgendaHubScreen> {
                       segments: const [
                         ButtonSegment(
                           value: TaskPriority.low,
-                          label: Text('Rendah', maxLines: 1, overflow: TextOverflow.ellipsis),
+                          label: Text(
+                            'Rendah',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
                         ),
                         ButtonSegment(
                           value: TaskPriority.medium,
-                          label: Text('Sedang', maxLines: 1, overflow: TextOverflow.ellipsis),
+                          label: Text(
+                            'Sedang',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
                         ),
                         ButtonSegment(
                           value: TaskPriority.high,
-                          label: Text('Tinggi', maxLines: 1, overflow: TextOverflow.ellipsis),
+                          label: Text(
+                            'Tinggi',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
                         ),
                       ],
                       selected: {selectedPriority},
@@ -240,7 +257,10 @@ class _AgendaHubScreenState extends ConsumerState<AgendaHubScreen> {
           heroTag: 'agenda_add_meeting_fab',
           onPressed: _openAddMeeting,
           icon: const Icon(Icons.add_rounded),
-          label: const Text('Meeting Baru'),
+          label: const Text(
+            'Meeting Baru',
+            style: TextStyle(fontWeight: FontWeight.w700),
+          ),
         );
       case 1:
         return FloatingActionButton.extended(
@@ -248,7 +268,10 @@ class _AgendaHubScreenState extends ConsumerState<AgendaHubScreen> {
           heroTag: 'agenda_add_task_fab',
           onPressed: _showAddTaskDialog,
           icon: const Icon(Icons.add_rounded),
-          label: const Text('Tambah Tugas'),
+          label: const Text(
+            'Tambah Tugas',
+            style: TextStyle(fontWeight: FontWeight.w700),
+          ),
         );
       case 2:
       default:
@@ -258,6 +281,8 @@ class _AgendaHubScreenState extends ConsumerState<AgendaHubScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final colors = HubColors.of(context);
+
     // Listen to external provider updates (e.g. from Home KPI cards tap)
     ref.listen<int>(agendaSelectedSectionProvider, (previous, next) {
       if (next != _selectedSection) {
@@ -267,100 +292,126 @@ class _AgendaHubScreenState extends ConsumerState<AgendaHubScreen> {
       }
     });
 
-    return Scaffold(
-      backgroundColor: AppTokens.canvas(context),
-      appBar: AppBar(
-        backgroundColor: AppTokens.canvas(context),
-        elevation: 0,
-        scrolledUnderElevation: 0,
-        title: Text(
-          'Agenda',
-          style: TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.w800,
-            color: AppTokens.textPrimary(context),
-            letterSpacing: -0.3,
-          ),
-        ),
-        actions: [
-          IconButton(
-            tooltip: 'Cari',
-            icon: const Icon(Icons.search_rounded),
-            onPressed: () => MainNavigationShell.openSearch(context),
-          ),
-          IconButton(
-            tooltip: 'AI Copilot',
-            icon: const Icon(Icons.auto_awesome_outlined),
-            onPressed: () => MainNavigationShell.openAiChat(context),
-          ),
-        ],
-        bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(52),
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-            child: SizedBox(
-              width: double.infinity,
-              child: SegmentedButton<int>(
-                showSelectedIcon: false,
-                style: SegmentedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
-                  visualDensity: VisualDensity.compact,
+    return LuxeAmbientBackground(
+      child: Scaffold(
+        backgroundColor: Colors.transparent,
+        appBar: AppBar(
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          scrolledUnderElevation: 0,
+          title: Row(
+            children: [
+              LuxeIconMedallion(
+                icon: Icons.calendar_month_rounded,
+                color: colors.primary,
+                size: 34,
+                iconSize: 18,
+                borderRadius: 10,
+              ),
+              const SizedBox(width: 10),
+              Text(
+                'Agenda',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w800,
+                  color: colors.textPrimary,
+                  letterSpacing: -0.4,
                 ),
-                segments: const [
-                  ButtonSegment<int>(
-                    value: 0,
-                    label: Text(
-                      'Meeting',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      softWrap: false,
+              ),
+            ],
+          ),
+          actions: [
+            LuxeHeaderIconButton(
+              tooltip: 'Cari',
+              icon: Icons.search_rounded,
+              onPressed: () => MainNavigationShell.openSearch(context),
+            ),
+            LuxeHeaderIconButton(
+              tooltip: 'AI Copilot',
+              icon: Icons.auto_awesome_rounded,
+              accentColor: colors.accentAi,
+              onPressed: () => MainNavigationShell.openAiChat(context),
+            ),
+            const SizedBox(width: 4),
+          ],
+          bottom: PreferredSize(
+            preferredSize: const Size.fromHeight(56),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
+              child: Container(
+                padding: const EdgeInsets.all(3),
+                decoration: BoxDecoration(
+                  color: colors.surfaceSubtle.withValues(alpha: 0.75),
+                  borderRadius: HubRadius.rPill,
+                  border: Border.all(color: colors.borderHairline),
+                ),
+                width: double.infinity,
+                child: SegmentedButton<int>(
+                  showSelectedIcon: false,
+                  style: SegmentedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 6,
+                      vertical: 8,
                     ),
-                    icon: Icon(Icons.calendar_month_rounded, size: 16),
+                    visualDensity: VisualDensity.compact,
+                    side: BorderSide.none,
                   ),
-                  ButtonSegment<int>(
-                    value: 1,
-                    label: Text(
-                      'Tugas & Habit',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      softWrap: false,
+                  segments: const [
+                    ButtonSegment<int>(
+                      value: 0,
+                      label: Text(
+                        'Meeting',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        softWrap: false,
+                      ),
+                      icon: Icon(Icons.calendar_month_rounded, size: 16),
                     ),
-                    icon: Icon(Icons.check_box_outlined, size: 16),
-                  ),
-                  ButtonSegment<int>(
-                    value: 2,
-                    label: Text(
-                      'Sholat & Kiblat',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      softWrap: false,
+                    ButtonSegment<int>(
+                      value: 1,
+                      label: Text(
+                        'Tugas & Habit',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        softWrap: false,
+                      ),
+                      icon: Icon(Icons.check_box_outlined, size: 16),
                     ),
-                    icon: Icon(Icons.explore_outlined, size: 16),
-                  ),
-                ],
-                selected: {_selectedSection},
-                onSelectionChanged: (selection) {
-                  if (selection.isNotEmpty) {
-                    _selectSection(selection.first);
-                  }
-                },
+                    ButtonSegment<int>(
+                      value: 2,
+                      label: Text(
+                        'Sholat & Kiblat',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        softWrap: false,
+                      ),
+                      icon: Icon(Icons.explore_outlined, size: 16),
+                    ),
+                  ],
+                  selected: {_selectedSection},
+                  onSelectionChanged: (selection) {
+                    if (selection.isNotEmpty) {
+                      _selectSection(selection.first);
+                    }
+                  },
+                ),
               ),
             ),
           ),
         ),
+        body: IndexedStack(
+          index: _selectedSection,
+          children: [
+            MeetingsScreen(
+              isEmbedded: true,
+              onPromoteActionItem: widget.onPromoteActionItem,
+            ),
+            const TasksHabitsScreen(isEmbedded: true),
+            const PrayerScheduleScreen(isEmbedded: true),
+          ],
+        ),
+        floatingActionButton: _buildContextualFab(),
       ),
-      body: IndexedStack(
-        index: _selectedSection,
-        children: [
-          MeetingsScreen(
-            isEmbedded: true,
-            onPromoteActionItem: widget.onPromoteActionItem,
-          ),
-          const TasksHabitsScreen(isEmbedded: true),
-          const PrayerScheduleScreen(isEmbedded: true),
-        ],
-      ),
-      floatingActionButton: _buildContextualFab(),
     );
   }
 }

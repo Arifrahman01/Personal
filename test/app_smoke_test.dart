@@ -1,6 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:http/http.dart' as http;
 import 'package:personal_hub/app.dart';
 import 'package:personal_hub/core/config/secure_config_store.dart';
@@ -70,7 +69,6 @@ class _FakeAiClient extends SamudraAiClient {
 
 void main() {
   setUpAll(() {
-    GoogleFonts.config.allowRuntimeFetching = false;
     sqfliteFfiInit();
   });
 

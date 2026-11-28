@@ -145,7 +145,7 @@ void main() {
 
         final repo = PrayerPrefsRepository(db);
         final defaults = await repo.loadPrefs();
-        expect(defaults.notificationMode, AdzanNotificationMode.firebaseFcm);
+        expect(defaults.notificationMode, AdzanNotificationMode.both);
         expect(defaults.method, PrayerMethod.kemenag);
 
         final updated = defaults.copyWith(
@@ -168,6 +168,45 @@ void main() {
         expect(reloaded.soundEnabled, isFalse);
         expect(reloaded.enabledPrayers, {PrayerName.subuh, PrayerName.isya});
         expect(reloaded.notificationMode, AdzanNotificationMode.both);
+      },
+    );
+
+    test(
+      'schedules offline fallback alarms for firebaseFcm mode only when forceLocalFallback is true',
+      () async {
+        final gateway = _RecordingAlarmGateway();
+        final scheduler = PrayerAlarmScheduler(
+          prayerTimeService: timeService,
+          gateway: gateway,
+        );
+
+        final now = DateTime(2026, 5, 15, 1, 0);
+        final fcmOnlyPrefs = PrayerAlarmPrefs(
+          cityName: 'Jakarta Pusat',
+          latitude: -6.2088,
+          longitude: 106.8456,
+          method: PrayerMethod.kemenag,
+          preReminderMinutes: 0,
+          soundEnabled: true,
+          enabledPrayers: PrayerName.values.toSet(),
+          notificationMode: AdzanNotificationMode.firebaseFcm,
+        );
+
+        final skippedCount = await scheduler.syncAlarms(
+          now: now,
+          prefs: fcmOnlyPrefs,
+          forceLocalFallback: false,
+        );
+        expect(skippedCount, 0);
+        expect(gateway.scheduled, isEmpty);
+
+        final fallbackCount = await scheduler.syncAlarms(
+          now: now,
+          prefs: fcmOnlyPrefs,
+          forceLocalFallback: true,
+        );
+        expect(fallbackCount, 35);
+        expect(gateway.scheduled, hasLength(35));
       },
     );
   });

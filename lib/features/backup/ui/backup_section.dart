@@ -1,7 +1,6 @@
-import 'dart:typed_data';
-
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:personal_hub/core/errors/app_exceptions.dart';
@@ -11,6 +10,8 @@ import 'package:personal_hub/core/utils/file_export_helper.dart';
 import 'package:personal_hub/features/backup/providers/backup_providers.dart';
 import 'package:personal_hub/features/backup/services/backup_crypto_service.dart';
 import 'package:personal_hub/features/backup/services/backup_service.dart';
+import 'package:personal_hub/features/vault/providers/vault_lock_controller.dart';
+import 'package:personal_hub/features/vault/providers/vault_providers.dart';
 
 /// Callback that persists/shares exported `.phub` bytes with a suggested [fileName].
 typedef BackupExportHandler =
@@ -19,6 +20,67 @@ typedef BackupExportHandler =
 /// Callback that lets the user choose a `.phub` file and returns its raw bytes,
 /// or `null` if the user cancels.
 typedef BackupPickHandler = Future<Uint8List?> Function();
+
+/// Verifies Vault authorization before exporting encrypted backups containing Vault data.
+///
+/// If a Vault PIN is configured and the Vault is currently locked or in decoy mode,
+/// prompts the user to unlock with the primary PIN or biometrics, and returns
+/// `unlockedTemporarily = true` so callers can re-lock immediately after export.
+Future<({bool authorized, bool unlockedTemporarily})>
+ensureVaultAuthorizedForBackup(BuildContext context, WidgetRef ref) async {
+  final lockController = ref.read(vaultLockControllerProvider);
+  var hasPin = false;
+  try {
+    hasPin = await lockController.hasPin();
+  } on MissingPluginException {
+    hasPin = false;
+  } on UnimplementedError {
+    hasPin = false;
+  }
+
+  if (!hasPin) {
+    return (authorized: true, unlockedTemporarily: false);
+  }
+
+  if (lockController.isUnlocked && !lockController.isDecoyMode) {
+    return (authorized: true, unlockedTemporarily: false);
+  }
+
+  if (!context.mounted) {
+    return (authorized: false, unlockedTemporarily: false);
+  }
+
+  final canBiometrics = await lockController.canUseBiometrics().catchError(
+    (_) => false,
+  );
+  if (!context.mounted) {
+    return (authorized: false, unlockedTemporarily: false);
+  }
+
+  final unlocked = await showDialog<bool>(
+    context: context,
+    builder: (_) => _VaultBackupAuthDialog(
+      lockController: lockController,
+      canUseBiometrics: canBiometrics,
+    ),
+  );
+
+  return (
+    authorized: unlocked == true,
+    unlockedTemporarily: unlocked == true,
+  );
+}
+
+/// Prompts the user for a backup encryption/decryption passphrase.
+Future<String?> showBackupPassphraseDialog(
+  BuildContext context, {
+  required bool isExport,
+}) {
+  return showDialog<String>(
+    context: context,
+    builder: (context) => _PassphraseDialog(isExport: isExport),
+  );
+}
 
 /// Settings section providing encrypted `.phub` backup export and restore,
 /// and clear human explanation of backup rotation.
@@ -89,7 +151,6 @@ class _BackupSectionState extends ConsumerState<BackupSection> {
             ),
           ),
           const SizedBox(height: 12),
-          // Human-readable GFS rotation explanation
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             decoration: BoxDecoration(
@@ -149,11 +210,17 @@ class _BackupSectionState extends ConsumerState<BackupSection> {
   }
 
   Future<void> _handleExport() async {
-    final passphrase = await _showPassphraseDialog(isExport: true);
-    if (passphrase == null || !mounted) return;
+    final auth = await ensureVaultAuthorizedForBackup(context, ref);
+    if (!auth.authorized || !mounted) return;
 
-    setState(() => _isBusy = true);
     try {
+      final passphrase = await showBackupPassphraseDialog(
+        context,
+        isExport: true,
+      );
+      if (passphrase == null || !mounted) return;
+
+      setState(() => _isBusy = true);
       final service = ref.read(backupServiceProvider);
       final bytes = await service.exportEncryptedBytes(passphrase: passphrase);
       final stamp = DateFormat('yyyyMMdd_HHmmss').format(DateTime.now());
@@ -167,6 +234,9 @@ class _BackupSectionState extends ConsumerState<BackupSection> {
     } on ValidationException catch (error) {
       if (!mounted) return;
       _showSnackBar(error.message, isError: true);
+    } on VaultDecryptionException catch (error) {
+      if (!mounted) return;
+      _showSnackBar(error.message, isError: true);
     } catch (_) {
       if (!mounted) return;
       _showSnackBar(
@@ -174,6 +244,9 @@ class _BackupSectionState extends ConsumerState<BackupSection> {
         isError: true,
       );
     } finally {
+      if (auth.unlockedTemporarily) {
+        ref.read(vaultLockControllerProvider).lock();
+      }
       if (mounted) {
         setState(() => _isBusy = false);
       }
@@ -199,7 +272,10 @@ class _BackupSectionState extends ConsumerState<BackupSection> {
     }
 
     setState(() => _isBusy = false);
-    final passphrase = await _showPassphraseDialog(isExport: false);
+    final passphrase = await showBackupPassphraseDialog(
+      context,
+      isExport: false,
+    );
     if (passphrase == null || !mounted) return;
 
     setState(() => _isBusy = true);
@@ -245,13 +321,6 @@ class _BackupSectionState extends ConsumerState<BackupSection> {
     return files.first.readAsBytes();
   }
 
-  Future<String?> _showPassphraseDialog({required bool isExport}) {
-    return showDialog<String>(
-      context: context,
-      builder: (context) => _PassphraseDialog(isExport: isExport),
-    );
-  }
-
   String _formatRestoreSummary(BackupRestoreReport report) {
     return 'Restore selesai: '
         '${report.notesCount} catatan, '
@@ -272,6 +341,166 @@ class _BackupSectionState extends ConsumerState<BackupSection> {
           behavior: SnackBarBehavior.floating,
         ),
       );
+  }
+}
+
+class _VaultBackupAuthDialog extends StatefulWidget {
+  const _VaultBackupAuthDialog({
+    required this.lockController,
+    required this.canUseBiometrics,
+  });
+
+  final VaultLockController lockController;
+  final bool canUseBiometrics;
+
+  @override
+  State<_VaultBackupAuthDialog> createState() => _VaultBackupAuthDialogState();
+}
+
+class _VaultBackupAuthDialogState extends State<_VaultBackupAuthDialog> {
+  final _pinController = TextEditingController();
+  bool _isVerifying = false;
+  String? _errorText;
+
+  @override
+  void dispose() {
+    _pinController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _verifyPin() async {
+    final pin = _pinController.text.trim();
+    if (pin.isEmpty) {
+      setState(() => _errorText = 'Masukkan PIN utama Brankas terlebih dahulu.');
+      return;
+    }
+
+    setState(() {
+      _isVerifying = true;
+      _errorText = null;
+    });
+
+    try {
+      final ok = await widget.lockController.unlockWithPin(pin);
+      if (!mounted) return;
+      if (ok && !widget.lockController.isDecoyMode) {
+        Navigator.of(context).pop(true);
+        return;
+      }
+      if (ok && widget.lockController.isDecoyMode) {
+        widget.lockController.lock();
+      }
+      setState(() {
+        _isVerifying = false;
+        _errorText = widget.lockController.isLockedOut
+            ? 'Terlalu banyak percobaan salah. Coba lagi nanti.'
+            : 'PIN utama Brankas tidak sesuai.';
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _isVerifying = false;
+        _errorText = 'Gagal memverifikasi PIN Brankas.';
+      });
+    }
+  }
+
+  Future<void> _verifyBiometrics() async {
+    setState(() {
+      _isVerifying = true;
+      _errorText = null;
+    });
+    try {
+      final ok = await widget.lockController.unlockWithBiometrics();
+      if (!mounted) return;
+      if (ok) {
+        Navigator.of(context).pop(true);
+        return;
+      }
+      setState(() {
+        _isVerifying = false;
+        _errorText = 'Autentikasi biometrik gagal atau dibatalkan.';
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _isVerifying = false;
+        _errorText = 'Autentikasi biometrik gagal.';
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Verifikasi Brankas'),
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              'Cadangan .phub menyertakan entri Brankas Anda. Masukkan PIN utama Brankas untuk melanjutkan ekspor.',
+              style: TextStyle(
+                fontSize: 12,
+                color: AppTokens.textSecondary(context),
+              ),
+            ),
+            const SizedBox(height: 14),
+            TextField(
+              controller: _pinController,
+              obscureText: true,
+              autofocus: true,
+              keyboardType: TextInputType.number,
+              inputFormatters: [
+                FilteringTextInputFormatter.digitsOnly,
+                LengthLimitingTextInputFormatter(
+                  VaultLockController.maxPinLength,
+                ),
+              ],
+              decoration: const InputDecoration(
+                labelText: 'PIN Utama Brankas',
+                prefixIcon: Icon(Icons.lock_outline_rounded),
+              ),
+              onSubmitted: (_) {
+                if (!_isVerifying) _verifyPin();
+              },
+            ),
+            if (widget.canUseBiometrics) ...[
+              const SizedBox(height: 10),
+              OutlinedButton.icon(
+                onPressed: _isVerifying ? null : _verifyBiometrics,
+                icon: const Icon(Icons.fingerprint_rounded, size: 18),
+                label: const Text('Verifikasi dengan Biometrik'),
+              ),
+            ],
+            if (_errorText != null) ...[
+              const SizedBox(height: 10),
+              Text(
+                _errorText!,
+                style: TextStyle(
+                  color: AppTokens.error(context),
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: _isVerifying
+              ? null
+              : () => Navigator.of(context).pop(false),
+          child: const Text('Batal'),
+        ),
+        FilledButton(
+          onPressed: _isVerifying ? null : _verifyPin,
+          child: const Text('Verifikasi'),
+        ),
+      ],
+    );
   }
 }
 

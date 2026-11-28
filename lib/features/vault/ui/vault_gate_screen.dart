@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -5,6 +7,7 @@ import 'package:personal_hub/app.dart';
 import 'package:personal_hub/core/errors/app_exceptions.dart';
 import 'package:personal_hub/core/theme/app_tokens.dart';
 import 'package:personal_hub/core/theme/hub_widgets.dart';
+import 'package:personal_hub/features/vault/providers/vault_lock_controller.dart';
 import 'package:personal_hub/features/vault/providers/vault_providers.dart';
 
 export 'vault_tab_view.dart';
@@ -28,6 +31,7 @@ class _VaultGateScreenState extends ConsumerState<VaultGateScreen> {
   bool _canUseBiometrics = false;
   bool _obscurePin = true;
   String? _errorMessage;
+  Timer? _lockoutTicker;
 
   @override
   void initState() {
@@ -37,10 +41,42 @@ class _VaultGateScreenState extends ConsumerState<VaultGateScreen> {
 
   @override
   void dispose() {
+    _lockoutTicker?.cancel();
     _pinController.dispose();
     _confirmPinController.dispose();
     _keyboardFocusNode.dispose();
     super.dispose();
+  }
+
+  void _syncLockoutTicker(VaultLockController controller) {
+    if (controller.isLockedOut) {
+      _lockoutTicker ??= Timer.periodic(const Duration(seconds: 1), (_) {
+        if (!mounted) return;
+        final ctrl = ref.read(vaultLockControllerProvider);
+        if (!ctrl.isLockedOut) {
+          _lockoutTicker?.cancel();
+          _lockoutTicker = null;
+          setState(() {
+            _errorMessage = null;
+          });
+        } else {
+          setState(() {});
+        }
+      });
+    } else {
+      _lockoutTicker?.cancel();
+      _lockoutTicker = null;
+    }
+  }
+
+  String _formatRemainingLockout(Duration remaining) {
+    final totalSeconds = remaining.inSeconds.clamp(1, 3600);
+    final minutes = totalSeconds ~/ 60;
+    final seconds = totalSeconds % 60;
+    if (minutes > 0) {
+      return '$minutes menit $seconds detik';
+    }
+    return '$seconds detik';
   }
 
   void _handleKeyEvent(KeyEvent event) {
@@ -62,7 +98,9 @@ class _VaultGateScreenState extends ConsumerState<VaultGateScreen> {
     final controller = ref.read(vaultLockControllerProvider);
     final hasPin = await controller.hasPin();
     final canBiometric = await controller.canUseBiometrics();
+    await controller.loadBruteforceState();
     if (!mounted) return;
+    _syncLockoutTicker(controller);
     setState(() {
       _hasPin = hasPin;
       _canUseBiometrics = canBiometric;
@@ -113,6 +151,16 @@ class _VaultGateScreenState extends ConsumerState<VaultGateScreen> {
   }
 
   Future<void> _handleUnlockWithPin() async {
+    final controller = ref.read(vaultLockControllerProvider);
+    if (controller.isLockedOut) {
+      _syncLockoutTicker(controller);
+      setState(() {
+        _errorMessage =
+            'Terlalu banyak percobaan salah. Coba lagi dalam ${_formatRemainingLockout(controller.remainingLockoutDuration)}.';
+      });
+      return;
+    }
+
     final pin = _pinController.text.trim();
     if (pin.isEmpty) {
       setState(() {
@@ -127,14 +175,29 @@ class _VaultGateScreenState extends ConsumerState<VaultGateScreen> {
     });
 
     try {
-      final ok = await ref.read(vaultLockControllerProvider).unlockWithPin(pin);
+      final ok = await controller.unlockWithPin(pin);
       if (!mounted) return;
 
       if (ok) {
+        _lockoutTicker?.cancel();
+        _lockoutTicker = null;
         _pinController.clear();
       } else {
+        _pinController.clear();
+        _syncLockoutTicker(controller);
+        final remainingAttempts =
+            VaultLockController.maxFailedAttemptsBeforeLockout -
+            controller.failedAttempts;
         setState(() {
-          _errorMessage = 'PIN salah. Silakan coba lagi.';
+          if (controller.isLockedOut) {
+            _errorMessage =
+                'Terlalu banyak percobaan salah. Brankas dikunci sementara (${_formatRemainingLockout(controller.remainingLockoutDuration)}).';
+          } else if (remainingAttempts > 0 && remainingAttempts <= 3) {
+            _errorMessage =
+                'PIN salah. Sisa $remainingAttempts percobaan sebelum dikunci sementara.';
+          } else {
+            _errorMessage = 'PIN salah. Silakan coba lagi.';
+          }
         });
       }
     } catch (_) {
@@ -188,7 +251,9 @@ class _VaultGateScreenState extends ConsumerState<VaultGateScreen> {
   }
 
   void _onKeypadDigit(String digit) {
-    if (_pinController.text.length < 8) {
+    final controller = ref.read(vaultLockControllerProvider);
+    if (controller.isLockedOut || _isSubmitting) return;
+    if (_pinController.text.length < VaultLockController.maxPinLength) {
       setState(() {
         _pinController.text = '${_pinController.text}$digit';
         _errorMessage = null;
@@ -197,6 +262,9 @@ class _VaultGateScreenState extends ConsumerState<VaultGateScreen> {
   }
 
   void _onKeypadBackspace() {
+    if (ref.read(vaultLockControllerProvider).isLockedOut || _isSubmitting) {
+      return;
+    }
     if (_pinController.text.isNotEmpty) {
       setState(() {
         _pinController.text =
@@ -275,88 +343,145 @@ class _VaultGateScreenState extends ConsumerState<VaultGateScreen> {
 
     final pinLength = _pinController.text.length;
     final dotCount = pinLength > 4 ? pinLength : 4;
+    final gold = colors.accentGold;
+    final lockController = ref.watch(vaultLockControllerProvider);
+    final isLockedOut = lockController.isLockedOut;
+    final lockoutMessage = isLockedOut
+        ? 'Terlalu banyak percobaan salah. Coba lagi dalam ${_formatRemainingLockout(lockController.remainingLockoutDuration)}.'
+        : null;
 
-    return Scaffold(
-      backgroundColor: AppTokens.canvas(context),
-      appBar: AppBar(
-        title: const Text('Brankas Kata Sandi'),
-        backgroundColor: AppTokens.canvas(context),
-        centerTitle: false,
-        elevation: 0,
-        actions: [
-          IconButton(
-            tooltip: 'AI Copilot',
-            icon: const Icon(Icons.auto_awesome_outlined),
-            onPressed: () => MainNavigationShell.openAiChat(context),
+    return LuxeAmbientBackground(
+      child: Scaffold(
+        backgroundColor: Colors.transparent,
+        appBar: AppBar(
+          title: Row(
+            children: [
+              LuxeIconMedallion(
+                icon: Icons.verified_user_rounded,
+                color: primary,
+                size: 34,
+                iconSize: 18,
+                borderRadius: 10,
+              ),
+              const SizedBox(width: 10),
+              const Text(
+                'Brankas Kata Sandi',
+                style: TextStyle(fontWeight: FontWeight.w800),
+              ),
+            ],
           ),
-        ],
-      ),
-      body: SafeArea(
-        child: KeyboardListener(
-          focusNode: _keyboardFocusNode,
-          autofocus: true,
-          onKeyEvent: _hasPin ? _handleKeyEvent : null,
-          child: Center(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 400),
-                child: HubCard(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      // Shield Icon
-                      Center(
-                        child: Container(
-                          width: 46,
-                          height: 46,
-                          decoration: BoxDecoration(
-                            color: primary.withValues(alpha: 0.12),
-                            shape: BoxShape.circle,
-                          ),
-                          child: Icon(
-                            _hasPin ? Icons.lock_outline_rounded : Icons.verified_user_outlined,
-                            size: 24,
-                            color: primary,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      // Security Badge
-                      Center(
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 10,
-                            vertical: 4,
-                          ),
-                          decoration: BoxDecoration(
-                            color: primary.withValues(alpha: 0.10),
-                            borderRadius: HubRadius.rPill,
-                            border: Border.all(
-                              color: primary.withValues(alpha: 0.35),
-                              width: 1,
+          backgroundColor: Colors.transparent,
+          centerTitle: false,
+          elevation: 0,
+          actions: [
+            LuxeHeaderIconButton(
+              tooltip: 'AI Copilot',
+              icon: Icons.auto_awesome_rounded,
+              accentColor: colors.accentAi,
+              onPressed: () => MainNavigationShell.openAiChat(context),
+            ),
+            const SizedBox(width: 4),
+          ],
+        ),
+        body: SafeArea(
+          child: KeyboardListener(
+            focusNode: _keyboardFocusNode,
+            autofocus: true,
+            onKeyEvent: _hasPin ? _handleKeyEvent : null,
+            child: Center(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 400),
+                  child: HubCard(
+                    elevationGlowColor: primary,
+                    borderColor: primary.withValues(alpha: 0.25),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 18,
+                      vertical: 20,
+                    ),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        // Concentric Sanctuary Shield Emblem
+                        Center(
+                          child: Container(
+                            width: 72,
+                            height: 72,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: gold.withValues(alpha: 0.08),
+                              border: Border.all(
+                                color: gold.withValues(alpha: 0.30),
+                              ),
                             ),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(Icons.shield_outlined, size: 12, color: primary),
-                              const SizedBox(width: 5),
-                              Text(
-                                'Terkunci Aman',
-                                style: TextStyle(
-                                  color: primary,
-                                  fontWeight: FontWeight.w700,
-                                  fontSize: 11,
-                                  letterSpacing: 0.2,
+                            alignment: Alignment.center,
+                            child: Container(
+                              width: 52,
+                              height: 52,
+                              decoration: BoxDecoration(
+                                gradient: LinearGradient(
+                                  begin: Alignment.topLeft,
+                                  end: Alignment.bottomRight,
+                                  colors: [
+                                    primary.withValues(alpha: 0.24),
+                                    gold.withValues(alpha: 0.14),
+                                  ],
+                                ),
+                                shape: BoxShape.circle,
+                                border: Border.all(
+                                  color: primary.withValues(alpha: 0.45),
                                 ),
                               ),
-                            ],
+                              child: Icon(
+                                _hasPin
+                                    ? Icons.lock_outline_rounded
+                                    : Icons.verified_user_outlined,
+                                size: 24,
+                                color: primary,
+                              ),
+                            ),
                           ),
                         ),
-                      ),
+                        const SizedBox(height: 10),
+                        // Security Badge
+                        Center(
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 4,
+                            ),
+                            decoration: BoxDecoration(
+                              color: primary.withValues(alpha: 0.12),
+                              borderRadius: HubRadius.rPill,
+                              border: Border.all(
+                                color: primary.withValues(alpha: 0.35),
+                                width: 1,
+                              ),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  Icons.shield_outlined,
+                                  size: 12,
+                                  color: primary,
+                                ),
+                                const SizedBox(width: 5),
+                                Text(
+                                  'Terkunci Aman',
+                                  style: TextStyle(
+                                    color: primary,
+                                    fontWeight: FontWeight.w800,
+                                    fontSize: 11,
+                                    letterSpacing: 0.2,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
                     const SizedBox(height: 10),
                     Text(
                       _hasPin ? 'Brankas Terkunci' : 'Buat PIN Brankas',
@@ -369,8 +494,8 @@ class _VaultGateScreenState extends ConsumerState<VaultGateScreen> {
                     const SizedBox(height: 4),
                     Text(
                       _hasPin
-                          ? 'Masukkan PIN (4-8 digit) atau gunakan biometrik.'
-                          : 'Atur PIN minimal 4 digit angka untuk melindungi brankas.',
+                          ? 'Masukkan PIN (4–8 digit) atau gunakan biometrik.'
+                          : 'Atur PIN 4–8 digit angka untuk melindungi brankas.',
                       textAlign: TextAlign.center,
                       style: theme.textTheme.bodySmall?.copyWith(
                         color: AppTokens.textSecondary(context),
@@ -552,11 +677,17 @@ class _VaultGateScreenState extends ConsumerState<VaultGateScreen> {
                         controller: _pinController,
                         obscureText: _obscurePin,
                         keyboardType: TextInputType.number,
+                        inputFormatters: [
+                          FilteringTextInputFormatter.digitsOnly,
+                          LengthLimitingTextInputFormatter(
+                            VaultLockController.maxPinLength,
+                          ),
+                        ],
                         textInputAction: TextInputAction.next,
                         onChanged: (_) => setState(() {}),
                         decoration: InputDecoration(
-                          labelText: 'Buat PIN (min. 4 digit)',
-                          hintText: 'Minimal 4 digit angka',
+                          labelText: 'Buat PIN (4–8 digit)',
+                          hintText: '4 sampai 8 digit angka',
                           prefixIcon: const Icon(Icons.vpn_key_outlined),
                           suffixIcon: IconButton(
                             tooltip: _obscurePin
@@ -580,6 +711,12 @@ class _VaultGateScreenState extends ConsumerState<VaultGateScreen> {
                         controller: _confirmPinController,
                         obscureText: _obscurePin,
                         keyboardType: TextInputType.number,
+                        inputFormatters: [
+                          FilteringTextInputFormatter.digitsOnly,
+                          LengthLimitingTextInputFormatter(
+                            VaultLockController.maxPinLength,
+                          ),
+                        ],
                         textInputAction: TextInputAction.done,
                         onSubmitted: (_) {
                           if (!_isSubmitting) {
@@ -593,10 +730,10 @@ class _VaultGateScreenState extends ConsumerState<VaultGateScreen> {
                         ),
                       ),
                     ],
-                    if (_errorMessage != null) ...[
+                    if (lockoutMessage != null || _errorMessage != null) ...[
                       const SizedBox(height: 12),
                       Text(
-                        _errorMessage!,
+                        lockoutMessage ?? _errorMessage!,
                         textAlign: TextAlign.center,
                         style: theme.textTheme.bodySmall?.copyWith(
                           color: AppTokens.error(context),
@@ -614,7 +751,7 @@ class _VaultGateScreenState extends ConsumerState<VaultGateScreen> {
                           borderRadius: HubRadius.rSm,
                         ),
                       ),
-                      onPressed: _isSubmitting
+                      onPressed: (_isSubmitting || (_hasPin && isLockedOut))
                           ? null
                           : (_hasPin
                               ? _handleUnlockWithPin
@@ -662,6 +799,7 @@ class _VaultGateScreenState extends ConsumerState<VaultGateScreen> {
           ),
         ),
       ),
+    ),
     ),
   );
 }

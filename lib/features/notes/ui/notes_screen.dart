@@ -195,53 +195,67 @@ class _NotesScreenState extends ConsumerState<NotesScreen> {
   Widget build(BuildContext context) {
     final notesAsync = ref.watch(notesListProvider);
     final theme = Theme.of(context);
+    final colors = HubColors.of(context);
 
-    return Scaffold(
-      backgroundColor: AppTokens.canvas(context),
-      appBar: AppBar(
-        backgroundColor: AppTokens.canvas(context),
-        elevation: 0,
-        scrolledUnderElevation: 0,
-        title: Text(
-          'Catatan',
-          style: theme.textTheme.titleLarge?.copyWith(
-            fontWeight: FontWeight.w700,
-            color: AppTokens.textPrimary(context),
-          ),
-        ),
-        actions: [
-          IconButton(
-            tooltip: 'AI Copilot',
-            icon: const Icon(Icons.auto_awesome_outlined),
-            onPressed: () => MainNavigationShell.openAiChat(context),
-          ),
-          MenuAnchor(
-            builder: (context, controller, child) {
-              return IconButton(
-                tooltip: 'Opsi lainnya',
-                icon: Icon(
-                  Icons.more_vert_rounded,
-                  color: AppTokens.textPrimary(context),
+    return LuxeAmbientBackground(
+      child: Scaffold(
+        backgroundColor: Colors.transparent,
+        appBar: AppBar(
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          scrolledUnderElevation: 0,
+          title: Row(
+            children: [
+              LuxeIconMedallion(
+                icon: Icons.edit_note_rounded,
+                color: colors.primary,
+                size: 34,
+                iconSize: 19,
+                borderRadius: 10,
+              ),
+              const SizedBox(width: 10),
+              Text(
+                'Catatan',
+                style: theme.textTheme.titleLarge?.copyWith(
+                  fontWeight: FontWeight.w800,
+                  color: colors.textPrimary,
                 ),
-                onPressed: () {
-                  if (controller.isOpen) {
-                    controller.close();
-                  } else {
-                    controller.open();
-                  }
-                },
-              );
-            },
-            menuChildren: [
-              MenuItemButton(
-                leadingIcon: const Icon(Icons.cloud_download_outlined, size: 18),
-                onPressed: _exportAllNotes,
-                child: const Text('Ekspor Semua (.md)'),
               ),
             ],
           ),
-        ],
-      ),
+          actions: [
+            LuxeHeaderIconButton(
+              tooltip: 'AI Copilot',
+              icon: Icons.auto_awesome_rounded,
+              accentColor: colors.accentAi,
+              onPressed: () => MainNavigationShell.openAiChat(context),
+            ),
+            MenuAnchor(
+              builder: (context, controller, child) {
+                return LuxeHeaderIconButton(
+                  tooltip: 'Opsi lainnya',
+                  icon: Icons.more_vert_rounded,
+                  onPressed: () {
+                    if (controller.isOpen) {
+                      controller.close();
+                    } else {
+                      controller.open();
+                    }
+                  },
+                );
+              },
+              menuChildren: [
+                MenuItemButton(
+                  leadingIcon:
+                      const Icon(Icons.cloud_download_outlined, size: 18),
+                  onPressed: _exportAllNotes,
+                  child: const Text('Ekspor Semua (.md)'),
+                ),
+              ],
+            ),
+            const SizedBox(width: 4),
+          ],
+        ),
       floatingActionButton: FloatingActionButton.extended(
         heroTag: 'notes_fab',
         onPressed: () => _openEditor(),
@@ -453,6 +467,7 @@ class _NotesScreenState extends ConsumerState<NotesScreen> {
           },
         ),
       ),
+    ),
     );
   }
 
@@ -561,176 +576,213 @@ class _NoteCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final colors = HubColors.of(context);
     final snippet = note.content.trim();
 
     return HubCard(
       onTap: onTap,
       borderRadius: HubRadius.rMd,
       borderColor: note.isPinned
-          ? AppTokens.primary(context).withValues(alpha: 0.45)
-          : AppTokens.border(context),
+          ? colors.accentGold.withValues(alpha: 0.45)
+          : colors.borderHairline,
+      elevationGlowColor: note.isPinned ? colors.accentGold : null,
       borderWidth: 1.0,
-      padding: const EdgeInsets.fromLTRB(
-        HubSpacing.lg,
-        HubSpacing.md,
-        HubSpacing.sm,
-        HubSpacing.md,
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Header Row: Title & Single 3-dot Action Popup
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              if (note.isPinned) ...[
-                Padding(
-                  padding: const EdgeInsets.only(right: 6),
-                  child: Icon(
-                    Icons.push_pin_rounded,
-                    size: 16,
-                    color: AppTokens.primary(context),
+      padding: EdgeInsets.zero,
+      child: IntrinsicHeight(
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            if (note.isPinned)
+              Container(
+                width: 4,
+                margin: const EdgeInsets.fromLTRB(8, 12, 0, 12),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [colors.accentGold, colors.primary],
                   ),
-                ),
-              ],
-              Expanded(
-                child: Text(
-                  note.title,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: theme.textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w700,
-                    color: AppTokens.textPrimary(context),
-                    letterSpacing: -0.2,
-                  ),
+                  borderRadius: HubRadius.rPill,
                 ),
               ),
-              // Single 3-dot MenuAnchor Action Menu (>= 48x48dp touch target)
-              SizedBox(
-                width: 48,
-                height: 48,
-                child: MenuAnchor(
-                  builder: (context, controller, child) {
-                    return IconButton(
-                      tooltip: 'Aksi catatan',
-                      icon: Icon(
-                        Icons.more_vert_rounded,
-                        size: 20,
-                        color: AppTokens.textSecondary(context),
-                      ),
-                      onPressed: () {
-                        if (controller.isOpen) {
-                          controller.close();
-                        } else {
-                          controller.open();
-                        }
-                      },
-                    );
-                  },
-                  menuChildren: [
-                    MenuItemButton(
-                      leadingIcon: Icon(
-                        note.isPinned
-                            ? Icons.push_pin_outlined
-                            : Icons.push_pin_rounded,
-                        size: 18,
-                      ),
-                      onPressed: onTogglePin,
-                      child: Text(note.isPinned ? 'Lepas Sematan' : 'Sematkan'),
+            Expanded(
+              child: Padding(
+                padding: EdgeInsets.fromLTRB(
+                  note.isPinned ? HubSpacing.md : HubSpacing.lg,
+                  HubSpacing.md,
+                  HubSpacing.sm,
+                  HubSpacing.md,
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Header Row: Title & Single 3-dot Action Popup
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        if (note.isPinned) ...[
+                          Container(
+                            padding: const EdgeInsets.all(4),
+                            margin: const EdgeInsets.only(right: 8),
+                            decoration: BoxDecoration(
+                              color: colors.accentGold.withValues(alpha: 0.14),
+                              borderRadius: HubRadius.rXs,
+                            ),
+                            child: Icon(
+                              Icons.push_pin_rounded,
+                              size: 13,
+                              color: colors.accentGold,
+                            ),
+                          ),
+                        ],
+                        Expanded(
+                          child: Text(
+                            note.title,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: theme.textTheme.titleMedium?.copyWith(
+                              fontWeight: FontWeight.w800,
+                              color: colors.textPrimary,
+                              letterSpacing: -0.2,
+                            ),
+                          ),
+                        ),
+                        // Single 3-dot MenuAnchor Action Menu (>= 48x48dp touch target)
+                        SizedBox(
+                          width: 48,
+                          height: 48,
+                          child: MenuAnchor(
+                            builder: (context, controller, child) {
+                              return IconButton(
+                                tooltip: 'Aksi catatan',
+                                icon: Icon(
+                                  Icons.more_vert_rounded,
+                                  size: 20,
+                                  color: colors.textSecondary,
+                                ),
+                                onPressed: () {
+                                  if (controller.isOpen) {
+                                    controller.close();
+                                  } else {
+                                    controller.open();
+                                  }
+                                },
+                              );
+                            },
+                            menuChildren: [
+                              MenuItemButton(
+                                leadingIcon: Icon(
+                                  note.isPinned
+                                      ? Icons.push_pin_outlined
+                                      : Icons.push_pin_rounded,
+                                  size: 18,
+                                ),
+                                onPressed: onTogglePin,
+                                child: Text(
+                                  note.isPinned ? 'Lepas Sematan' : 'Sematkan',
+                                ),
+                              ),
+                              MenuItemButton(
+                                leadingIcon: const Icon(
+                                  Icons.download_rounded,
+                                  size: 18,
+                                ),
+                                onPressed: onExport,
+                                child: const Text('Ekspor .md'),
+                              ),
+                              MenuItemButton(
+                                leadingIcon: Icon(
+                                  Icons.delete_outline_rounded,
+                                  size: 18,
+                                  color: colors.danger,
+                                ),
+                                onPressed: onDelete,
+                                child: Text(
+                                  'Hapus',
+                                  style: TextStyle(color: colors.danger),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
                     ),
-                    MenuItemButton(
-                      leadingIcon: const Icon(Icons.download_rounded, size: 18),
-                      onPressed: onExport,
-                      child: const Text('Ekspor .md'),
-                    ),
-                    MenuItemButton(
-                      leadingIcon: Icon(
-                        Icons.delete_outline_rounded,
-                        size: 18,
-                        color: AppTokens.error(context),
+
+                    if (snippet.isNotEmpty) ...[
+                      const SizedBox(height: HubSpacing.xs),
+                      Padding(
+                        padding: const EdgeInsets.only(right: HubSpacing.sm),
+                        child: Text(
+                          snippet,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            color: colors.textSecondary,
+                            height: 1.45,
+                          ),
+                        ),
                       ),
-                      onPressed: onDelete,
-                      child: Text(
-                        'Hapus',
-                        style: TextStyle(color: AppTokens.error(context)),
+                    ],
+
+                    const SizedBox(height: HubSpacing.md),
+
+                    // Bottom Row: Tags & Tabular Date
+                    Padding(
+                      padding: const EdgeInsets.only(right: HubSpacing.sm),
+                      child: Row(
+                        children: [
+                          if (note.tags.isNotEmpty)
+                            Expanded(
+                              child: Wrap(
+                                spacing: 6,
+                                runSpacing: 4,
+                                children: [
+                                  for (final tag in note.tags.take(3))
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 8,
+                                        vertical: 3,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: colors.primary
+                                            .withValues(alpha: 0.10),
+                                        borderRadius: HubRadius.rPill,
+                                        border: Border.all(
+                                          color: colors.primary
+                                              .withValues(alpha: 0.25),
+                                        ),
+                                      ),
+                                      child: Text(
+                                        '#$tag',
+                                        style: TextStyle(
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.w700,
+                                          color: colors.primary,
+                                        ),
+                                      ),
+                                    ),
+                                ],
+                              ),
+                            )
+                          else
+                            const Spacer(),
+                          Text(
+                            _formatUpdatedAt(note.updatedAt),
+                            style: HubTypography.tabular(
+                              theme.textTheme.labelSmall!.copyWith(
+                                color: colors.textSecondary,
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ],
                 ),
               ),
-            ],
-          ),
-
-          if (snippet.isNotEmpty) ...[
-            const SizedBox(height: HubSpacing.xs),
-            Padding(
-              padding: const EdgeInsets.only(right: HubSpacing.sm),
-              child: Text(
-                snippet,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  color: AppTokens.textSecondary(context),
-                  height: 1.4,
-                ),
-              ),
             ),
           ],
-
-          const SizedBox(height: HubSpacing.md),
-
-          // Bottom Row: Tags & Tabular Date
-          Padding(
-            padding: const EdgeInsets.only(right: HubSpacing.sm),
-            child: Row(
-              children: [
-                if (note.tags.isNotEmpty)
-                  Expanded(
-                    child: Wrap(
-                      spacing: 6,
-                      runSpacing: 4,
-                      children: [
-                        for (final tag in note.tags.take(3))
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 8,
-                              vertical: 3,
-                            ),
-                            decoration: BoxDecoration(
-                              color: AppTokens.primary(context)
-                                  .withValues(alpha: 0.1),
-                              borderRadius: HubRadius.rPill,
-                              border: Border.all(
-                                color: AppTokens.primary(context)
-                                    .withValues(alpha: 0.25),
-                              ),
-                            ),
-                            child: Text(
-                              '#$tag',
-                              style: TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w600,
-                                color: AppTokens.primary(context),
-                              ),
-                            ),
-                          ),
-                      ],
-                    ),
-                  )
-                else
-                  const Spacer(),
-                Text(
-                  _formatUpdatedAt(note.updatedAt),
-                  style: HubTypography.tabular(
-                    theme.textTheme.labelSmall!.copyWith(
-                      color: AppTokens.textSecondary(context),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }

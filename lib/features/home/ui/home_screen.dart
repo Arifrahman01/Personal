@@ -20,17 +20,18 @@ import 'package:personal_hub/features/meetings/services/meeting_draft_store.dart
 import 'package:personal_hub/features/meetings/ui/live_meeting_recorder_screen.dart';
 import 'package:personal_hub/features/meetings/ui/meeting_detail_screen.dart';
 import 'package:personal_hub/features/prayer/providers/prayer_providers.dart';
+import 'package:personal_hub/features/prayer/services/prayer_location_service.dart';
 import 'package:personal_hub/features/prayer/ui/prayer_schedule_screen.dart';
 import 'package:personal_hub/features/settings/ui/settings_screen.dart';
 import 'package:personal_hub/features/tasks/providers/tasks_providers.dart';
 
-/// Command Center Beranda Personal Hub v3.0 ("Calm Clarity").
-/// Exactly 5 Focused Blocks:
-/// 1. Greeting header + 2 Hero action buttons side-by-side: [🎙️ Rekam Meeting] & [+ Catat Cepat]
-/// 2. Next Prayer Card (accurate interval ratio, tap -> Agenda: Sholat & Kiblat)
-/// 3. Today's Focus Card (nearest meeting + max 3 direct-toggle tasks, with 'Lihat Agenda →')
-/// 4. 2 Compact KPI Cards in 1 row: Saldo Bulan Ini & Habit Hari Ini
-/// 5. AI Daily Briefing Card (compact/collapsible with [Buat] button)
+/// Command Center Beranda Personal Hub v4.0 ("Sanctuary Luxe").
+/// Responsive Bento Command Center with:
+/// 1. Editorial Greeting + 2 Sculpted Hero Action Tiles ([Rekam Meeting] & [Catat Cepat])
+/// 2. Celestial Next Prayer Hero Card (time-of-day gradient + glowing progress bar)
+/// 3. Today's Focus Bento Card (nearest meeting + max 3 direct-toggle tasks)
+/// 4. 2 Compact Bento KPI Cards: Saldo Bulan Ini & Habit Hari Ini (with circular gauge)
+/// 5. Samudra AI Daily Briefing Card (indigo-violet glow)
 /// + First-run guidance card 'Mulai Cepat (3 Langkah)' when empty
 /// + Meeting recording draft recovery banner
 class HomeScreen extends ConsumerStatefulWidget {
@@ -112,35 +113,39 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   }
 
   Widget _buildStepRow(BuildContext context, String number, String text) {
+    final colors = HubColors.of(context);
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Container(
-          constraints: const BoxConstraints(minWidth: 22, minHeight: 22),
+          constraints: const BoxConstraints(minWidth: 24, minHeight: 24),
           padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
           alignment: Alignment.center,
           decoration: BoxDecoration(
-            color: AppTokens.primary(context).withValues(alpha: 0.12),
+            gradient: LinearGradient(
+              colors: [colors.primary, colors.accentGold],
+            ),
             shape: BoxShape.circle,
           ),
           child: Text(
             number,
             style: HubTypography.tabular(
-              TextStyle(
+              const TextStyle(
                 fontSize: 11,
-                fontWeight: FontWeight.w700,
-                color: AppTokens.primary(context),
+                fontWeight: FontWeight.w800,
+                color: Colors.white,
               ),
             ),
           ),
         ),
-        const SizedBox(width: 8),
+        const SizedBox(width: 10),
         Expanded(
           child: Text(
             text,
             style: TextStyle(
-              fontSize: 12,
-              color: AppTokens.textSecondary(context),
+              fontSize: 12.5,
+              height: 1.35,
+              color: colors.textSecondary,
             ),
           ),
         ),
@@ -150,6 +155,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final colors = HubColors.of(context);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final now = DateTime.now();
     final prayerService = ref.watch(prayerTimeServiceProvider);
     final hijriDate = prayerService.formatHijriDate(now);
@@ -167,7 +174,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final activeDraftAsync = ref.watch(activeMeetingDraftProvider);
     final modulePreferences = ref.watch(homeModulePreferencesProvider);
 
-    final cityName = prayerPrefsAsync.value?.cityName ?? 'Jakarta Pusat';
+    final rawPrefs = prayerPrefsAsync.value;
+    final cityName = rawPrefs == null
+        ? 'Jakarta Pusat'
+        : PrayerLocationService.sanitizeCityName(
+            cityName: rawPrefs.cityName,
+            latitude: rawPrefs.latitude,
+            longitude: rawPrefs.longitude,
+          );
     final prayerTimes = prayerTimesAsync.value;
     final nextPrayer = nextPrayerAsync.value;
     final allMeetings = meetingsAsync.value ?? const [];
@@ -179,7 +193,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
     // Filter today's meetings
     final todayMeetings = allMeetings.where((m) {
-      final scheduled = m.scheduledAt;
+      final scheduled = m.scheduledAt.toLocal();
       return scheduled.year == now.year &&
           scheduled.month == now.month &&
           scheduled.day == now.day;
@@ -192,342 +206,607 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         (summary == null ||
             (summary.totalIncome == 0 && summary.totalExpense == 0));
 
-    return Scaffold(
-      backgroundColor: AppTokens.canvas(context),
-      appBar: AppBar(
-        backgroundColor: AppTokens.canvas(context),
-        elevation: 0,
-        scrolledUnderElevation: 0,
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Personal Hub',
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w800,
-                color: AppTokens.textPrimary(context),
-                letterSpacing: -0.3,
-              ),
-            ),
-            Text(
-              'Hari Ini',
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w500,
-                color: AppTokens.textSecondary(context),
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          IconButton(
-            tooltip: 'Cari',
-            icon: const Icon(Icons.search_rounded),
-            onPressed: _openGlobalSearch,
-          ),
-          IconButton(
-            tooltip: 'AI Copilot',
-            icon: const Icon(Icons.auto_awesome_outlined),
-            onPressed: _openAiChat,
-          ),
-          IconButton(
-            tooltip: 'Pengaturan',
-            icon: const Icon(Icons.settings_outlined),
-            onPressed: _openSettings,
-          ),
-        ],
-      ),
-      floatingActionButton: FloatingActionButton.extended(
-        heroTag: 'home_quick_capture_fab',
-        onPressed: () => QuickCaptureSheet.show(context),
-        icon: const Icon(Icons.add_rounded),
-        label: const Text(
-          'Catat',
-          style: TextStyle(fontWeight: FontWeight.w600),
-        ),
-      ),
-      body: SafeArea(
-        top: false,
-        child: Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 840),
-            child: RefreshIndicator(
-              onRefresh: () async {
-                ref.invalidate(todayPrayerTimesProvider);
-                ref.invalidate(nextPrayerProvider);
-                ref.invalidate(meetingsListProvider);
-                ref.invalidate(tasksProvider);
-                ref.invalidate(monthlySummaryProvider);
-                ref.invalidate(habitsProvider);
-                ref.invalidate(habitStatsProvider);
-                ref.invalidate(activeMeetingDraftProvider);
-              },
-              child: SingleChildScrollView(
-                physics: const AlwaysScrollableScrollPhysics(),
-                padding: const EdgeInsets.fromLTRB(16, 8, 16, 96),
+    return LuxeAmbientBackground(
+      child: Scaffold(
+        backgroundColor: Colors.transparent,
+        appBar: AppBar(
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          scrolledUnderElevation: 0,
+          title: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const LuxeBrandEmblem(size: 34),
+              const SizedBox(width: 10),
+              Flexible(
                 child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    // Block 1: Greeting Header + 2 Hero Action Buttons side-by-side (height >= 52dp)
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: HubSpacing.lg, left: 2),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            _getGreeting(),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.w700,
-                              color: AppTokens.textPrimary(context),
-                              letterSpacing: -0.3,
-                            ),
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            '$gregorianDate • $hijriDate',
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                            style: HubTypography.tabular(
-                              TextStyle(
-                                fontSize: 12,
-                                color: AppTokens.textSecondary(context),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(height: 14),
-
-                          // 2 Hero Action Buttons (height >= 52dp)
-                          Row(
-                            children: [
-                              Expanded(
-                                child: FilledButton.icon(
-                                  key: const Key('home_record_meeting_button'),
-                                  style: FilledButton.styleFrom(
-                                    minimumSize: const Size.fromHeight(52),
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: HubRadius.rSm,
-                                    ),
-                                  ),
-                                  onPressed: _openLiveMeetingRecorder,
-                                  icon: const Icon(Icons.mic_rounded, size: 20),
-                                  label: const Text(
-                                    'Rekam Meeting',
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: TextStyle(
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.w700,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(width: HubSpacing.md),
-                              Expanded(
-                                child: FilledButton.tonalIcon(
-                                  key: const Key('home_quick_capture_button'),
-                                  style: FilledButton.styleFrom(
-                                    minimumSize: const Size.fromHeight(52),
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: HubRadius.rSm,
-                                    ),
-                                  ),
-                                  onPressed: () => QuickCaptureSheet.show(context),
-                                  icon: const Icon(Icons.add_rounded, size: 20),
-                                  label: const Text(
-                                    'Catat Cepat',
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: TextStyle(
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.w700,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
+                    Text(
+                      'Personal Hub',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 17,
+                        fontWeight: FontWeight.w800,
+                        color: colors.textPrimary,
+                        letterSpacing: -0.3,
                       ),
                     ),
-
-                    // Draft Recovery Banner (if unfinalized recording detected)
-                    if (activeDraft != null &&
-                        activeDraft.transcript.trim().isNotEmpty) ...[
-                      HubCard(
-                        padding: const EdgeInsets.all(12),
-                        child: Row(
-                          children: [
-                            Icon(
-                              Icons.error_outline_rounded,
-                              color: AppTokens.warning(context),
-                              size: 20,
-                            ),
-                            const SizedBox(width: 10),
-                            Expanded(
-                              child: Text(
-                                'Ada rekaman meeting belum dirapikan — Lanjutkan / Susun AI',
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w600,
-                                  color: AppTokens.textPrimary(context),
-                                ),
-                              ),
-                            ),
-                            TextButton(
-                              onPressed: _openLiveMeetingRecorder,
-                              child: const Text(
-                                'Lanjutkan',
-                                style: TextStyle(
-                                  fontWeight: FontWeight.w700,
-                                  fontSize: 12,
-                                ),
-                              ),
-                            ),
-                            IconButton(
-                              icon: const Icon(Icons.close_rounded, size: 16),
-                              tooltip: 'Buang draft',
-                              onPressed: () => ref
-                                  .read(activeMeetingDraftProvider.notifier)
-                                  .clear(),
-                            ),
-                          ],
-                        ),
+                    Text(
+                      'Hari Ini',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w600,
+                        color: colors.primary,
                       ),
-                      const SizedBox(height: 12),
-                    ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            LuxeHeaderIconButton(
+              tooltip: 'Cari',
+              icon: Icons.search_rounded,
+              onPressed: _openGlobalSearch,
+            ),
+            LuxeHeaderIconButton(
+              tooltip: 'AI Copilot',
+              icon: Icons.auto_awesome_rounded,
+              accentColor: colors.accentAi,
+              onPressed: _openAiChat,
+            ),
+            LuxeHeaderIconButton(
+              tooltip: 'Pengaturan',
+              icon: Icons.settings_outlined,
+              onPressed: _openSettings,
+            ),
+            const SizedBox(width: 4),
+          ],
+        ),
+        floatingActionButton: FloatingActionButton.extended(
+          heroTag: 'home_quick_capture_fab',
+          onPressed: () => QuickCaptureSheet.show(context),
+          icon: const Icon(Icons.add_rounded),
+          label: const Text(
+            'Catat',
+            style: TextStyle(fontWeight: FontWeight.w700),
+          ),
+        ),
+        body: SafeArea(
+          top: false,
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 1040),
+              child: RefreshIndicator(
+                onRefresh: () async {
+                  ref.invalidate(todayPrayerTimesProvider);
+                  ref.invalidate(nextPrayerProvider);
+                  ref.invalidate(meetingsListProvider);
+                  ref.invalidate(tasksProvider);
+                  ref.invalidate(monthlySummaryProvider);
+                  ref.invalidate(habitsProvider);
+                  ref.invalidate(habitStatsProvider);
+                  ref.invalidate(activeMeetingDraftProvider);
+                },
+                child: LayoutBuilder(
+                  builder: (context, constraints) {
+                    final isBentoWide = constraints.maxWidth >= 720;
 
-                    // First-run Guidance Card 'Mulai Cepat (3 Langkah)' (dismissible)
-                    if (isDataEmpty && !_isFirstRunDismissed) ...[
-                      HubCard(
-                        padding: const EdgeInsets.all(16),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    final hasRightColumn = modulePreferences.showFinance ||
+                        modulePreferences.showHabits ||
+                        modulePreferences.showAiBriefing;
+
+                    return SingleChildScrollView(
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 112),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          // Block 1: Editorial Greeting Header + 2 Sculpted Hero Action Buttons
+                          Padding(
+                            padding: const EdgeInsets.only(bottom: HubSpacing.lg),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Expanded(
+                                Text(
+                                  _getGreeting(),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    fontSize: 24,
+                                    fontWeight: FontWeight.w800,
+                                    color: colors.textPrimary,
+                                    letterSpacing: -0.6,
+                                  ),
+                                ),
+                                const SizedBox(height: 6),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 10,
+                                    vertical: 5,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: colors.accentGold.withValues(
+                                      alpha: isDark ? 0.14 : 0.10,
+                                    ),
+                                    borderRadius: HubRadius.rPill,
+                                    border: Border.all(
+                                      color: colors.accentGold.withValues(
+                                        alpha: 0.28,
+                                      ),
+                                    ),
+                                  ),
                                   child: Row(
+                                    mainAxisSize: MainAxisSize.min,
                                     children: [
                                       Icon(
-                                        Icons.explore_outlined,
-                                        size: 18,
-                                        color: AppTokens.primary(context),
+                                        Icons.calendar_today_rounded,
+                                        size: 12,
+                                        color: colors.accentGold,
                                       ),
-                                      const SizedBox(width: 8),
-                                      Expanded(
+                                      const SizedBox(width: 6),
+                                      Flexible(
                                         child: Text(
-                                          'Mulai Cepat (3 Langkah)',
-                                          style: TextStyle(
-                                            fontSize: 14,
-                                            fontWeight: FontWeight.w700,
-                                            color: AppTokens.textPrimary(context),
-                                          ),
+                                          '$gregorianDate • $hijriDate',
+                                          maxLines: 2,
                                           overflow: TextOverflow.ellipsis,
+                                          style: HubTypography.tabular(
+                                            TextStyle(
+                                              fontSize: 11.5,
+                                              fontWeight: FontWeight.w600,
+                                              color: colors.textPrimary,
+                                            ),
+                                          ),
                                         ),
                                       ),
                                     ],
                                   ),
                                 ),
-                                IconButton(
-                                  icon: const Icon(Icons.close_rounded, size: 16),
-                                  tooltip: 'Tutup panduan',
-                                  onPressed: () => setState(
-                                    () => _isFirstRunDismissed = true,
-                                  ),
+                                const SizedBox(height: 16),
+
+                                // 2 Sculpted Hero Action Buttons (height >= 56dp)
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: _HeroActionTile(
+                                        key: const Key(
+                                          'home_record_meeting_button',
+                                        ),
+                                        label: 'Rekam Meeting',
+                                        icon: Icons.mic_rounded,
+                                        isPrimaryGradient: true,
+                                        onTap: _openLiveMeetingRecorder,
+                                      ),
+                                    ),
+                                    const SizedBox(width: HubSpacing.md),
+                                    Expanded(
+                                      child: _HeroActionTile(
+                                        key: const Key(
+                                          'home_quick_capture_button',
+                                        ),
+                                        label: 'Catat Cepat',
+                                        icon: Icons.bolt_rounded,
+                                        isPrimaryGradient: false,
+                                        onTap: () =>
+                                            QuickCaptureSheet.show(context),
+                                      ),
+                                    ),
+                                  ],
                                 ),
                               ],
                             ),
-                            const SizedBox(height: 10),
-                            _buildStepRow(
-                              context,
-                              '1',
-                              'Rekam meeting pertama Anda dengan 1-ketuk atau jadwalkan rapat.',
+                          ),
+
+                          // Draft Recovery Banner (if unfinalized recording detected)
+                          if (activeDraft != null &&
+                              activeDraft.transcript.trim().isNotEmpty) ...[
+                            HubCard(
+                              borderColor:
+                                  colors.warning.withValues(alpha: 0.45),
+                              backgroundColor: colors.warning.withValues(
+                                alpha: isDark ? 0.14 : 0.08,
+                              ),
+                              padding: const EdgeInsets.all(12),
+                              child: Row(
+                                children: [
+                                  LuxeIconMedallion(
+                                    icon: Icons.graphic_eq_rounded,
+                                    color: colors.warning,
+                                    size: 36,
+                                    iconSize: 18,
+                                  ),
+                                  const SizedBox(width: 10),
+                                  Expanded(
+                                    child: Text(
+                                      'Ada rekaman meeting belum dirapikan — Lanjutkan / Susun AI',
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w600,
+                                        color: colors.textPrimary,
+                                      ),
+                                    ),
+                                  ),
+                                  TextButton(
+                                    onPressed: _openLiveMeetingRecorder,
+                                    child: const Text(
+                                      'Lanjutkan',
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.w800,
+                                        fontSize: 12,
+                                      ),
+                                    ),
+                                  ),
+                                  IconButton(
+                                    icon: const Icon(
+                                      Icons.close_rounded,
+                                      size: 16,
+                                    ),
+                                    tooltip: 'Buang draft',
+                                    onPressed: () => ref
+                                        .read(
+                                          activeMeetingDraftProvider.notifier,
+                                        )
+                                        .clear(),
+                                  ),
+                                ],
+                              ),
                             ),
-                            const SizedBox(height: 6),
-                            _buildStepRow(
-                              context,
-                              '2',
-                              'Tambahkan tugas harian dan aktifkan preset habit ibadah.',
-                            ),
-                            const SizedBox(height: 6),
-                            _buildStepRow(
-                              context,
-                              '3',
-                              'Catat transaksi pengeluaran atau pemasukan pertama Anda.',
-                            ),
+                            const SizedBox(height: 12),
                           ],
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                    ],
 
-                    // Block 2: Next Prayer Card (tap navigates to Agenda: Sholat & Kiblat)
-                    if (modulePreferences.showPrayer) ...[
-                      TodayPrayerCard(
-                        cityName: cityName,
-                        hijriDate: hijriDate,
-                        nextPrayer: nextPrayer,
-                        prayerTimes: prayerTimes,
-                        now: now,
-                        onTap: _navigateToPrayer,
-                      ),
-                      const SizedBox(height: HubSpacing.lg),
-                    ],
+                          // First-run Guidance Card 'Mulai Cepat (3 Langkah)' (dismissible)
+                          if (isDataEmpty && !_isFirstRunDismissed) ...[
+                            HubCard(
+                              borderColor:
+                                  colors.primary.withValues(alpha: 0.30),
+                              padding: const EdgeInsets.all(16),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    mainAxisAlignment:
+                                        MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      Expanded(
+                                        child: Row(
+                                          children: [
+                                            LuxeIconMedallion(
+                                              icon: Icons.explore_rounded,
+                                              color: colors.primary,
+                                              size: 32,
+                                              iconSize: 17,
+                                              borderRadius: 10,
+                                            ),
+                                            const SizedBox(width: 10),
+                                            Expanded(
+                                              child: Text(
+                                                'Mulai Cepat (3 Langkah)',
+                                                style: TextStyle(
+                                                  fontSize: 14,
+                                                  fontWeight: FontWeight.w800,
+                                                  color: colors.textPrimary,
+                                                ),
+                                                overflow: TextOverflow.ellipsis,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                      IconButton(
+                                        icon: const Icon(
+                                          Icons.close_rounded,
+                                          size: 16,
+                                        ),
+                                        tooltip: 'Tutup panduan',
+                                        onPressed: () => setState(
+                                          () => _isFirstRunDismissed = true,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 12),
+                                  _buildStepRow(
+                                    context,
+                                    '1',
+                                    'Rekam meeting pertama Anda dengan 1-ketuk atau jadwalkan rapat.',
+                                  ),
+                                  const SizedBox(height: 8),
+                                  _buildStepRow(
+                                    context,
+                                    '2',
+                                    'Tambahkan tugas harian dan aktifkan preset habit ibadah.',
+                                  ),
+                                  const SizedBox(height: 8),
+                                  _buildStepRow(
+                                    context,
+                                    '3',
+                                    'Catat transaksi pengeluaran atau pemasukan pertama Anda.',
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(height: 14),
+                          ],
 
-                    // Block 3: Today's Focus Card (nearest meeting + max 3 checked in-place)
-                    if (modulePreferences.showFocus) ...[
-                      TodayFocusCard(
-                        meetings: todayMeetings,
-                        tasks: allTasks,
-                        onOpenMeeting: _openMeetingDetail,
-                        onToggleTask: (taskId) => ref
-                            .read(tasksProvider.notifier)
-                            .toggleTaskDone(taskId),
-                        onSeeAllAgenda: () {
-                          ref.read(agendaSelectedSectionProvider.notifier).setSection(0);
-                          widget.onSwitchTab?.call(1);
-                        },
-                      ),
-                      const SizedBox(height: HubSpacing.lg),
-                    ],
+                          // Block 2: Celestial Next Prayer Hero Card
+                          if (modulePreferences.showPrayer) ...[
+                            TodayPrayerCard(
+                              cityName: cityName,
+                              hijriDate: hijriDate,
+                              nextPrayer: nextPrayer,
+                              prayerTimes: prayerTimes,
+                              now: now,
+                              onTap: _navigateToPrayer,
+                            ),
+                            const SizedBox(height: HubSpacing.lg),
+                          ],
 
-                    // Block 4: 2 Compact KPI Cards (1 row, 2 cols)
-                    if (modulePreferences.showFinance ||
-                        modulePreferences.showHabits) ...[
-                      TodayKpiRow(
-                        summary: modulePreferences.showFinance ? summary : null,
-                        habits: modulePreferences.showHabits ? habits : const [],
-                        habitStats:
-                            modulePreferences.showHabits ? habitStats : null,
-                        onOpenFinance: () => widget.onSwitchTab?.call(3),
-                        onOpenHabits: () {
-                          ref.read(agendaSelectedSectionProvider.notifier).setSection(1);
-                          widget.onSwitchTab?.call(1);
-                        },
-                      ),
-                      const SizedBox(height: HubSpacing.lg),
-                    ],
+                          // Responsive Bento Grid for Focus + KPIs + AI Briefing
+                          if (isBentoWide &&
+                              modulePreferences.showFocus &&
+                              hasRightColumn)
+                            Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Expanded(
+                                  flex: 6,
+                                  child: TodayFocusCard(
+                                    meetings: todayMeetings,
+                                    tasks: allTasks,
+                                    onOpenMeeting: _openMeetingDetail,
+                                    onToggleTask: (taskId) => ref
+                                        .read(tasksProvider.notifier)
+                                        .toggleTaskDone(taskId),
+                                    onSeeAllAgenda: () {
+                                      ref
+                                          .read(
+                                            agendaSelectedSectionProvider
+                                                .notifier,
+                                          )
+                                          .setSection(0);
+                                      widget.onSwitchTab?.call(1);
+                                    },
+                                  ),
+                                ),
+                                const SizedBox(width: HubSpacing.lg),
+                                Expanded(
+                                  flex: 5,
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.stretch,
+                                    children: [
+                                      if (modulePreferences.showFinance ||
+                                          modulePreferences.showHabits) ...[
+                                        TodayKpiRow(
+                                          summary:
+                                              modulePreferences.showFinance
+                                                  ? summary
+                                                  : null,
+                                          habits: modulePreferences.showHabits
+                                              ? habits
+                                              : const [],
+                                          habitStats:
+                                              modulePreferences.showHabits
+                                                  ? habitStats
+                                                  : null,
+                                          onOpenFinance: () =>
+                                              widget.onSwitchTab?.call(3),
+                                          onOpenHabits: () {
+                                            ref
+                                                .read(
+                                                  agendaSelectedSectionProvider
+                                                      .notifier,
+                                                )
+                                                .setSection(1);
+                                            widget.onSwitchTab?.call(1);
+                                          },
+                                        ),
+                                        if (modulePreferences.showAiBriefing)
+                                          const SizedBox(height: HubSpacing.lg),
+                                      ],
+                                      if (modulePreferences.showAiBriefing)
+                                        TodayBriefingCard(
+                                          briefingState: briefingState,
+                                          onGenerate: () => ref
+                                              .read(
+                                                dailyBriefingControllerProvider
+                                                    .notifier,
+                                              )
+                                              .generateTodayBriefing(),
+                                        ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            )
+                          else ...[
+                            // Block 3: Today's Focus Card
+                            if (modulePreferences.showFocus) ...[
+                              TodayFocusCard(
+                                meetings: todayMeetings,
+                                tasks: allTasks,
+                                onOpenMeeting: _openMeetingDetail,
+                                onToggleTask: (taskId) => ref
+                                    .read(tasksProvider.notifier)
+                                    .toggleTaskDone(taskId),
+                                onSeeAllAgenda: () {
+                                  ref
+                                      .read(
+                                        agendaSelectedSectionProvider.notifier,
+                                      )
+                                      .setSection(0);
+                                  widget.onSwitchTab?.call(1);
+                                },
+                              ),
+                              const SizedBox(height: HubSpacing.lg),
+                            ],
 
-                    // Block 5: Today AI Briefing Card (compact/collapsible)
-                    if (modulePreferences.showAiBriefing) ...[
-                      TodayBriefingCard(
-                        briefingState: briefingState,
-                        onGenerate: () => ref
-                            .read(dailyBriefingControllerProvider.notifier)
-                            .generateTodayBriefing(),
+                            // Block 4: 2 Compact KPI Cards (1 row, 2 cols)
+                            if (modulePreferences.showFinance ||
+                                modulePreferences.showHabits) ...[
+                              TodayKpiRow(
+                                summary: modulePreferences.showFinance
+                                    ? summary
+                                    : null,
+                                habits: modulePreferences.showHabits
+                                    ? habits
+                                    : const [],
+                                habitStats: modulePreferences.showHabits
+                                    ? habitStats
+                                    : null,
+                                onOpenFinance: () =>
+                                    widget.onSwitchTab?.call(3),
+                                onOpenHabits: () {
+                                  ref
+                                      .read(
+                                        agendaSelectedSectionProvider.notifier,
+                                      )
+                                      .setSection(1);
+                                  widget.onSwitchTab?.call(1);
+                                },
+                              ),
+                              const SizedBox(height: HubSpacing.lg),
+                            ],
+
+                            // Block 5: Today AI Briefing Card
+                            if (modulePreferences.showAiBriefing) ...[
+                              TodayBriefingCard(
+                                briefingState: briefingState,
+                                onGenerate: () => ref
+                                    .read(
+                                      dailyBriefingControllerProvider.notifier,
+                                    )
+                                    .generateTodayBriefing(),
+                              ),
+                            ],
+                          ],
+                        ],
                       ),
-                    ],
-                  ],
+                    );
+                  },
                 ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _HeroActionTile extends StatelessWidget {
+  const _HeroActionTile({
+    super.key,
+    required this.label,
+    required this.icon,
+    required this.isPrimaryGradient,
+    required this.onTap,
+  });
+
+  final String label;
+  final IconData icon;
+  final bool isPrimaryGradient;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = HubColors.of(context);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final radius = HubRadius.rMd;
+
+    final decoration = isPrimaryGradient
+        ? BoxDecoration(
+            gradient: const LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                Color(0xFF0E8F74),
+                Color(0xFF0A5C4D),
+              ],
+            ),
+            borderRadius: radius,
+            border: Border.all(
+              color: Colors.white.withValues(alpha: 0.22),
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: colors.primary.withValues(alpha: isDark ? 0.30 : 0.22),
+                blurRadius: 16,
+                offset: const Offset(0, 6),
+              ),
+            ],
+          )
+        : BoxDecoration(
+            color: colors.surfaceCard,
+            borderRadius: radius,
+            border: Border.all(color: colors.borderHairline),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: isDark ? 0.24 : 0.05),
+                blurRadius: 14,
+                offset: const Offset(0, 5),
+              ),
+            ],
+          );
+
+    return ConstrainedBox(
+      constraints: const BoxConstraints(minHeight: 56),
+      child: DecoratedBox(
+        decoration: decoration,
+        child: Material(
+          type: MaterialType.transparency,
+          child: InkWell(
+            borderRadius: radius,
+            onTap: onTap,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              child: Row(
+                children: [
+                  Container(
+                    width: 34,
+                    height: 34,
+                    decoration: BoxDecoration(
+                      color: isPrimaryGradient
+                          ? Colors.white.withValues(alpha: 0.18)
+                          : colors.accentGold.withValues(alpha: 0.14),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(
+                        color: isPrimaryGradient
+                            ? Colors.white.withValues(alpha: 0.25)
+                            : colors.accentGold.withValues(alpha: 0.30),
+                      ),
+                    ),
+                    child: Icon(
+                      icon,
+                      size: 18,
+                      color: isPrimaryGradient
+                          ? Colors.white
+                          : colors.accentGold,
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      label,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 13.5,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: -0.2,
+                        color: isPrimaryGradient
+                            ? Colors.white
+                            : colors.textPrimary,
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
           ),

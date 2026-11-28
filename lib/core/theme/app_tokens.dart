@@ -1,15 +1,18 @@
 import 'package:flutter/material.dart';
 
-/// WCAG AA/AAA compliant theme extension color tokens for Personal Hub v3.0 ("Calm Clarity").
+/// WCAG AA/AAA compliant theme extension color tokens for Personal Hub v4.0 ("Sanctuary Luxe").
 class HubColors extends ThemeExtension<HubColors> {
   final Color canvas;
   final Color surfaceCard;
   final Color surfaceSubtle;
+  final Color surfaceElevated;
   final Color borderHairline;
   final Color textPrimary;
   final Color textSecondary;
   final Color primary;
   final Color primarySoft;
+  final Color accentGold;
+  final Color accentAi;
   final Color success;
   final Color warning;
   final Color danger;
@@ -19,47 +22,56 @@ class HubColors extends ThemeExtension<HubColors> {
     required this.canvas,
     required this.surfaceCard,
     required this.surfaceSubtle,
+    this.surfaceElevated = const Color(0xFFFFFFFF),
     required this.borderHairline,
     required this.textPrimary,
     required this.textSecondary,
     required this.primary,
     required this.primarySoft,
+    this.accentGold = const Color(0xFFC98A1A),
+    this.accentAi = const Color(0xFF5B5FEF),
     required this.success,
     required this.warning,
     required this.danger,
     required this.info,
   });
 
-  /// Light theme token palette (WCAG AA/AAA).
+  /// Light theme token palette (Warm Editorial Alabaster + Sovereign Emerald + Burnished Gold).
   static const HubColors light = HubColors(
-    canvas: Color(0xFFF6F7F9),
+    canvas: Color(0xFFF4F2ED),
     surfaceCard: Color(0xFFFFFFFF),
-    surfaceSubtle: Color(0xFFEEF1F4),
-    borderHairline: Color(0xFFE5E7EB),
-    textPrimary: Color(0xFF111827),
-    textSecondary: Color(0xFF4B5563),
-    primary: Color(0xFF0D6E66),
-    primarySoft: Color(0xFFE6F4F2),
+    surfaceSubtle: Color(0xFFECE9E2),
+    surfaceElevated: Color(0xFFFFFFFF),
+    borderHairline: Color(0xFFE2DDD3),
+    textPrimary: Color(0xFF0F172A),
+    textSecondary: Color(0xFF57534E),
+    primary: Color(0xFF0B6E5B),
+    primarySoft: Color(0xFFE1F5EF),
+    accentGold: Color(0xFFC98A1A),
+    accentAi: Color(0xFF5B5FEF),
     success: Color(0xFF15803D),
     warning: Color(0xFFB45309),
-    danger: Color(0xFFDC2626),
-    info: Color(0xFF1D4ED8),
+    danger: Color(0xFFE11D48),
+    info: Color(0xFF2563EB),
   );
 
-  /// Dark theme token palette (WCAG AA/AAA).
+  /// Dark theme token palette (Deep Obsidian Velvet + Electric Emerald Jade + Champagne Gold).
   static const HubColors dark = HubColors(
-    canvas: Color(0xFF0D1117),
-    surfaceCard: Color(0xFF161B22),
-    surfaceSubtle: Color(0xFF1E2530),
-    borderHairline: Color(0xFF2B3340),
-    textPrimary: Color(0xFFF1F5F9),
+    canvas: Color(0xFF07090F),
+    surfaceCard: Color(0xFF101521),
+    surfaceSubtle: Color(0xFF182032),
+    surfaceElevated: Color(0xFF141B2B),
+    borderHairline: Color(0xFF243047),
+    textPrimary: Color(0xFFF8FAFC),
     textSecondary: Color(0xFF94A3B8),
-    primary: Color(0xFF2DD4BF),
-    primarySoft: Color(0xFF123532),
+    primary: Color(0xFF10D9A3),
+    primarySoft: Color(0xFF0C2E29),
+    accentGold: Color(0xFFF5C451),
+    accentAi: Color(0xFF818CF8),
     success: Color(0xFF34D399),
     warning: Color(0xFFFBBF24),
-    danger: Color(0xFFF87171),
-    info: Color(0xFF60A5FA),
+    danger: Color(0xFFFB7185),
+    info: Color(0xFF38BDF8),
   );
 
   /// Retrieves the active [HubColors] from the current [BuildContext].
@@ -73,11 +85,14 @@ class HubColors extends ThemeExtension<HubColors> {
     Color? canvas,
     Color? surfaceCard,
     Color? surfaceSubtle,
+    Color? surfaceElevated,
     Color? borderHairline,
     Color? textPrimary,
     Color? textSecondary,
     Color? primary,
     Color? primarySoft,
+    Color? accentGold,
+    Color? accentAi,
     Color? success,
     Color? warning,
     Color? danger,
@@ -87,11 +102,14 @@ class HubColors extends ThemeExtension<HubColors> {
       canvas: canvas ?? this.canvas,
       surfaceCard: surfaceCard ?? this.surfaceCard,
       surfaceSubtle: surfaceSubtle ?? this.surfaceSubtle,
+      surfaceElevated: surfaceElevated ?? this.surfaceElevated,
       borderHairline: borderHairline ?? this.borderHairline,
       textPrimary: textPrimary ?? this.textPrimary,
       textSecondary: textSecondary ?? this.textSecondary,
       primary: primary ?? this.primary,
       primarySoft: primarySoft ?? this.primarySoft,
+      accentGold: accentGold ?? this.accentGold,
+      accentAi: accentAi ?? this.accentAi,
       success: success ?? this.success,
       warning: warning ?? this.warning,
       danger: danger ?? this.danger,
@@ -107,6 +125,9 @@ class HubColors extends ThemeExtension<HubColors> {
       surfaceCard: Color.lerp(surfaceCard, other.surfaceCard, t) ?? surfaceCard,
       surfaceSubtle:
           Color.lerp(surfaceSubtle, other.surfaceSubtle, t) ?? surfaceSubtle,
+      surfaceElevated:
+          Color.lerp(surfaceElevated, other.surfaceElevated, t) ??
+          surfaceElevated,
       borderHairline:
           Color.lerp(borderHairline, other.borderHairline, t) ?? borderHairline,
       textPrimary: Color.lerp(textPrimary, other.textPrimary, t) ?? textPrimary,
@@ -114,6 +135,8 @@ class HubColors extends ThemeExtension<HubColors> {
           Color.lerp(textSecondary, other.textSecondary, t) ?? textSecondary,
       primary: Color.lerp(primary, other.primary, t) ?? primary,
       primarySoft: Color.lerp(primarySoft, other.primarySoft, t) ?? primarySoft,
+      accentGold: Color.lerp(accentGold, other.accentGold, t) ?? accentGold,
+      accentAi: Color.lerp(accentAi, other.accentAi, t) ?? accentAi,
       success: Color.lerp(success, other.success, t) ?? success,
       warning: Color.lerp(warning, other.warning, t) ?? warning,
       danger: Color.lerp(danger, other.danger, t) ?? danger,
@@ -122,30 +145,38 @@ class HubColors extends ThemeExtension<HubColors> {
   }
 }
 
-/// Design tokens for Personal Hub v3.0 ("Calm Clarity").
+/// Design tokens for Personal Hub v4.0 ("Sanctuary Luxe").
 /// High contrast Material 3 tactile system with WCAG AA/AAA compliance.
 abstract final class AppTokens {
-  // Brand Emerald-Teal
-  static const Color primaryLight = Color(0xFF0D6E66);
-  static const Color primaryDark = Color(0xFF2DD4BF);
-  static const Color primarySoftLight = Color(0xFFE6F4F2);
-  static const Color primarySoftDark = Color(0xFF123532);
+  // Brand Sovereign Emerald & Champagne Gold
+  static const Color primaryLight = Color(0xFF0B6E5B);
+  static const Color primaryDark = Color(0xFF10D9A3);
+  static const Color primarySoftLight = Color(0xFFE1F5EF);
+  static const Color primarySoftDark = Color(0xFF0C2E29);
 
-  // Surfaces Light
-  static const Color canvasLight = Color(0xFFF6F7F9);
+  static const Color accentGoldLight = Color(0xFFC98A1A);
+  static const Color accentGoldDark = Color(0xFFF5C451);
+
+  static const Color accentAiLight = Color(0xFF5B5FEF);
+  static const Color accentAiDark = Color(0xFF818CF8);
+
+  // Surfaces Light (Warm Alabaster)
+  static const Color canvasLight = Color(0xFFF4F2ED);
   static const Color cardLight = Color(0xFFFFFFFF);
-  static const Color surfaceSubtleLight = Color(0xFFEEF1F4);
-  static const Color textPrimaryLight = Color(0xFF111827);
-  static const Color textSecondaryLight = Color(0xFF4B5563);
-  static const Color borderLight = Color(0xFFE5E7EB);
+  static const Color surfaceSubtleLight = Color(0xFFECE9E2);
+  static const Color surfaceElevatedLight = Color(0xFFFFFFFF);
+  static const Color textPrimaryLight = Color(0xFF0F172A);
+  static const Color textSecondaryLight = Color(0xFF57534E);
+  static const Color borderLight = Color(0xFFE2DDD3);
 
-  // Surfaces Dark
-  static const Color canvasDark = Color(0xFF0D1117);
-  static const Color cardDark = Color(0xFF161B22);
-  static const Color surfaceSubtleDark = Color(0xFF1E2530);
-  static const Color textPrimaryDark = Color(0xFFF1F5F9);
+  // Surfaces Dark (Obsidian Velvet)
+  static const Color canvasDark = Color(0xFF07090F);
+  static const Color cardDark = Color(0xFF101521);
+  static const Color surfaceSubtleDark = Color(0xFF182032);
+  static const Color surfaceElevatedDark = Color(0xFF141B2B);
+  static const Color textPrimaryDark = Color(0xFFF8FAFC);
   static const Color textSecondaryDark = Color(0xFF94A3B8);
-  static const Color borderDark = Color(0xFF2B3340);
+  static const Color borderDark = Color(0xFF243047);
 
   // Semantics
   static const Color successLight = Color(0xFF15803D);
@@ -154,23 +185,27 @@ abstract final class AppTokens {
   static const Color warningLight = Color(0xFFB45309);
   static const Color warningDark = Color(0xFFFBBF24);
 
-  static const Color errorLight = Color(0xFFDC2626);
-  static const Color errorDark = Color(0xFFF87171);
+  static const Color errorLight = Color(0xFFE11D48);
+  static const Color errorDark = Color(0xFFFB7185);
 
-  static const Color dangerLight = Color(0xFFDC2626);
-  static const Color dangerDark = Color(0xFFF87171);
+  static const Color dangerLight = Color(0xFFE11D48);
+  static const Color dangerDark = Color(0xFFFB7185);
 
-  static const Color infoLight = Color(0xFF1D4ED8);
-  static const Color infoDark = Color(0xFF60A5FA);
+  static const Color infoLight = Color(0xFF2563EB);
+  static const Color infoDark = Color(0xFF38BDF8);
 
   // Dynamic getters delegating to HubColors
   static Color primary(BuildContext context) => HubColors.of(context).primary;
   static Color primarySoft(BuildContext context) =>
       HubColors.of(context).primarySoft;
+  static Color gold(BuildContext context) => HubColors.of(context).accentGold;
+  static Color ai(BuildContext context) => HubColors.of(context).accentAi;
   static Color canvas(BuildContext context) => HubColors.of(context).canvas;
   static Color card(BuildContext context) => HubColors.of(context).surfaceCard;
   static Color surfaceSubtle(BuildContext context) =>
       HubColors.of(context).surfaceSubtle;
+  static Color surfaceElevated(BuildContext context) =>
+      HubColors.of(context).surfaceElevated;
   static Color textPrimary(BuildContext context) =>
       HubColors.of(context).textPrimary;
   static Color textSecondary(BuildContext context) =>
@@ -186,12 +221,12 @@ abstract final class AppTokens {
   static Color info(BuildContext context) => HubColors.of(context).info;
 }
 
-/// 5-step radius scale for tactile components.
+/// 5-step radius scale for Sanctuary Luxe tactile components.
 abstract final class HubRadius {
   static const double xs = 8.0;
   static const double sm = 12.0;
-  static const double md = 16.0;
-  static const double lg = 20.0;
+  static const double md = 18.0;
+  static const double lg = 24.0;
   static const double pill = 999.0;
 
   static BorderRadius get rXs => BorderRadius.circular(xs);
@@ -201,7 +236,7 @@ abstract final class HubRadius {
   static BorderRadius get rPill => BorderRadius.circular(pill);
 }
 
-/// Spacing scale in logical pixels (Calm Clarity v3.0 standard).
+/// Spacing scale in logical pixels (Sanctuary Luxe v4.0 standard).
 abstract final class HubSpacing {
   static const double xs = 4.0;
   static const double sm = 8.0;

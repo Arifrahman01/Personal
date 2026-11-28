@@ -1,17 +1,36 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:personal_hub/app.dart';
 import 'package:personal_hub/core/database/app_database.dart';
+import 'package:personal_hub/core/storage/app_preferences_repository.dart';
 import 'package:personal_hub/core/theme/app_theme.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  LicenseRegistry.addLicense(() async* {
+    final license = await rootBundle.loadString('google_fonts/OFL.txt');
+    yield LicenseEntryWithLineBreaks(['Plus Jakarta Sans'], license);
+  });
 
   try {
     final appDatabase = await AppDatabase.open();
+    final bootstrap = await AppPreferencesBootstrap.load(
+      SqliteAppPreferencesStore(appDatabase),
+    );
     runApp(
       ProviderScope(
-        overrides: [appDatabaseProvider.overrideWithValue(appDatabase)],
+        overrides: [
+          appDatabaseProvider.overrideWithValue(appDatabase),
+          initialThemeModeProvider.overrideWithValue(bootstrap.themeMode),
+          initialHomeModulePreferencesProvider.overrideWithValue(
+            bootstrap.homeModulePreferences,
+          ),
+          initialManualZakatAssetProvider.overrideWithValue(
+            bootstrap.manualZakatAssets,
+          ),
+        ],
         child: const PersonalHubApp(),
       ),
     );

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:personal_hub/core/errors/app_exceptions.dart';
@@ -45,6 +47,30 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
       text: widget.note?.content ?? '',
     );
     _isPinned = widget.note?.isPinned ?? false;
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final notes = ref.read(notesListProvider).asData?.value;
+      if (notes != null) {
+        _syncNotesToSemanticMemory(notes);
+      }
+    });
+  }
+
+  void _syncNotesToSemanticMemory(List<Note> allNotes) {
+    final semanticService = ref.read(semanticMemoryServiceProvider);
+    for (final otherNote in allNotes) {
+      if (otherNote.id != widget.note?.id &&
+          semanticService.getById('note_${otherNote.id}') == null) {
+        semanticService.embedAndStore(
+          id: 'note_${otherNote.id}',
+          entityType: 'note',
+          entityId: otherNote.id,
+          text: '${otherNote.title}\n${otherNote.content}',
+          metadata: {'title': otherNote.title, 'tags': otherNote.tags},
+        );
+      }
+    }
   }
 
   @override
@@ -231,21 +257,12 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
     final theme = Theme.of(context);
     final parsedTags = _parseTags(_tagsController.text);
 
-    // Synchronize other notes into semantic memory for intelligent cross-linking
-    final allNotes = ref.watch(notesListProvider).asData?.value ?? [];
-    final semanticService = ref.watch(semanticMemoryServiceProvider);
-    for (final otherNote in allNotes) {
-      if (otherNote.id != widget.note?.id &&
-          semanticService.getById('note_${otherNote.id}') == null) {
-        semanticService.embedAndStore(
-          id: 'note_${otherNote.id}',
-          entityType: 'note',
-          entityId: otherNote.id,
-          text: '${otherNote.title}\n${otherNote.content}',
-          metadata: {'title': otherNote.title, 'tags': otherNote.tags},
-        );
+    ref.listen<AsyncValue<List<Note>>>(notesListProvider, (_, next) {
+      final notes = next.asData?.value;
+      if (notes != null) {
+        _syncNotesToSemanticMemory(notes);
       }
-    }
+    });
 
     final wordCount = _contentController.text
         .trim()
@@ -623,7 +640,7 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
 /// Compact semantic cross-link recommendation panel that queries [SemanticMemoryService]
 /// to suggest related notes, meetings, and tasks.
 /// ONLY displays if relevant links are detected.
-class _SemanticCrossLinkPanel extends ConsumerWidget {
+class _SemanticCrossLinkPanel extends ConsumerStatefulWidget {
   const _SemanticCrossLinkPanel({
     required this.currentNoteId,
     required this.currentTitle,
@@ -637,21 +654,97 @@ class _SemanticCrossLinkPanel extends ConsumerWidget {
   final ValueChanged<String> onInsertReference;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final theme = Theme.of(context);
-    final fullText = '$currentTitle\n$currentContent'.trim();
+  ConsumerState<_SemanticCrossLinkPanel> createState() =>
+      _SemanticCrossLinkPanelState();
+}
 
-    final semanticService = ref.watch(semanticMemoryServiceProvider);
+class _SemanticCrossLinkPanelState
+    extends ConsumerState<_SemanticCrossLinkPanel> {
+  static const Duration _recomputeDebounce = Duration(milliseconds: 120);
 
-    List<EntityLink> links = [];
-    if (fullText.isNotEmpty) {
-      final vector = semanticService.pseudoEmbedder.embed(fullText);
-      links = semanticService.discoverEntityLinksFromStore(
-        currentNoteId ?? 'draft_note_temp',
-        vector,
-        threshold: 0.20,
-      );
+  Timer? _debounce;
+  List<EntityLink> _links = const [];
+  String _lastQueryText = '';
+  int _lastCorpusCount = -1;
+  DateTime? _lastComputedAt;
+
+  @override
+  void initState() {
+    super.initState();
+    _recomputeLinks();
+  }
+
+  @override
+  void didUpdateWidget(covariant _SemanticCrossLinkPanel oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final fullText = _buildFullText(widget.currentTitle, widget.currentContent);
+    final corpusCount = ref.read(semanticMemoryServiceProvider).embeddings.length;
+    if (fullText == _lastQueryText &&
+        corpusCount == _lastCorpusCount &&
+        widget.currentNoteId == oldWidget.currentNoteId) {
+      return;
     }
+
+    _debounce?.cancel();
+    if (fullText.isEmpty) {
+      setState(() {
+        _lastQueryText = '';
+        _lastCorpusCount = corpusCount;
+        _links = const [];
+      });
+      return;
+    }
+
+    final now = DateTime.now();
+    final elapsedSinceLast = _lastComputedAt == null
+        ? _recomputeDebounce
+        : now.difference(_lastComputedAt!);
+    if (elapsedSinceLast >= _recomputeDebounce) {
+      _recomputeLinks();
+      return;
+    }
+
+    _debounce = Timer(_recomputeDebounce, () {
+      if (!mounted) return;
+      setState(_recomputeLinks);
+    });
+  }
+
+  @override
+  void dispose() {
+    _debounce?.cancel();
+    super.dispose();
+  }
+
+  String _buildFullText(String title, String content) =>
+      '$title\n$content'.trim();
+
+  void _recomputeLinks() {
+    final fullText = _buildFullText(widget.currentTitle, widget.currentContent);
+    final semanticService = ref.read(semanticMemoryServiceProvider);
+    final corpusCount = semanticService.embeddings.length;
+    _lastQueryText = fullText;
+    _lastCorpusCount = corpusCount;
+
+    if (fullText.isEmpty) {
+      _lastComputedAt = null;
+      _links = const [];
+      return;
+    }
+
+    _lastComputedAt = DateTime.now();
+    final vector = semanticService.pseudoEmbedder.embed(fullText);
+    _links = semanticService.discoverEntityLinksFromStore(
+      widget.currentNoteId ?? 'draft_note_temp',
+      vector,
+      threshold: 0.20,
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final links = _links;
 
     // ONLY display if there are relevant links detected!
     if (links.isEmpty) {
@@ -846,7 +939,7 @@ class _SemanticCrossLinkPanel extends ConsumerWidget {
                   onPressed: () {
                     final refText =
                         '📌 Terkait [${link.targetEntityType.toUpperCase()}]: $title';
-                    onInsertReference(refText);
+                    widget.onInsertReference(refText);
                     Navigator.of(sheetContext).pop();
                   },
                   icon: const Icon(Icons.link_rounded, size: 16),

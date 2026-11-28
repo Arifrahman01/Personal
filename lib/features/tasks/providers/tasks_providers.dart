@@ -1,11 +1,20 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:personal_hub/core/database/app_database.dart';
+import 'package:personal_hub/core/notifications/app_notification_center.dart';
 import 'package:personal_hub/features/tasks/data/tasks_repository.dart';
 import 'package:personal_hub/features/tasks/models/task_models.dart';
+import 'package:personal_hub/features/tasks/services/task_reminder_service.dart';
 
 /// Provides [TasksRepository] backed by [appDatabaseProvider].
 final tasksRepositoryProvider = Provider<TasksRepository>((ref) {
   return TasksRepository(ref.watch(appDatabaseProvider));
+});
+
+/// Provides [TaskReminderService] backed by [appNotificationCenterProvider].
+final taskReminderServiceProvider = Provider<TaskReminderService>((ref) {
+  return TaskReminderService(
+    notificationCenter: ref.watch(appNotificationCenterProvider),
+  );
 });
 
 /// Snapshot of a habit's daily completion count and current streak.
@@ -32,7 +41,7 @@ class TasksNotifier extends AsyncNotifier<List<PersonalTask>> {
     state = AsyncData(tasks);
   }
 
-  /// Creates a new task and refreshes the list.
+  /// Creates a new task, schedules its reminder if it has a due date, and refreshes the list.
   Future<PersonalTask> createTask({
     required String title,
     DateTime? dueDate,
@@ -45,19 +54,53 @@ class TasksNotifier extends AsyncNotifier<List<PersonalTask>> {
           priority: priority,
           sourceMeetingId: sourceMeetingId,
         );
+    await ref.read(taskReminderServiceProvider).scheduleTaskReminder(created);
     await refresh();
     return created;
   }
 
-  /// Toggles completion status for [id] and refreshes the list.
+  /// Updates an existing task in place, reschedules its reminder if needed,
+  /// and refreshes [tasksProvider].
+  Future<PersonalTask> updateTask({
+    required String id,
+    required String title,
+    DateTime? dueDate,
+    required TaskPriority priority,
+  }) async {
+    final updated = await ref.read(tasksRepositoryProvider).updateTask(
+          id: id,
+          title: title,
+          dueDate: dueDate,
+          priority: priority,
+        );
+    if (updated.isDone || updated.dueDate == null) {
+      await ref.read(taskReminderServiceProvider).cancelTaskReminder(id);
+    } else {
+      await ref
+          .read(taskReminderServiceProvider)
+          .scheduleTaskReminder(updated);
+    }
+    await refresh();
+    return updated;
+  }
+
+  /// Toggles completion status for [id], updates its reminder notification, and refreshes the list.
   Future<void> toggleTaskDone(String id) async {
-    await ref.read(tasksRepositoryProvider).toggleTaskDone(id);
+    final updated = await ref.read(tasksRepositoryProvider).toggleTaskDone(id);
+    if (updated.isDone) {
+      await ref.read(taskReminderServiceProvider).cancelTaskReminder(id);
+    } else {
+      await ref
+          .read(taskReminderServiceProvider)
+          .scheduleTaskReminder(updated);
+    }
     await refresh();
   }
 
-  /// Deletes the task identified by [id] and refreshes the list.
+  /// Deletes the task identified by [id], cancels its reminder, and refreshes the list.
   Future<void> deleteTask(String id) async {
     await ref.read(tasksRepositoryProvider).deleteTask(id);
+    await ref.read(taskReminderServiceProvider).cancelTaskReminder(id);
     await refresh();
   }
 }

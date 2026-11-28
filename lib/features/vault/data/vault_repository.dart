@@ -101,12 +101,26 @@ class VaultRepository {
     await _db.db.delete(_tableName, where: 'id = ?', whereArgs: [id]);
   }
 
+  /// Validates, normalizes, and encrypts [entry] into a SQLite row map without writing it.
+  Future<Map<String, Object?>> encryptEntryForStorage(VaultEntry entry) async {
+    if (entry.id.trim().isEmpty) {
+      throw const ValidationException('ID entri brankas tidak boleh kosong.');
+    }
+    _validateFields(title: entry.title, password: entry.password);
+
+    final normalized = entry.copyWith(
+      title: entry.title.trim(),
+      username: entry.username.trim(),
+      url: entry.url.trim(),
+      createdAt: entry.createdAt.toUtc(),
+      updatedAt: entry.updatedAt.toUtc(),
+    );
+    return _toEncryptedRow(normalized);
+  }
+
   /// Decrypts and returns vault entries sorted alphabetically by title, optionally filtered by [query].
   Future<List<VaultEntry>> getEntries({String? query}) async {
-    final rows = await _db.db.query(
-      _tableName,
-      orderBy: 'LOWER(title) ASC, updated_at DESC',
-    );
+    final rows = await _db.db.query(_tableName);
     if (rows.isEmpty) {
       return const [];
     }
@@ -121,6 +135,12 @@ class VaultRepository {
         entries.add(entry);
       }
     }
+
+    entries.sort((a, b) {
+      final titleCmp = a.title.toLowerCase().compareTo(b.title.toLowerCase());
+      if (titleCmp != 0) return titleCmp;
+      return b.updatedAt.compareTo(a.updatedAt);
+    });
     return entries;
   }
 
@@ -142,6 +162,8 @@ class VaultRepository {
   Future<Map<String, Object?>> _toEncryptedRow(VaultEntry entry) async {
     final masterKey = await _configStore.getOrCreateVaultMasterKey();
     final secretJson = jsonEncode({
+      'title': entry.title,
+      'username': entry.username,
       'password': entry.password,
       'url': entry.url,
       'notes': entry.notes,
@@ -150,8 +172,8 @@ class VaultRepository {
 
     return {
       'id': entry.id,
-      'title': entry.title,
-      'username': entry.username,
+      'title': '[terenkripsi]',
+      'username': '',
       'encrypted_payload': payload.cipherTextBase64,
       'nonce': payload.nonceBase64,
       'mac': payload.macBase64,
@@ -178,10 +200,21 @@ class VaultRepository {
       );
     }
 
+    final decodedTitle = (decoded['title'] as String?)?.trim();
+    final rowTitle = row['title']! as String;
+    final resolvedTitle =
+        (decodedTitle != null && decodedTitle.isNotEmpty)
+            ? decodedTitle
+            : rowTitle;
+    final resolvedUsername =
+        (decoded['username'] as String?) ??
+        (row['username'] as String?) ??
+        '';
+
     return VaultEntry(
       id: row['id']! as String,
-      title: row['title']! as String,
-      username: (row['username'] as String?) ?? '',
+      title: resolvedTitle,
+      username: resolvedUsername,
       password: (decoded['password'] as String?) ?? '',
       url: (decoded['url'] as String?) ?? '',
       notes: (decoded['notes'] as String?) ?? '',

@@ -56,6 +56,8 @@ class SamudraAiClient {
     }
 
     final baseUrl = await _configStore.getBaseUrl();
+    final primaryModel = await _configStore.getPrimaryModel();
+    final fallbackModel = await _configStore.getFallbackModel();
     final endpoint = Uri.parse(
       '${baseUrl.replaceFirst(RegExp(r'/+$'), '')}/chat/completions',
     );
@@ -64,14 +66,14 @@ class SamudraAiClient {
     final primaryResponse = await _postCompletion(
       endpoint: endpoint,
       apiKey: apiKey,
-      model: AiConstants.freeModel,
+      model: primaryModel,
       messages: payloadMessages,
     );
 
     if (_isSuccessStatus(primaryResponse.statusCode)) {
       return AiResponse(
         content: _parseContent(primaryResponse.body),
-        usedModel: AiConstants.freeModel,
+        usedModel: primaryModel,
         didFallback: false,
       );
     }
@@ -88,14 +90,14 @@ class SamudraAiClient {
     final fallbackResponse = await _postCompletion(
       endpoint: endpoint,
       apiKey: apiKey,
-      model: AiConstants.fallbackModel,
+      model: fallbackModel,
       messages: payloadMessages,
     );
 
     if (_isSuccessStatus(fallbackResponse.statusCode)) {
       return AiResponse(
         content: _parseContent(fallbackResponse.body),
-        usedModel: AiConstants.fallbackModel,
+        usedModel: fallbackModel,
         didFallback: true,
         fallbackReason: fallbackReason,
       );

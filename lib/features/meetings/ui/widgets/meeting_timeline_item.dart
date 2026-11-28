@@ -4,7 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:personal_hub/core/theme/app_tokens.dart';
 import 'package:personal_hub/core/theme/hub_widgets.dart';
 import 'package:personal_hub/features/meetings/models/meeting.dart';
-import 'package:personal_hub/features/meetings/providers/calendar_sync_providers.dart';
+import 'package:personal_hub/features/meetings/providers/meetings_providers.dart';
 import 'package:personal_hub/features/meetings/ui/widgets/meeting_category.dart';
 
 /// Meeting timeline row with left timestamp column, vertical guideline,
@@ -80,14 +80,23 @@ class MeetingTimelineItem extends StatelessWidget {
               children: [
                 const SizedBox(height: 18),
                 Container(
-                  width: 10,
-                  height: 10,
+                  width: 14,
+                  height: 14,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    color: accent,
+                    color: accent.withValues(alpha: 0.18),
                     border: Border.all(
-                      color: colors.canvas,
-                      width: 2,
+                      color: accent.withValues(alpha: 0.45),
+                      width: 1.2,
+                    ),
+                  ),
+                  alignment: Alignment.center,
+                  child: Container(
+                    width: 7,
+                    height: 7,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: accent,
                     ),
                   ),
                 ),

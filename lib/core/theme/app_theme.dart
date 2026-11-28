@@ -1,19 +1,28 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:google_fonts/google_fonts.dart';
+import 'package:personal_hub/core/storage/app_preferences_repository.dart';
 import 'package:personal_hub/core/theme/app_tokens.dart';
 
 export 'package:personal_hub/core/theme/app_tokens.dart';
 export 'package:personal_hub/core/theme/hub_widgets.dart';
+export 'package:personal_hub/core/theme/luxe_components.dart';
 
 /// Holds and updates the active application [ThemeMode].
 class ThemeModeNotifier extends Notifier<ThemeMode> {
   @override
-  ThemeMode build() => ThemeMode.system;
+  ThemeMode build() => ref.watch(initialThemeModeProvider);
 
   /// Updates the active theme mode (`system`, `light`, or `dark`).
   void setThemeMode(ThemeMode mode) {
     state = mode;
+    unawaited(
+      ref
+          .read(appPreferencesStoreProvider)
+          .setString(AppPreferenceKeys.themeMode, mode.name)
+          .catchError((_) {}),
+    );
   }
 }
 
@@ -22,91 +31,11 @@ final themeModeProvider = NotifierProvider<ThemeModeNotifier, ThemeMode>(
   ThemeModeNotifier.new,
 );
 
-/// Refleq Minimal Aurora Design System Color Tokens & Gradients.
-abstract final class RefleqPalette {
-  // Canvas & Surfaces (Obsidian depth)
-  /// Deep Obsidian Indigo (#0C101D) - Main atmospheric canvas background.
-  static const Color background = Color(0xFF0C101D);
-
-  /// Elevated Obsidian Slate (#13192B) - Elevated surfaces and dialogs.
-  static const Color surface = Color(0xFF13192B);
-
-  /// Frosted Card Slate (#182035) - Base card slate tone.
-  static const Color surfaceCard = Color(0xFF182035);
-
-  /// Frosted Card Glass (rgba(24, 32, 53, 0.72) / #182035 with 72% opacity).
-  static final Color surfaceCardGlass =
-      const Color(0xFF182035).withValues(alpha: 0.72);
-
-  /// Specular Glass Border (rgba(255, 255, 255, 0.10) / 10% white).
-  static final Color surfaceBorder = Colors.white.withValues(alpha: 0.10);
-
-  // Refleq Aurora Pastel Accents (Refleq Minimal UI)
-  /// Rose Pink (#FB7185) - Health, physical activity, high priority.
-  static const Color rosePink = Color(0xFFFB7185);
-  static const Color rosePinkSurface = Color(0x22FB7185);
-
-  /// Sky Cyan (#38BDF8) - Meetings, client schedule, calendar alerts.
-  static const Color skyCyan = Color(0xFF38BDF8);
-  static const Color skyCyanSurface = Color(0x2238BDF8);
-
-  /// Lavender (#A78BFA) - Notes, AI copilot, creative tasks.
-  static const Color lavender = Color(0xFFA78BFA);
-  static const Color lavenderSurface = Color(0x22A78BFA);
-
-  /// Royal Violet (#8B5CF6) - Primary brand anchor & gradient starter.
-  static const Color royalViolet = Color(0xFF8B5CF6);
-  static const Color royalVioletSurface = Color(0x228B5CF6);
-
-  /// Amber Peach (#FBBF24) - Breaks, warnings, prayer due alerts.
-  static const Color amberPeach = Color(0xFFFBBF24);
-  static const Color amberPeachSurface = Color(0x22FBBF24);
-
-  /// Emerald Mint (#34D399) - Positive finance, income, habits completed.
-  static const Color emeraldMint = Color(0xFF34D399);
-  static const Color emeraldMintSurface = Color(0x2234D399);
-
-  // Sunset Aurora Gradients
-  /// Sunset Aurora: Royal Violet (#8B5CF6) to Sunset Rose (#F43F5E).
-  static const LinearGradient sunsetAurora = LinearGradient(
-    colors: [Color(0xFF8B5CF6), Color(0xFFF43F5E)],
-    begin: Alignment.topLeft,
-    end: Alignment.bottomRight,
-  );
-
-  /// Sunset Warm: Rose Pink (#FB7185) to Amber Peach (#FBBF24).
-  static const LinearGradient sunsetWarm = LinearGradient(
-    colors: [Color(0xFFFB7185), Color(0xFFFBBF24)],
-    begin: Alignment.centerLeft,
-    end: Alignment.centerRight,
-  );
-
-  /// Lavender Cloud: Royal Violet (#8B5CF6) to Soft Lavender (#A78BFA).
-  static const LinearGradient lavenderCloud = LinearGradient(
-    colors: [Color(0xFF8B5CF6), Color(0xFFA78BFA)],
-    begin: Alignment.topLeft,
-    end: Alignment.bottomRight,
-  );
-}
-
-/// Material 3 Light and Dark themes with Plus Jakarta Sans typography.
+/// Material 3 Light and Dark themes for Personal Hub v4.0 ("Sanctuary Luxe")
+/// with Plus Jakarta Sans typography.
 abstract final class AppTheme {
-  // Aliases for quick access to Refleq tokens
-  static const Color canvasObsidian = RefleqPalette.background;
-  static const Color elevatedSlate = RefleqPalette.surface;
-  static final Color frostedCardGlass = RefleqPalette.surfaceCardGlass;
-  static final Color glassBorderColor = RefleqPalette.surfaceBorder;
-
-  static const Color rosePink = RefleqPalette.rosePink;
-  static const Color skyCyan = RefleqPalette.skyCyan;
-  static const Color lavender = RefleqPalette.lavender;
-  static const Color royalViolet = RefleqPalette.royalViolet;
-  static const Color amberPeach = RefleqPalette.amberPeach;
-  static const Color emeraldMint = RefleqPalette.emeraldMint;
-
-  static const LinearGradient sunsetAurora = RefleqPalette.sunsetAurora;
-  static const LinearGradient sunsetWarm = RefleqPalette.sunsetWarm;
-  static const LinearGradient lavenderCloud = RefleqPalette.lavenderCloud;
+  /// Font family name declared natively in `pubspec.yaml`.
+  static const String fontFamily = 'Plus Jakarta Sans';
 
   static ThemeData get light {
     final scheme = ColorScheme.fromSeed(
@@ -114,17 +43,27 @@ abstract final class AppTheme {
       brightness: Brightness.light,
       dynamicSchemeVariant: DynamicSchemeVariant.tonalSpot,
       primary: AppTokens.primaryLight,
+      onPrimary: Colors.white,
+      primaryContainer: AppTokens.primarySoftLight,
+      onPrimaryContainer: const Color(0xFF064E3B),
+      secondary: const Color(0xFF1F4E5F),
+      secondaryContainer: const Color(0xFFE5EDF0),
+      tertiary: AppTokens.accentGoldLight,
       surface: AppTokens.cardLight,
+      onSurface: AppTokens.textPrimaryLight,
+      onSurfaceVariant: AppTokens.textSecondaryLight,
       surfaceContainerLowest: AppTokens.canvasLight,
-      surfaceContainerLow: const Color(0xFFF8FAFC),
+      surfaceContainerLow: const Color(0xFFFAF8F4),
       surfaceContainer: AppTokens.surfaceSubtleLight,
-      surfaceContainerHigh: const Color(0xFFE8ECEF),
-      surfaceContainerHighest: const Color(0xFFE0E5EB),
+      surfaceContainerHigh: const Color(0xFFE7E2D9),
+      surfaceContainerHighest: const Color(0xFFDDD7CC),
       outlineVariant: AppTokens.borderLight,
+      error: AppTokens.errorLight,
     );
 
     return _buildTheme(
       scheme: scheme,
+      hubColors: HubColors.light,
       scaffoldBackground: AppTokens.canvasLight,
     );
   }
@@ -135,47 +74,49 @@ abstract final class AppTheme {
       brightness: Brightness.dark,
       dynamicSchemeVariant: DynamicSchemeVariant.tonalSpot,
       primary: AppTokens.primaryDark,
+      onPrimary: const Color(0xFF04221B),
+      primaryContainer: AppTokens.primarySoftDark,
+      onPrimaryContainer: const Color(0xFF6EE7B7),
+      secondary: const Color(0xFF7DD3FC),
+      secondaryContainer: const Color(0xFF172538),
+      tertiary: AppTokens.accentGoldDark,
       surface: AppTokens.cardDark,
+      onSurface: AppTokens.textPrimaryDark,
+      onSurfaceVariant: AppTokens.textSecondaryDark,
       surfaceContainerLowest: AppTokens.canvasDark,
-      surfaceContainerLow: const Color(0xFF131820),
+      surfaceContainerLow: const Color(0xFF0C111C),
       surfaceContainer: AppTokens.surfaceSubtleDark,
-      surfaceContainerHigh: const Color(0xFF222A36),
-      surfaceContainerHighest: const Color(0xFF2B3340),
+      surfaceContainerHigh: const Color(0xFF1D263B),
+      surfaceContainerHighest: const Color(0xFF243047),
       outlineVariant: AppTokens.borderDark,
+      error: AppTokens.errorDark,
     );
 
     return _buildTheme(
       scheme: scheme,
+      hubColors: HubColors.dark,
       scaffoldBackground: AppTokens.canvasDark,
     );
   }
 
   static ThemeData _buildTheme({
     required ColorScheme scheme,
+    required HubColors hubColors,
     required Color scaffoldBackground,
   }) {
     final base = ThemeData(
       useMaterial3: true,
+      fontFamily: fontFamily,
       colorScheme: scheme,
       scaffoldBackgroundColor: scaffoldBackground,
-      extensions: [
-        scheme.brightness == Brightness.dark ? HubColors.dark : HubColors.light,
-      ],
+      extensions: [hubColors],
     );
 
     final textTheme = _safePlusJakartaTextTheme(base.textTheme, scheme);
 
     return base.copyWith(
-      extensions: [
-        scheme.brightness == Brightness.dark ? HubColors.dark : HubColors.light,
-      ],
+      extensions: [hubColors],
       textTheme: textTheme,
-      progressIndicatorTheme: const ProgressIndicatorThemeData(
-        year2023: false,
-      ),
-      sliderTheme: const SliderThemeData(
-        year2023: false,
-      ),
       appBarTheme: AppBarTheme(
         backgroundColor: Colors.transparent,
         foregroundColor: scheme.onSurface,
@@ -183,7 +124,8 @@ abstract final class AppTheme {
         scrolledUnderElevation: 0,
         centerTitle: false,
         titleTextStyle: textTheme.titleLarge?.copyWith(
-          fontWeight: FontWeight.w700,
+          fontWeight: FontWeight.w800,
+          letterSpacing: -0.35,
           color: scheme.onSurface,
         ),
       ),
@@ -193,120 +135,134 @@ abstract final class AppTheme {
         clipBehavior: Clip.antiAlias,
         margin: EdgeInsets.zero,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(18),
           side: BorderSide(color: scheme.outlineVariant),
         ),
       ),
       dialogTheme: DialogThemeData(
-        backgroundColor: scheme.surfaceContainerHigh,
+        backgroundColor: hubColors.surfaceElevated,
+        surfaceTintColor: Colors.transparent,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(28),
+          side: BorderSide(color: hubColors.borderHairline),
         ),
       ),
       bottomSheetTheme: BottomSheetThemeData(
         showDragHandle: true,
         clipBehavior: Clip.antiAlias,
-        backgroundColor: scheme.surfaceContainerLow,
+        backgroundColor: hubColors.surfaceElevated,
         surfaceTintColor: Colors.transparent,
         shape: const RoundedRectangleBorder(
           borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
         ),
       ),
       floatingActionButtonTheme: FloatingActionButtonThemeData(
-        backgroundColor: scheme.primaryContainer,
-        foregroundColor: scheme.onPrimaryContainer,
-        elevation: 2,
+        backgroundColor: scheme.primary,
+        foregroundColor: scheme.onPrimary,
+        elevation: 4,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(18),
         ),
       ),
       searchBarTheme: SearchBarThemeData(
         elevation: const WidgetStatePropertyAll(0),
-        backgroundColor: WidgetStatePropertyAll(scheme.surfaceContainerHigh),
+        backgroundColor: WidgetStatePropertyAll(hubColors.surfaceCard),
         side: WidgetStatePropertyAll(
-          BorderSide(color: scheme.outlineVariant),
+          BorderSide(color: hubColors.borderHairline),
         ),
         shape: const WidgetStatePropertyAll(StadiumBorder()),
       ),
       snackBarTheme: SnackBarThemeData(
         behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(14),
         ),
       ),
       segmentedButtonTheme: SegmentedButtonThemeData(
         style: SegmentedButton.styleFrom(
-          selectedBackgroundColor: scheme.secondaryContainer,
-          selectedForegroundColor: scheme.onSecondaryContainer,
+          selectedBackgroundColor: scheme.primary,
+          selectedForegroundColor: scheme.onPrimary,
           foregroundColor: scheme.onSurfaceVariant,
-          side: BorderSide(color: scheme.outlineVariant),
+          side: BorderSide(color: hubColors.borderHairline),
           shape: const StadiumBorder(),
         ),
       ),
       chipTheme: base.chipTheme.copyWith(
-        backgroundColor: scheme.surface,
-        selectedColor: scheme.secondaryContainer,
-        side: BorderSide(color: scheme.outlineVariant),
+        backgroundColor: hubColors.surfaceCard,
+        selectedColor: hubColors.primarySoft,
+        side: BorderSide(color: hubColors.borderHairline),
         shape: const StadiumBorder(),
       ),
       tabBarTheme: TabBarThemeData(
         labelColor: scheme.primary,
         unselectedLabelColor: scheme.onSurfaceVariant,
         indicatorColor: scheme.primary,
-        dividerColor: scheme.outlineVariant,
+        dividerColor: hubColors.borderHairline,
       ),
       navigationBarTheme: NavigationBarThemeData(
-        backgroundColor: scheme.surface,
-        indicatorColor: scheme.primaryContainer,
+        backgroundColor: Colors.transparent,
+        surfaceTintColor: Colors.transparent,
+        indicatorColor: hubColors.primary.withValues(alpha: 0.16),
         labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
         elevation: 0,
+        labelTextStyle: WidgetStateProperty.resolveWith((states) {
+          final isSelected = states.contains(WidgetState.selected);
+          return textTheme.labelSmall?.copyWith(
+            fontSize: 11,
+            fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
+            color: isSelected ? hubColors.primary : hubColors.textSecondary,
+          );
+        }),
         iconTheme: WidgetStateProperty.resolveWith((states) {
           if (states.contains(WidgetState.selected)) {
-            return IconThemeData(color: scheme.onPrimaryContainer);
+            return IconThemeData(color: hubColors.primary, size: 22);
           }
-          return IconThemeData(color: scheme.onSurfaceVariant);
+          return IconThemeData(color: hubColors.textSecondary, size: 22);
         }),
       ),
       navigationRailTheme: NavigationRailThemeData(
-        backgroundColor: scheme.surface,
-        indicatorColor: scheme.primaryContainer,
-        selectedIconTheme: IconThemeData(color: scheme.onPrimaryContainer),
-        unselectedIconTheme: IconThemeData(color: scheme.onSurfaceVariant),
+        backgroundColor: Colors.transparent,
+        indicatorColor: hubColors.primary.withValues(alpha: 0.16),
+        selectedIconTheme: IconThemeData(color: hubColors.primary, size: 22),
+        unselectedIconTheme: IconThemeData(color: hubColors.textSecondary, size: 22),
         selectedLabelTextStyle: textTheme.labelMedium?.copyWith(
-          color: scheme.onSurface,
-          fontWeight: FontWeight.w700,
+          color: hubColors.primary,
+          fontWeight: FontWeight.w800,
         ),
         unselectedLabelTextStyle: textTheme.labelMedium?.copyWith(
-          color: scheme.onSurfaceVariant,
+          color: hubColors.textSecondary,
+          fontWeight: FontWeight.w600,
         ),
       ),
       menuTheme: MenuThemeData(
         style: MenuStyle(
-          backgroundColor: WidgetStatePropertyAll(scheme.surfaceContainer),
+          backgroundColor: WidgetStatePropertyAll(hubColors.surfaceElevated),
+          surfaceTintColor: const WidgetStatePropertyAll(Colors.transparent),
           shape: WidgetStatePropertyAll(
             RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-              side: BorderSide(color: scheme.outlineVariant),
+              borderRadius: BorderRadius.circular(14),
+              side: BorderSide(color: hubColors.borderHairline),
             ),
           ),
         ),
       ),
       dropdownMenuTheme: DropdownMenuThemeData(
         menuStyle: MenuStyle(
-          backgroundColor: WidgetStatePropertyAll(scheme.surfaceContainer),
+          backgroundColor: WidgetStatePropertyAll(hubColors.surfaceElevated),
+          surfaceTintColor: const WidgetStatePropertyAll(Colors.transparent),
           shape: WidgetStatePropertyAll(
             RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-              side: BorderSide(color: scheme.outlineVariant),
+              borderRadius: BorderRadius.circular(14),
+              side: BorderSide(color: hubColors.borderHairline),
             ),
           ),
         ),
         inputDecorationTheme: InputDecorationTheme(
           filled: true,
-          fillColor: scheme.surfaceContainerLow,
+          fillColor: hubColors.surfaceSubtle,
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(14),
-            borderSide: BorderSide(color: scheme.outlineVariant),
+            borderSide: BorderSide(color: hubColors.borderHairline),
           ),
         ),
       ),
@@ -314,23 +270,23 @@ abstract final class AppTheme {
         iconColor: scheme.onSurfaceVariant,
         textColor: scheme.onSurface,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(14),
         ),
       ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
-        fillColor: scheme.surfaceContainerLow,
+        fillColor: hubColors.surfaceSubtle.withValues(alpha: 0.65),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
-          borderSide: BorderSide(color: scheme.outlineVariant),
+          borderSide: BorderSide(color: hubColors.borderHairline),
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
-          borderSide: BorderSide(color: scheme.outlineVariant),
+          borderSide: BorderSide(color: hubColors.borderHairline),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
-          borderSide: BorderSide(color: scheme.primary, width: 1.5),
+          borderSide: BorderSide(color: scheme.primary, width: 1.6),
         ),
       ),
       filledButtonTheme: FilledButtonThemeData(
@@ -346,7 +302,7 @@ abstract final class AppTheme {
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(14),
           ),
-          side: BorderSide(color: scheme.outlineVariant),
+          side: BorderSide(color: hubColors.borderHairline),
         ),
       ),
     );
@@ -356,16 +312,10 @@ abstract final class AppTheme {
     TextTheme base,
     ColorScheme scheme,
   ) {
-    try {
-      return GoogleFonts.plusJakartaSansTextTheme(base).apply(
-        bodyColor: scheme.onSurface,
-        displayColor: scheme.onSurface,
-      );
-    } catch (_) {
-      return base.apply(
-        bodyColor: scheme.onSurface,
-        displayColor: scheme.onSurface,
-      );
-    }
+    return base.apply(
+      fontFamily: fontFamily,
+      bodyColor: scheme.onSurface,
+      displayColor: scheme.onSurface,
+    );
   }
 }

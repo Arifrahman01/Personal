@@ -35,7 +35,7 @@ class TasksRepository {
     final task = PersonalTask(
       id: _uuid.v4(),
       title: trimmedTitle,
-      dueDate: dueDate,
+      dueDate: dueDate?.toLocal(),
       priority: priority,
       isDone: false,
       sourceMeetingId:
@@ -48,6 +48,59 @@ class TasksRepository {
 
     await _database.db.insert(_tasksTable, task.toMap());
     return task;
+  }
+
+  /// Updates [title], [dueDate], and [priority] on an existing task in place,
+  /// preserving its `id`, `isDone`, `sourceMeetingId`, and `createdAt`.
+  ///
+  /// Throws [ValidationException] when [title] is blank or task [id] is missing.
+  Future<PersonalTask> updateTask({
+    required String id,
+    required String title,
+    DateTime? dueDate,
+    required TaskPriority priority,
+  }) async {
+    final trimmedTitle = title.trim();
+    if (trimmedTitle.isEmpty) {
+      throw const ValidationException('Judul tugas tidak boleh kosong.');
+    }
+
+    final rows = await _database.db.query(
+      _tasksTable,
+      where: 'id = ?',
+      whereArgs: [id],
+      limit: 1,
+    );
+    if (rows.isEmpty) {
+      throw const ValidationException('Tugas tidak ditemukan.');
+    }
+
+    final existing = PersonalTask.fromMap(rows.first);
+    final updatedAt = DateTime.now().toUtc();
+    final updated = PersonalTask(
+      id: existing.id,
+      title: trimmedTitle,
+      dueDate: dueDate?.toLocal(),
+      priority: priority,
+      isDone: existing.isDone,
+      sourceMeetingId: existing.sourceMeetingId,
+      createdAt: existing.createdAt,
+      updatedAt: updatedAt,
+    );
+
+    await _database.db.update(
+      _tasksTable,
+      {
+        'title': updated.title,
+        'due_date': updated.dueDate?.toUtc().toIso8601String(),
+        'priority': updated.priority.name,
+        'updated_at': updatedAt.toIso8601String(),
+      },
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+
+    return updated;
   }
 
   /// Toggles the `isDone` state of the task identified by [id].

@@ -1,9 +1,14 @@
 import 'dart:io';
 
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:path/path.dart' as p;
 import 'package:personal_hub/core/database/app_database.dart';
+import 'package:personal_hub/core/storage/app_preferences_repository.dart';
+import 'package:personal_hub/core/theme/app_theme.dart';
+import 'package:personal_hub/features/finance/providers/asset_aggregator_providers.dart';
+import 'package:personal_hub/features/home/providers/home_module_preferences.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 void main() {
@@ -13,9 +18,9 @@ void main() {
 
   group('AppDatabase', () {
     test(
-      'creates all nine schema tables and indices on fresh in-memory database',
+      'creates all ten schema tables and indices on fresh in-memory database',
       () async {
-        expect(AppDatabase.schemaVersion, 1);
+        expect(AppDatabase.schemaVersion, 2);
 
         final appDb = await AppDatabase.open(
           pathOverride: inMemoryDatabasePath,
@@ -42,9 +47,10 @@ void main() {
             'habits',
             'habit_logs',
             'transactions',
+            'app_preferences',
           ]),
         );
-        expect(tableNames, hasLength(9));
+        expect(tableNames, hasLength(10));
 
         final indicesResult = await appDb.db.rawQuery(
           "SELECT name FROM sqlite_master WHERE type = 'index' AND name LIKE 'idx_%' ORDER BY name",
@@ -92,6 +98,15 @@ void main() {
         final fkResult = await appDb.db.rawQuery('PRAGMA foreign_keys');
         expect(fkResult.first.values.first, 1);
 
+        // Insert parent habit row required by FK constraint on habit_logs.
+        await appDb.db.insert('habits', {
+          'id': 'habit-1',
+          'title': 'Tilawah',
+          'category': 'Ibadah',
+          'target_per_day': 1,
+          'created_at': '2026-11-23T05:00:00Z',
+        });
+
         // Verify UNIQUE(habit_id, log_date) on habit_logs.
         await appDb.db.insert('habit_logs', {
           'id': 'log-1',
@@ -108,6 +123,19 @@ void main() {
           }),
           throwsA(isA<DatabaseException>()),
         );
+
+        // Verify ON DELETE CASCADE removes habit_logs when parent habit is deleted.
+        await appDb.db.delete(
+          'habits',
+          where: 'id = ?',
+          whereArgs: ['habit-1'],
+        );
+        final remainingLogs = await appDb.db.query(
+          'habit_logs',
+          where: 'habit_id = ?',
+          whereArgs: ['habit-1'],
+        );
+        expect(remainingLogs, isEmpty);
       },
     );
 
@@ -206,6 +234,11 @@ void main() {
           expect(rows, hasLength(1));
           expect(rows.first['title'], 'Catatan Versi 1');
           expect(await v2.db.getVersion(), 2);
+
+          final prefTables = await v2.db.rawQuery(
+            "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'app_preferences'",
+          );
+          expect(prefTables, hasLength(1));
         },
       );
     });
@@ -238,5 +271,57 @@ void main() {
 
       expect(overriddenContainer.read(appDatabaseProvider), same(appDb));
     });
+
+    test(
+      'AppPreferencesBootstrap persists ThemeMode, HomeModulePreferences, and ManualZakatAssetInput across containers',
+      () async {
+        final appDb = await AppDatabase.open(
+          pathOverride: inMemoryDatabasePath,
+          factoryOverride: databaseFactoryFfi,
+        );
+        addTearDown(() async => appDb.close());
+
+        final container1 = ProviderContainer(
+          overrides: [appDatabaseProvider.overrideWithValue(appDb)],
+        );
+        addTearDown(container1.dispose);
+
+        container1.read(themeModeProvider.notifier).setThemeMode(ThemeMode.dark);
+        container1.read(homeModulePreferencesProvider.notifier).togglePrayer(false);
+        container1.read(manualZakatAssetInputProvider.notifier).update(
+              goldGrams: 50.0,
+              shortTermDebts: 1500000.0,
+            );
+
+        // Allow unawaited SQLite preference writes to complete.
+        await Future<void>.delayed(const Duration(milliseconds: 50));
+
+        final bootstrap = await AppPreferencesBootstrap.load(
+          SqliteAppPreferencesStore(appDb),
+        );
+
+        final container2 = ProviderContainer(
+          overrides: [
+            appDatabaseProvider.overrideWithValue(appDb),
+            initialThemeModeProvider.overrideWithValue(bootstrap.themeMode),
+            initialHomeModulePreferencesProvider.overrideWithValue(
+              bootstrap.homeModulePreferences,
+            ),
+            initialManualZakatAssetProvider.overrideWithValue(
+              bootstrap.manualZakatAssets,
+            ),
+          ],
+        );
+        addTearDown(container2.dispose);
+
+        expect(container2.read(themeModeProvider), ThemeMode.dark);
+        expect(container2.read(homeModulePreferencesProvider).showPrayer, isFalse);
+        expect(container2.read(manualZakatAssetInputProvider).goldGrams, 50.0);
+        expect(
+          container2.read(manualZakatAssetInputProvider).shortTermDebts,
+          1500000.0,
+        );
+      },
+    );
   });
 }

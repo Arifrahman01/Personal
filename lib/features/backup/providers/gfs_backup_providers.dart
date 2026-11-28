@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:personal_hub/features/backup/services/gfs_backup_service.dart';
+import 'package:personal_hub/features/backup/services/local_gfs_backup_storage.dart';
 
 /// Provides the active [GfsBackupPolicy] configuration.
 final gfsBackupPolicyProvider = Provider<GfsBackupPolicy>((ref) {
@@ -10,6 +11,11 @@ final gfsBackupPolicyProvider = Provider<GfsBackupPolicy>((ref) {
 final gfsBackupServiceProvider = Provider<GfsBackupService>((ref) {
   final policy = ref.watch(gfsBackupPolicyProvider);
   return GfsBackupService(policy: policy);
+});
+
+/// Provides [LocalGfsBackupStorage] for real `.phub` snapshot file persistence.
+final localGfsBackupStorageProvider = Provider<LocalGfsBackupStorage>((ref) {
+  return LocalGfsBackupStorage();
 });
 
 /// Manages reactive collection of backup snapshots for GFS evaluation.
@@ -40,6 +46,15 @@ class GfsSnapshotsNotifier extends Notifier<List<BackupSnapshotInfo>> {
   /// Clears all snapshots.
   void clear() {
     state = const [];
+  }
+
+  /// Loads persisted `.phub` snapshots from [storage].
+  Future<void> loadFromDisk(
+    LocalGfsBackupStorage storage,
+    GfsBackupService service,
+  ) async {
+    final loaded = await storage.listSnapshots(service);
+    state = loaded;
   }
 }
 
